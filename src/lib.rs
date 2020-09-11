@@ -6,4 +6,5 @@
 
 #![warn(missing_docs)]
 
+pub mod range;
 pub mod version;
