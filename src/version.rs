@@ -4,18 +4,27 @@
 
 //! Versions following the semantic versioning scheme of major.minor.patch.
 //!
-//! This module provides functions to create and compare versions.
+//! This module provides traits and types to create and compare versions.
 
-/// Type for semantic versions.
+/// Versions have a minimal version (a "0" version)
+/// and are ordered such that every version has a next one.
+pub trait Version {
+    /// Returns the lowest version.
+    fn lowest() -> Self;
+    /// Returns the next version, the smallest strictly higher version.
+    fn bump(self) -> Self;
+}
+
+/// Type for semantic versions: major.minor.patch.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Version {
+pub struct SemanticVersion {
     major: usize,
     minor: usize,
     patch: usize,
 }
 
 // Constructors
-impl Version {
+impl SemanticVersion {
     /// Create a version with "major", "minor" and "patch" values.
     /// `version = major.minor.patch`
     pub fn new(major: usize, minor: usize, patch: usize) -> Self {
@@ -43,7 +52,7 @@ impl Version {
 }
 
 // Convert a tuple (major, minor, patch) into a version.
-impl From<(usize, usize, usize)> for Version {
+impl From<(usize, usize, usize)> for SemanticVersion {
     fn from(tuple: (usize, usize, usize)) -> Self {
         let (major, minor, patch) = tuple;
         Self::new(major, minor, patch)
@@ -51,14 +60,14 @@ impl From<(usize, usize, usize)> for Version {
 }
 
 // Convert a version into a tuple (major, minor, patch).
-impl Into<(usize, usize, usize)> for Version {
+impl Into<(usize, usize, usize)> for SemanticVersion {
     fn into(self) -> (usize, usize, usize) {
         (self.major, self.minor, self.patch)
     }
 }
 
 // Bump versions.
-impl Version {
+impl SemanticVersion {
     /// Bump the patch number of a version.
     pub fn bump_patch(self) -> Self {
         Self::new(self.major, self.minor, self.patch + 1)
@@ -72,5 +81,15 @@ impl Version {
     /// Bump the major number of a version.
     pub fn bump_major(self) -> Self {
         Self::new(self.major + 1, self.minor, self.patch)
+    }
+}
+
+// Implement Version for SemanticVersion.
+impl Version for SemanticVersion {
+    fn lowest() -> Self {
+        Self::zero()
+    }
+    fn bump(self) -> Self {
+        self.bump_patch()
     }
 }
