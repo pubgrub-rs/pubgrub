@@ -2,10 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-//! PubGrub version solving algorithm.
+//! Non exposed modules.
 
-#![warn(missing_docs)]
-
-pub mod internal;
-pub mod range;
-pub mod version;
+pub mod term;
