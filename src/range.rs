@@ -20,14 +20,14 @@ use crate::version::Version;
 
 /// A Range is a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Range<T: Clone + Eq + Version> {
-    segments: Vec<Interval<T>>,
+pub struct Range<V: Clone + Eq + Version> {
+    segments: Vec<Interval<V>>,
 }
 
-type Interval<T> = (T, Option<T>);
+type Interval<V> = (V, Option<V>);
 
 // Range building blocks.
-impl<T: Clone + Ord + Version> Range<T> {
+impl<V: Clone + Ord + Version> Range<V> {
     /// Empty set of versions.
     pub fn none() -> Self {
         Self {
@@ -37,30 +37,30 @@ impl<T: Clone + Ord + Version> Range<T> {
 
     /// Set of all possible versions.
     pub fn any() -> Self {
-        Self::higher_than(T::lowest())
+        Self::higher_than(V::lowest())
     }
 
     /// Set containing exactly one version.
-    pub fn exact(v: T) -> Self {
+    pub fn exact(v: V) -> Self {
         Self {
             segments: vec![(v.clone(), Some(v.bump()))],
         }
     }
 
     /// Set of all versions higher or equal to some version.
-    pub fn higher_than(v: T) -> Self {
+    pub fn higher_than(v: V) -> Self {
         Self {
             segments: vec![(v, None)],
         }
     }
 
     /// Set of all versions strictly lower than some version.
-    pub fn strictly_lower_than(v: T) -> Self {
-        if v == T::lowest() {
+    pub fn strictly_lower_than(v: V) -> Self {
+        if v == V::lowest() {
             Self::none()
         } else {
             Self {
-                segments: vec![(T::lowest(), Some(v))],
+                segments: vec![(V::lowest(), Some(v))],
             }
         }
     }
@@ -68,7 +68,7 @@ impl<T: Clone + Ord + Version> Range<T> {
     /// Set of all versions comprised between two given versions.
     /// The lower bound is included and the higher bound excluded.
     /// `v1 <= v < v2`.
-    pub fn between(v1: T, v2: T) -> Self {
+    pub fn between(v1: V, v2: V) -> Self {
         if v1 < v2 {
             Self {
                 segments: vec![(v1, Some(v2))],
@@ -80,7 +80,7 @@ impl<T: Clone + Ord + Version> Range<T> {
 }
 
 // Set operations.
-impl<T: Clone + Ord + Version> Range<T> {
+impl<V: Clone + Ord + Version> Range<V> {
     // Negate ##################################################################
 
     /// Compute the complement set of versions.
@@ -91,7 +91,7 @@ impl<T: Clone + Ord + Version> Range<T> {
             // First high bound is +∞
             Some((v, None)) => {
                 // Complement of * is ∅
-                if v == &T::lowest() {
+                if v == &V::lowest() {
                     Self::none()
                 // Complement of "v <= _" is "_ < v"
                 } else {
@@ -101,13 +101,13 @@ impl<T: Clone + Ord + Version> Range<T> {
 
             // First high bound is not +∞
             Some((v1, Some(v2))) => {
-                if v1 == &T::lowest() {
+                if v1 == &V::lowest() {
                     Self {
                         segments: Self::negate_segments(v2.clone(), &self.segments[1..]),
                     }
                 } else {
                     Self {
-                        segments: Self::negate_segments(T::lowest(), &self.segments),
+                        segments: Self::negate_segments(V::lowest(), &self.segments),
                     }
                 }
             }
@@ -118,7 +118,7 @@ impl<T: Clone + Ord + Version> Range<T> {
     /// For example:
     ///    [ (v1, None) ] => [ (start, Some(v1)) ]
     ///    [ (v1, Some(v2)) ] => [ (start, Some(v1)), (v2, None) ]
-    fn negate_segments(start: T, segments: &[Interval<T>]) -> Vec<Interval<T>> {
+    fn negate_segments(start: V, segments: &[Interval<V>]) -> Vec<Interval<V>> {
         let mut complement_segments = Vec::with_capacity(1 + segments.len());
         let mut start = Some(start);
         for (v1, some_v2) in segments.iter() {
@@ -148,7 +148,7 @@ impl<T: Clone + Ord + Version> Range<T> {
     }
 
     /// Helper function performing intersection of two interval segments.
-    fn intersection_segments(s1: &[Interval<T>], s2: &[Interval<T>]) -> Vec<Interval<T>> {
+    fn intersection_segments(s1: &[Interval<V>], s2: &[Interval<V>]) -> Vec<Interval<V>> {
         let mut segments = Vec::with_capacity(s1.len().min(s2.len()));
         let mut left_iter = s1.iter();
         let mut right_iter = s2.iter();
@@ -218,9 +218,9 @@ impl<T: Clone + Ord + Version> Range<T> {
 }
 
 // Other useful functions.
-impl<T: Clone + Ord + Version> Range<T> {
+impl<V: Clone + Ord + Version> Range<V> {
     /// Check if a range contains a given version.
-    pub fn contains(&self, version: &T) -> bool {
+    pub fn contains(&self, version: &V) -> bool {
         for (v1, some_v2) in self.segments.iter() {
             match some_v2 {
                 None => return v1 <= version,
