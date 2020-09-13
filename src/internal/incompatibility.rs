@@ -113,15 +113,9 @@ where
 
     /// Generate a list of incompatibilities from direct dependencies of a package.
     pub fn from_dependencies(package: P, version: V, deps: &Map<P, Range<V>>) -> Vec<Self> {
-        let mut incompatibilities = Vec::with_capacity(deps.len());
-        for dependency in deps.iter() {
-            incompatibilities.push(Self::from_dependency(
-                package.clone(),
-                version.clone(),
-                dependency,
-            ));
-        }
-        incompatibilities
+        deps.iter()
+            .map(|dep| Self::from_dependency(package.clone(), version.clone(), dep))
+            .collect()
     }
 
     /// Build an incompatibility from a given dependency.
