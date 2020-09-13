@@ -4,5 +4,6 @@
 
 //! Non exposed modules.
 
+pub mod assignment;
 pub mod incompatibility;
 pub mod term;
