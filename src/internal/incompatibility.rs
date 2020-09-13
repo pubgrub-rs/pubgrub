@@ -182,7 +182,7 @@ where
         merged_map
     }
 
-    /// {-| Add this incompatibility into the set of all incompatibilities.
+    /// Add this incompatibility into the set of all incompatibilities.
     ///
     /// Pub collapses identical dependencies from adjacent package versions
     /// into individual incompatibilities.
