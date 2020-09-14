@@ -18,6 +18,7 @@ use crate::version::Version;
 /// organized by package instead of historically ordered.
 ///
 /// Contrary to PartialSolution, Memory does not store derivations causes, only the terms.
+#[derive(Clone)]
 pub struct Memory<P, V>
 where
     P: Clone + Eq + Hash,
@@ -28,6 +29,7 @@ where
 
 /// A package memory contains the potential decision and derivations
 /// that have already been made for a given package.
+#[derive(Clone)]
 struct PackageAssignments<V: Clone + Ord + Version> {
     decision: Option<V>,
     derivations: Vec<Term<V>>,
@@ -38,7 +40,16 @@ where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
 {
+    /// Initialize an empty memory.
+    pub fn empty() -> Self {
+        Self {
+            assignments: Map::new(),
+        }
+    }
+
     /// Initialize a Memory from a decision.
+    ///
+    /// TODO: is this actually used?
     pub fn from_decision(package: P, version: V) -> Self {
         let mut assignments = Map::new();
         assignments.insert(
@@ -52,6 +63,8 @@ where
     }
 
     /// Initialize a Memory from a derivation.
+    ///
+    /// TODO: is this actually used?
     pub fn from_derivation(package: P, term: Term<V>) -> Self {
         let mut assignments = Map::new();
         assignments.insert(

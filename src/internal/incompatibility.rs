@@ -27,7 +27,7 @@ use crate::version::Version;
 /// Incompatibilities can also be derived from two other incompatibilities
 /// during conflict resolution. More about all this in
 /// [PubGrub documentation](https://github.com/dart-lang/pub/blob/master/doc/solver.md#incompatibility).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Incompatibility<'a, P, V>
 where
     P: Clone + Eq + Hash,
@@ -37,7 +37,7 @@ where
     kind: Kind<'a, P, V>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Kind<'a, P, V>
 where
     P: Clone + Eq + Hash,
@@ -218,10 +218,13 @@ where
     }
 
     /// CF definition of Relation enum.
-    pub fn relation(&self, terms_set: &Map<P, Vec<Term<V>>>) -> Relation<P, V> {
+    pub fn relation<T: AsRef<Term<V>>>(
+        &self,
+        terms_set: &mut Map<P, impl Iterator<Item = T>>,
+    ) -> Relation<P, V> {
         let mut relation = Relation::Satisfied;
         for (package, incompat_term) in self.package_terms.iter() {
-            let terms_in_set = terms_set.get(package).map(|t| &t[..]).unwrap_or(&[]);
+            let terms_in_set = terms_set.get_mut(package);
             match incompat_term.relation_with(terms_in_set) {
                 term::Relation::Satisfied => {}
                 term::Relation::Contradicted => {

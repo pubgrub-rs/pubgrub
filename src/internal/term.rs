@@ -60,7 +60,7 @@ impl<V: Clone + Ord + Version> Term<V> {
 }
 
 // Set operations with terms.
-impl<V: Clone + Ord + Version> Term<V> {
+impl<'a, V: 'a + Clone + Ord + Version> Term<V> {
     /// Compute the intersection of two terms.
     /// If at least one term is positive, the intersection is also positive.
     pub fn intersection(&self, other: &Term<V>) -> Term<V> {
@@ -83,10 +83,14 @@ impl<V: Clone + Ord + Version> Term<V> {
     }
 
     /// Compute the intersection of multiple terms.
-    pub fn intersect_all(all_terms: &[Term<V>]) -> Option<Term<V>> {
-        let mut iter = all_terms.iter();
-        iter.next()
-            .map(|initial_term| iter.fold(initial_term.clone(), |acc, term| acc.intersection(term)))
+    pub fn intersect_all<T: AsRef<Term<V>>>(
+        mut all_terms: impl Iterator<Item = T>,
+    ) -> Option<Term<V>> {
+        all_terms.next().map(|initial_term| {
+            all_terms.fold(initial_term.as_ref().clone(), |acc, term| {
+                acc.intersection(term.as_ref())
+            })
+        })
     }
 
     /// Indicate if this term is a subset of another term.
@@ -113,12 +117,12 @@ pub enum Relation {
 }
 
 // Relation between terms.
-impl<V: Clone + Ord + Version> Term<V> {
+impl<'a, V: 'a + Clone + Ord + Version> Term<V> {
     /// Check if a set of terms satisfies this term.
     ///
     /// We say that a set of terms S "satisfies" a term t
     /// if t must be true whenever every term in S is true.
-    pub fn satisfied_by(&self, terms: &[Term<V>]) -> bool {
+    pub fn satisfied_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
         match Self::intersect_all(terms) {
             // Negative(Range::none) is always evaluated true.
             None => *self == Self::Negative(Range::none()),
@@ -130,7 +134,7 @@ impl<V: Clone + Ord + Version> Term<V> {
     ///
     /// We say that a set of terms S "contradicts" a term t
     /// if t must be false whenever every term in S is true.
-    pub fn contradicted_by(&self, terms: &[Term<V>]) -> bool {
+    pub fn contradicted_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
         match Self::intersect_all(terms) {
             // Positive(Range::none) is always evaluated false.
             None => *self == Self::Positive(Range::none()),
@@ -140,9 +144,13 @@ impl<V: Clone + Ord + Version> Term<V> {
 
     /// Check if a set of terms satisfies or contradicts a given term.
     /// Otherwise the relation is inconclusive.
-    pub fn relation_with(&self, other_terms: &[Term<V>]) -> Relation {
-        let other_terms_intersection =
-            Self::intersect_all(other_terms).unwrap_or(Self::Negative(Range::none()));
+    pub fn relation_with<T: AsRef<Term<V>>>(
+        &self,
+        other_terms: Option<impl Iterator<Item = T>>,
+    ) -> Relation {
+        let other_terms_intersection = other_terms
+            .and_then(|ot| Self::intersect_all(ot))
+            .unwrap_or(Self::Negative(Range::none()));
         let full_intersection = self.intersection(&other_terms_intersection);
         if full_intersection == other_terms_intersection {
             Relation::Satisfied
@@ -151,5 +159,11 @@ impl<V: Clone + Ord + Version> Term<V> {
         } else {
             Relation::Inconclusive
         }
+    }
+}
+
+impl<V: Clone + Ord + Version> AsRef<Term<V>> for Term<V> {
+    fn as_ref(&self) -> &Term<V> {
+        &self
     }
 }

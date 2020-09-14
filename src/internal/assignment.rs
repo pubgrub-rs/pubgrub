@@ -15,6 +15,7 @@ use crate::version::Version;
 /// An assignment refers to a given package and can either be
 /// (1) a decision, which is a chosen version,
 /// or (2) a derivation, which is a `Term` specifying compatible versions.
+#[derive(Clone)]
 pub struct Assignment<'a, P, V>
 where
     P: Clone + Eq + Hash,
@@ -34,6 +35,7 @@ where
 /// according to previous assignments and all incompatibilities.
 /// We also record the incompatibility responsible for
 /// that derivation term as its "cause".
+#[derive(Clone)]
 pub enum Kind<'a, P, V>
 where
     P: Clone + Eq + Hash,
