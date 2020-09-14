@@ -6,4 +6,5 @@
 
 pub mod assignment;
 pub mod incompatibility;
+pub mod memory;
 pub mod term;
