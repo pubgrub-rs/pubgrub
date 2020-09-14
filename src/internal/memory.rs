@@ -65,18 +65,26 @@ where
     }
 
     /// Retrieve all terms in memory.
-    ///
-    /// TODO: How to return an iterator instead of a Vec<_>?
-    pub fn all_terms(&self) -> Map<P, Vec<Term<V>>> {
+    pub fn all_terms(&self) -> Map<P, impl Iterator<Item = Term<V>> + '_> {
+        let identity = |x| x;
         self.assignments
             .iter()
             .map(|(p, a)| match &a.decision {
-                None => (p.clone(), a.derivations.clone()),
-                Some(version) => {
-                    let mut terms = a.derivations.clone();
-                    terms.push(Term::Positive(Range::exact(version.clone())));
-                    (p.clone(), terms)
-                }
+                None => (
+                    p.clone(),
+                    // The once(None).filter_map(identity) is just to produce
+                    // the same type on both branches of the match,
+                    // otherwise the code would not compile.
+                    std::iter::once(None)
+                        .filter_map(identity)
+                        .chain(a.derivations.iter().cloned()),
+                ),
+                Some(version) => (
+                    p.clone(),
+                    std::iter::once(Some(Term::Positive(Range::exact(version.clone()))))
+                        .filter_map(identity)
+                        .chain(a.derivations.iter().cloned()),
+                ),
             })
             .collect()
     }
