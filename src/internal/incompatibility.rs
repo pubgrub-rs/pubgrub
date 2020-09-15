@@ -256,4 +256,27 @@ where
             (package == &root_package) && term.accept_version(&root_version)
         }
     }
+
+    /// Get the term related to a given package (if it exists).
+    pub fn get(&self, package: &P) -> Option<&Term<V>> {
+        self.package_terms.get(package)
+    }
+
+    /// Iterate over packages.
+    pub fn iter(&self) -> std::collections::hash_map::Iter<P, Term<V>> {
+        self.package_terms.iter()
+    }
+}
+
+impl<'a, P, V> IntoIterator for Incompatibility<'a, P, V>
+where
+    P: Clone + Eq + Hash,
+    V: Clone + Ord + Version,
+{
+    type Item = (P, Term<V>);
+    type IntoIter = std::collections::hash_map::IntoIter<P, Term<V>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.package_terms.into_iter()
+    }
 }

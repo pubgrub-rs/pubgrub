@@ -152,130 +152,86 @@ where
         incompat.relation(&mut self.memory.all_terms())
     }
 
+    /// Find satisfier and previous satisfier decision level.
+    pub fn find_satisfier_and_previous_satisfier_level(
+        &'a self,
+        incompat: &Incompatibility<'a, P, V>,
+    ) -> (&Assignment<'a, P, V>, usize) {
+        let (satisfier, previous_assignments) =
+            Self::find_satisfier(incompat, self.history.as_slice())
+                .expect("We should always find a satisfier if called in the right context.");
+        let previous_satisfier_level =
+            Self::find_previous_satisfier(incompat, satisfier, previous_assignments)
+                .map_or(1, |(previous_satisfier, _)| {
+                    previous_satisfier.decision_level.max(1)
+                });
+        (satisfier, previous_satisfier_level)
+    }
+
     /// A satisfier is the earliest assignment in partial solution such that the incompatibility
     /// is satisfied by the partial solution up to and including that assignment.
     /// Also returns all assignments earlier than the satisfier.
-    /// We call the term in the incompatibility that refers to the same package "term".
-    pub fn find_satisfier(
-        &self,
+    fn find_satisfier(
         incompat: &Incompatibility<'a, P, V>,
-    ) -> (Assignment<'a, P, V>, Self, Term<V>) {
-        todo!()
+        history: &'a [Assignment<'a, P, V>],
+    ) -> Option<(&'a Assignment<'a, P, V>, &'a [Assignment<'a, P, V>])> {
+        let mut accum_satisfier: Map<P, (bool, Term<V>)> = incompat
+            .iter()
+            .map(|(p, _)| (p.clone(), (false, Term::Negative(Range::none()))))
+            .collect();
+        Self::find_satisfier_helper(incompat, &mut accum_satisfier, history)
     }
-    // findSatisfier : Incompatibility -> PartialSolution -> ( Assignment, PartialSolution, Term )
-    // findSatisfier incompat (PartialSolution partial _) =
-    //     if List.isEmpty partial then
-    //         Debug.todo "We should never call findSatisfier with an empty partial solution"
-    //
-    //     else
-    //         let
-    //             incompatDict =
-    //                 Incompatibility.asDict incompat
-    //
-    //             accumSatisfier =
-    //                 Dict.map (\_ _ -> ( False, Term.Negative Range.none )) incompatDict
-    //         in
-    //         case findSatisfierHelper incompatDict accumSatisfier [] (List.reverse partial) of
-    //             -- Not using Maybe.withDefault because Debug.todo crashes
-    //             Nothing ->
-    //                 Debug.todo "Should always find a satisfier right?"
-    //
-    //             Just value ->
-    //                 value
 
     /// Earliest assignment in the partial solution before satisfier
     /// such that incompatibility is satisfied by the partial solution up to
     /// and including that assignment plus satisfier.
-    pub fn find_previous_satisfier(
-        &self,
-        satisfier: &Assignment<'a, P, V>,
+    fn find_previous_satisfier(
         incompat: &Incompatibility<'a, P, V>,
-    ) -> Option<(Assignment<'a, P, V>, Self, Term<V>)> {
-        todo!()
+        satisfier: &Assignment<'a, P, V>,
+        previous_assignments: &'a [Assignment<'a, P, V>],
+    ) -> Option<(&'a Assignment<'a, P, V>, &'a [Assignment<'a, P, V>])> {
+        let mut accum_satisfier: Map<P, (bool, Term<V>)> = incompat
+            .iter()
+            .map(|(p, _)| (p.clone(), (false, Term::Negative(Range::none()))))
+            .collect();
+        // Add the satisfier to accum_satisfier.
+        let incompat_term = incompat.get(&satisfier.package).expect("This should exist");
+        let satisfier_term = satisfier.as_term();
+        let is_satisfied = satisfier_term.subset_of(incompat_term);
+        accum_satisfier.insert(satisfier.package.clone(), (is_satisfied, satisfier_term));
+        // Search previous satisfier.
+        Self::find_satisfier_helper(incompat, &mut accum_satisfier, previous_assignments)
     }
-    // findPreviousSatisfier : Assignment -> Incompatibility -> PartialSolution -> Maybe ( Assignment, PartialSolution, Term )
-    // findPreviousSatisfier satisfier incompat (PartialSolution earlierPartial _) =
-    //     let
-    //         incompatDict =
-    //             Incompatibility.asDict incompat
-    //
-    //         incompatSatisfierTerm =
-    //             case Dict.get satisfier.package incompatDict of
-    //                 -- Not using Maybe.withDefault because Debug.todo crashes
-    //                 Nothing ->
-    //                     Debug.todo "shoud exist"
-    //
-    //                 Just t ->
-    //                     t
-    //
-    //         satisfierTerm =
-    //             Assignment.getTerm satisfier.kind
-    //
-    //         accumSatisfier =
-    //             Dict.map (\_ _ -> ( False, Term.Negative Range.none )) incompatDict
-    //                 |> Dict.insert satisfier.package
-    //                     ( satisfierTerm |> Term.subsetOf incompatSatisfierTerm
-    //                     , satisfierTerm
-    //                     )
-    //     in
-    //     findSatisfierHelper incompatDict accumSatisfier [] (List.reverse earlierPartial)
 
     /// Iterate over the assignments (oldest must be first)
-    /// until we find the first one such that the set of all assignments until this one
+    /// until we find the first one such that the set of all assignments until this one (included)
     /// satisfies the given incompatibility.
     pub fn find_satisfier_helper(
         incompat: &Incompatibility<'a, P, V>,
-        accum_satisfier: Map<P, (bool, Term<V>)>,
-        accum_assignments: Vec<Assignment<'a, P, V>>,
-        new_assignment: &[Assignment<'a, P, V>],
-    ) -> Option<(Assignment<'a, P, V>, Self, Term<V>)> {
-        todo!()
+        accum_satisfier: &mut Map<P, (bool, Term<V>)>,
+        all_assignments: &'a [Assignment<'a, P, V>],
+    ) -> Option<(&'a Assignment<'a, P, V>, &'a [Assignment<'a, P, V>])> {
+        for (idx, assignment) in all_assignments.iter().enumerate() {
+            // We only care about packages related to the incompatibility.
+            if let Some(incompat_term) = incompat.get(&assignment.package) {
+                // Check if that incompat term is satisfied by our accumulated terms intersection.
+                match accum_satisfier.get_mut(&assignment.package) {
+                    None => panic!("A package in incompat should always exist in accum_satisfier"),
+                    Some((true, _)) => {} // If that package term is already satisfied, no need to check.
+                    Some((is_satisfied, accum_term)) => {
+                        accum_term.intersection(&assignment.as_term());
+                        *is_satisfied = accum_term.subset_of(incompat_term);
+                        // Check if we have found the satisfier
+                        // (all booleans in accum_satisfier are true).
+                        if *is_satisfied
+                            && accum_satisfier.iter().all(|(_, (satisfied, _))| *satisfied)
+                        {
+                            return Some((assignment, &all_assignments[0..idx]));
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
-    // findSatisfierHelper : Dict String Term -> Dict String ( Bool, Term ) -> List Assignment -> List Assignment -> Maybe ( Assignment, PartialSolution, Term )
-    // findSatisfierHelper incompat accumSatisfier accumAssignments newAssignments =
-    //     case newAssignments of
-    //         [] ->
-    //             Nothing
-    //
-    //         assignment :: otherAssignments ->
-    //             case Dict.get assignment.package incompat of
-    //                 Nothing ->
-    //                     -- We don't care of that assignment if its corresponding package is not in the incompatibility.
-    //                     findSatisfierHelper incompat accumSatisfier (assignment :: accumAssignments) otherAssignments
-    //
-    //                 Just incompatTerm ->
-    //                     -- If that package corresponds to a package in the incompatibility
-    //                     -- check if it is satisfied with the new assignment.
-    //                     case Dict.get assignment.package accumSatisfier of
-    //                         Nothing ->
-    //                             Debug.todo "A key in incompat should always exist in accumAssignments"
-    //
-    //                         Just ( True, _ ) ->
-    //                             -- package term is already satisfied, no need to check
-    //                             findSatisfierHelper incompat accumSatisfier (assignment :: accumAssignments) otherAssignments
-    //
-    //                         Just ( False, accumTerm ) ->
-    //                             -- check if the addition of the new term helps satisfying
-    //                             let
-    //                                 newAccumTerm =
-    //                                     Term.intersection (Assignment.getTerm assignment.kind) accumTerm
-    //
-    //                                 termSatisfied =
-    //                                     newAccumTerm
-    //                                         |> Term.subsetOf incompatTerm
-    //
-    //                                 newAccumSatisfier =
-    //                                     Dict.insert assignment.package ( termSatisfied, newAccumTerm ) accumSatisfier
-    //
-    //                                 foundSatisfier =
-    //                                     Utils.dictAll (\_ ( satisfied, _ ) -> satisfied) newAccumSatisfier
-    //
-    //                                 newAccumAssignment =
-    //                                     assignment :: accumAssignments
-    //                             in
-    //                             if foundSatisfier then
-    //                                 Just ( assignment, fromAssignements newAccumAssignment, incompatTerm )
-    //
-    //                             else
-    //                                 findSatisfierHelper incompat newAccumSatisfier newAccumAssignment otherAssignments
 }
