@@ -111,6 +111,27 @@ where
         None
     }
 
+    /// Heuristic to pick the next package to add to the partial solution.
+    /// This should be a package with a positive derivation but no decision yet.
+    /// If multiple choices are possible, use a heuristic.
+    ///
+    /// Pub chooses the package with the fewest versions
+    /// matching the outstanding constraint.
+    /// This tends to find conflicts earlier if any exist,
+    /// since these packages will run out of versions to try more quickly.
+    /// But there's likely room for improvement in these heuristics.
+    ///
+    /// Here we just pick the first one.
+    /// TODO: improve?
+    /// TODO: do not introduce any side effect if trying to improve.
+    pub fn pick_package(&self) -> Option<(P, Term<V>)> {
+        self.potential_packages().next().map(|(p, all_terms)| {
+            let all_terms_intersection =
+                Term::intersect_all(all_terms.iter()).unwrap_or(Term::Negative(Range::none()));
+            (p.clone(), all_terms_intersection)
+        })
+    }
+
     /// Extract all packages that may potentially be picked next
     /// to continue solving package dependencies.
     /// A package is a potential pick if there isn't an already
@@ -119,6 +140,19 @@ where
     /// in the partial solution.
     pub fn potential_packages(&self) -> impl Iterator<Item = (&P, &[Term<V>])> {
         self.memory.potential_packages()
+    }
+
+    /// Pub chooses the latest matching version of the package
+    /// that match the outstanding constraint.
+    ///
+    /// Here we just pick the first one that satisfies the terms.
+    /// It is the responsibility of the provider of `availableVersions`
+    /// to list them with preferred versions first.
+    pub fn pick_version(available_versions: &[V], partial_solution_term: &Term<V>) -> Option<V> {
+        available_versions
+            .iter()
+            .find(|v| partial_solution_term.accept_version(v))
+            .map(|v| v.clone())
     }
 
     /// We can add the version to the partial solution as a decision

@@ -246,14 +246,14 @@ where
 
     /// Check if an incompatibility should mark the end of the algorithm
     /// because it satisfies the root package.
-    pub fn is_terminal(&self, root_package: P, root_version: V) -> bool {
+    pub fn is_terminal(&self, root_package: &P, root_version: &V) -> bool {
         if self.package_terms.is_empty() {
             true
         } else if self.package_terms.len() > 1 {
             false
         } else {
             let (package, term) = self.package_terms.iter().next().unwrap();
-            (package == &root_package) && term.accept_version(&root_version)
+            (package == root_package) && term.accept_version(&root_version)
         }
     }
 
