@@ -107,7 +107,8 @@ where
         let backtrack = |decision_level| {
             self.partial_solution.backtrack(decision_level);
             if current_incompat_changed {
-                self.incompatibilities = current_incompat.merge_into(self.incompatibilities);
+                self.incompatibilities =
+                    current_incompat.clone().merge_into(self.incompatibilities);
             }
         };
         loop {
