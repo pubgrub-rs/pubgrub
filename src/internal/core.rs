@@ -103,14 +103,6 @@ where
     ) -> Result<Incompatibility<'a, P, V>, Box<dyn Error>> {
         let mut current_incompat = incompatibility.clone();
         let mut current_incompat_changed = false;
-        // Define backtracking closure.
-        let backtrack = |decision_level| {
-            self.partial_solution.backtrack(decision_level);
-            if current_incompat_changed {
-                self.incompatibilities =
-                    current_incompat.clone().merge_into(self.incompatibilities);
-            }
-        };
         loop {
             if current_incompat.is_terminal(&self.root_package, &self.root_version) {
                 Err("TODO: report explanation")?
@@ -120,12 +112,20 @@ where
                     .find_satisfier_and_previous_satisfier_level(&current_incompat);
                 match satisfier.kind {
                     Kind::Decision(_) => {
-                        backtrack(previous_satisfier_level);
+                        self.backtrack(
+                            current_incompat.clone(),
+                            current_incompat_changed,
+                            previous_satisfier_level,
+                        );
                         return Ok(current_incompat);
                     }
                     Kind::Derivation { term, cause } => {
                         if previous_satisfier_level != satisfier.decision_level {
-                            backtrack(previous_satisfier_level);
+                            self.backtrack(
+                                current_incompat.clone(),
+                                current_incompat_changed,
+                                previous_satisfier_level,
+                            );
                             return Ok(current_incompat);
                         } else {
                             let prior_cause =
@@ -136,6 +136,19 @@ where
                     }
                 }
             }
+        }
+    }
+
+    /// Backtracking.
+    fn backtrack(
+        &mut self,
+        incompat: Incompatibility<'a, P, V>,
+        incompat_changed: bool,
+        decision_level: usize,
+    ) {
+        self.partial_solution.backtrack(decision_level);
+        if incompat_changed {
+            self.incompatibilities = incompat.merge_into(self.incompatibilities);
         }
     }
 }
