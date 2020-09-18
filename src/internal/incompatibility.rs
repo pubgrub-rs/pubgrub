@@ -28,17 +28,18 @@ use crate::version::Version;
 /// during conflict resolution. More about all this in
 /// [PubGrub documentation](https://github.com/dart-lang/pub/blob/master/doc/solver.md#incompatibility).
 #[derive(Debug, Clone)]
-pub struct Incompatibility<'a, P, V>
+pub struct Incompatibility<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
 {
+    id: usize,
     package_terms: Map<P, Term<V>>,
-    kind: Kind<'a, P, V>,
+    kind: Kind<P, V>,
 }
 
 #[derive(Debug, Clone)]
-enum Kind<'a, P, V>
+enum Kind<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
@@ -47,7 +48,7 @@ where
     NoVersion,
     UnavailableDependencies(P, V),
     FromDependencyOf(P),
-    DerivedFrom(&'a Incompatibility<'a, P, V>, &'a Incompatibility<'a, P, V>),
+    DerivedFrom(usize, usize),
 }
 
 /// A Relation describes how a set of terms can be compared to an incompatibility.
@@ -70,16 +71,17 @@ where
     Inconclusive,
 }
 
-impl<'a, P, V> Incompatibility<'a, P, V>
+impl<P, V> Incompatibility<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
 {
     /// Create the initial "not Root" incompatibility.
-    pub fn not_root(package: P, version: V) -> Self {
+    pub fn not_root(id: usize, package: P, version: V) -> Self {
         let mut package_terms = Map::with_capacity(1);
         package_terms.insert(package, Term::Negative(Range::exact(version)));
         Self {
+            id,
             package_terms,
             kind: Kind::NotRoot,
         }
@@ -87,10 +89,11 @@ where
 
     /// Create an incompatibility to remember
     /// that a given range does not contain any version.
-    pub fn no_version(package: P, term: Term<V>) -> Self {
+    pub fn no_version(id: usize, package: P, term: Term<V>) -> Self {
         let mut package_terms = Map::with_capacity(1);
         package_terms.insert(package, term);
         Self {
+            id,
             package_terms,
             kind: Kind::NoVersion,
         }
@@ -99,27 +102,36 @@ where
     /// Create an incompatibility to remember
     /// that a package version is not selectable
     /// because its list of dependencies is unavailable.
-    pub fn unavailable_dependencies(package: P, version: V) -> Self {
+    pub fn unavailable_dependencies(id: usize, package: P, version: V) -> Self {
         let mut package_terms = Map::with_capacity(1);
         package_terms.insert(
             package.clone(),
             Term::Positive(Range::exact(version.clone())),
         );
         Self {
+            id,
             package_terms,
             kind: Kind::UnavailableDependencies(package, version),
         }
     }
 
     /// Generate a list of incompatibilities from direct dependencies of a package.
-    pub fn from_dependencies(package: P, version: V, deps: &Map<P, Range<V>>) -> Vec<Self> {
+    pub fn from_dependencies(
+        start_id: usize,
+        package: P,
+        version: V,
+        deps: &Map<P, Range<V>>,
+    ) -> Vec<Self> {
         deps.iter()
-            .map(|dep| Self::from_dependency(package.clone(), version.clone(), dep))
+            .enumerate()
+            .map(|(i, dep)| {
+                Self::from_dependency(start_id + i, package.clone(), version.clone(), dep)
+            })
             .collect()
     }
 
     /// Build an incompatibility from a given dependency.
-    fn from_dependency(package: P, version: V, dep: (&P, &Range<V>)) -> Self {
+    fn from_dependency(id: usize, package: P, version: V, dep: (&P, &Range<V>)) -> Self {
         let mut i1 = Map::with_capacity(1);
         let mut i2 = Map::with_capacity(1);
         i1.insert(
@@ -128,12 +140,12 @@ where
         );
         let (p, range) = dep;
         i2.insert(p.clone(), Term::Negative(range.clone()));
-        Self::union(&i1, &i2, Kind::FromDependencyOf(package))
+        Self::union(id, &i1, &i2, Kind::FromDependencyOf(package))
     }
 
     /// Perform the union of two incompatibilities.
     /// Terms that are always satisfied are removed from the union.
-    fn union(i1: &Map<P, Term<V>>, i2: &Map<P, Term<V>>, kind: Kind<'a, P, V>) -> Self {
+    fn union(id: usize, i1: &Map<P, Term<V>>, i2: &Map<P, Term<V>>, kind: Kind<P, V>) -> Self {
         let package_terms = Self::merge(i1, i2, |t1, t2| {
             let term_union = t1.union(t2);
             if term_union == Term::Negative(Range::none()) {
@@ -146,6 +158,7 @@ where
             }
         });
         Self {
+            id,
             package_terms,
             kind,
         }
@@ -204,17 +217,15 @@ where
     /// It may not be trivial since those incompatibilities
     /// may already have derived others.
     /// Maybe this should not be persued.
-    pub fn merge_into(&'a self, incompatibilities: Vec<&'a Self>) -> Vec<&Self> {
-        let mut incompats = incompatibilities;
-        incompats.push(self);
-        incompats
+    pub fn merge_into(self, incompatibilities: &mut Vec<Self>) {
+        incompatibilities.push(self);
     }
 
     /// A prior cause is computed as the union of the terms in two incompatibilities.
     /// Terms that are always satisfied are removed from the union.
-    pub fn prior_cause(i1: &'a Self, i2: &'a Self) -> Self {
-        let kind = Kind::DerivedFrom(i1, i2);
-        Self::union(&i1.package_terms, &i2.package_terms, kind)
+    pub fn prior_cause(id: usize, i1: &Self, i2: &Self) -> Self {
+        let kind = Kind::DerivedFrom(i1.id, i2.id);
+        Self::union(id, &i1.package_terms, &i2.package_terms, kind)
     }
 
     /// CF definition of Relation enum.
@@ -268,7 +279,7 @@ where
     }
 }
 
-impl<'a, P, V> IntoIterator for Incompatibility<'a, P, V>
+impl<P, V> IntoIterator for Incompatibility<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,

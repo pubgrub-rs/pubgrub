@@ -16,7 +16,7 @@ use crate::version::Version;
 /// (1) a decision, which is a chosen version,
 /// or (2) a derivation, which is a `Term` specifying compatible versions.
 #[derive(Clone)]
-pub struct Assignment<'a, P, V>
+pub struct Assignment<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
@@ -27,7 +27,7 @@ where
     /// Package that this assignment refers to.
     pub package: P,
     /// Type of the assignement, either decision or derivation.
-    pub kind: Kind<'a, P, V>,
+    pub kind: Kind<P, V>,
 }
 
 /// An assignment is either a decision, with the chosen version,
@@ -36,7 +36,7 @@ where
 /// We also record the incompatibility responsible for
 /// that derivation term as its "cause".
 #[derive(Clone)]
-pub enum Kind<'a, P, V>
+pub enum Kind<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
@@ -50,11 +50,11 @@ where
         /// Term of the derivation.
         term: Term<V>,
         /// Incompatibility cause of the derivation.
-        cause: &'a Incompatibility<'a, P, V>,
+        cause: Incompatibility<P, V>,
     },
 }
 
-impl<'a, P, V> Assignment<'a, P, V>
+impl<P, V> Assignment<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
@@ -83,7 +83,7 @@ where
         level: usize,
         package: P,
         term: Term<V>,
-        cause: &'a Incompatibility<'a, P, V>,
+        cause: Incompatibility<P, V>,
     ) -> Self {
         Self {
             decision_level: level,

@@ -24,17 +24,17 @@ use crate::version::Version;
 /// TODO: make sure that when I use the history,
 /// it is in the correct direction.
 #[derive(Clone)]
-pub struct PartialSolution<'a, P, V>
+pub struct PartialSolution<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
 {
     decision_level: usize,
-    history: Vec<Assignment<'a, P, V>>,
+    history: Vec<Assignment<P, V>>,
     memory: Memory<P, V>,
 }
 
-impl<'a, P, V> PartialSolution<'a, P, V>
+impl<P, V> PartialSolution<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
@@ -48,7 +48,7 @@ where
         }
     }
 
-    fn from_assignments(assignments: Vec<Assignment<'a, P, V>>) -> Self {
+    fn from_assignments(assignments: Vec<Assignment<P, V>>) -> Self {
         let mut decision_level = 0;
         let memory = assignments.iter().fold(Memory::empty(), |mut m, a| {
             m.add_assignment(a);
@@ -81,12 +81,7 @@ where
     }
 
     /// Add a derivation to the partial solution.
-    pub fn add_derivation(
-        &mut self,
-        package: P,
-        term: Term<V>,
-        cause: &'a Incompatibility<'a, P, V>,
-    ) {
+    pub fn add_derivation(&mut self, package: P, term: Term<V>, cause: Incompatibility<P, V>) {
         self.history.push(Assignment::new_derivation(
             self.decision_level,
             package.clone(),
@@ -97,16 +92,15 @@ where
     }
 
     /// Backtrack the partial solution to a given decision level.
-    pub fn backtrack(self, decision_level: usize) -> Self {
-        let mut history = self.history;
-        let index =
-            Self::find_level_index(history.as_slice(), decision_level + 1).unwrap_or(history.len());
-        history.truncate(index);
-        Self::from_assignments(history)
+    pub fn backtrack(&mut self, decision_level: usize) {
+        let index = Self::find_level_index(self.history.as_slice(), decision_level + 1)
+            .unwrap_or(self.history.len());
+        self.history.truncate(index);
+        *self = Self::from_assignments(self.history.to_owned());
     }
 
     // TODO: improve with dichotomic search.
-    fn find_level_index(history: &[Assignment<'a, P, V>], decision_level: usize) -> Option<usize> {
+    fn find_level_index(history: &[Assignment<P, V>], decision_level: usize) -> Option<usize> {
         for (index, level) in history.iter().map(|a| a.decision_level).enumerate() {
             if level >= decision_level {
                 return Some(index);
@@ -168,8 +162,8 @@ where
         &self,
         package: P,
         version: V,
-        new_incompatibilities: &[Incompatibility<'a, P, V>],
-    ) -> Option<PartialSolution<'a, P, V>> {
+        new_incompatibilities: &[Incompatibility<P, V>],
+    ) -> Option<PartialSolution<P, V>> {
         let mut updated_partial_solution = self.clone();
         updated_partial_solution.add_decision(package, version);
         if updated_partial_solution.satisfies_any_of(new_incompatibilities) {
@@ -179,22 +173,22 @@ where
         }
     }
 
-    fn satisfies_any_of(&self, incompatibilities: &[Incompatibility<'a, P, V>]) -> bool {
+    fn satisfies_any_of(&self, incompatibilities: &[Incompatibility<P, V>]) -> bool {
         incompatibilities
             .iter()
             .any(|incompat| self.relation(incompat) == Relation::Satisfied)
     }
 
     /// Check if the terms in the partial solution satisfy the incompatibility.
-    pub fn relation(&self, incompat: &Incompatibility<'a, P, V>) -> Relation<P, V> {
+    pub fn relation(&self, incompat: &Incompatibility<P, V>) -> Relation<P, V> {
         incompat.relation(&mut self.memory.all_terms())
     }
 
     /// Find satisfier and previous satisfier decision level.
     pub fn find_satisfier_and_previous_satisfier_level(
-        &'a self,
-        incompat: &Incompatibility<'a, P, V>,
-    ) -> (&'a Assignment<'a, P, V>, usize) {
+        &self,
+        incompat: &Incompatibility<P, V>,
+    ) -> (&Assignment<P, V>, usize) {
         let (satisfier, previous_assignments) =
             Self::find_satisfier(incompat, self.history.as_slice())
                 .expect("We should always find a satisfier if called in the right context.");
@@ -209,10 +203,10 @@ where
     /// A satisfier is the earliest assignment in partial solution such that the incompatibility
     /// is satisfied by the partial solution up to and including that assignment.
     /// Also returns all assignments earlier than the satisfier.
-    fn find_satisfier(
-        incompat: &Incompatibility<'a, P, V>,
-        history: &'a [Assignment<'a, P, V>],
-    ) -> Option<(&'a Assignment<'a, P, V>, &'a [Assignment<'a, P, V>])> {
+    fn find_satisfier<'a>(
+        incompat: &Incompatibility<P, V>,
+        history: &'a [Assignment<P, V>],
+    ) -> Option<(&'a Assignment<P, V>, &'a [Assignment<P, V>])> {
         let mut accum_satisfier: Map<P, (bool, Term<V>)> = incompat
             .iter()
             .map(|(p, _)| (p.clone(), (false, Term::Negative(Range::none()))))
@@ -223,11 +217,11 @@ where
     /// Earliest assignment in the partial solution before satisfier
     /// such that incompatibility is satisfied by the partial solution up to
     /// and including that assignment plus satisfier.
-    fn find_previous_satisfier(
-        incompat: &Incompatibility<'a, P, V>,
-        satisfier: &Assignment<'a, P, V>,
-        previous_assignments: &'a [Assignment<'a, P, V>],
-    ) -> Option<(&'a Assignment<'a, P, V>, &'a [Assignment<'a, P, V>])> {
+    fn find_previous_satisfier<'a>(
+        incompat: &Incompatibility<P, V>,
+        satisfier: &Assignment<P, V>,
+        previous_assignments: &'a [Assignment<P, V>],
+    ) -> Option<(&'a Assignment<P, V>, &'a [Assignment<P, V>])> {
         let mut accum_satisfier: Map<P, (bool, Term<V>)> = incompat
             .iter()
             .map(|(p, _)| (p.clone(), (false, Term::Negative(Range::none()))))
@@ -244,11 +238,11 @@ where
     /// Iterate over the assignments (oldest must be first)
     /// until we find the first one such that the set of all assignments until this one (included)
     /// satisfies the given incompatibility.
-    pub fn find_satisfier_helper(
-        incompat: &Incompatibility<'a, P, V>,
+    pub fn find_satisfier_helper<'a>(
+        incompat: &Incompatibility<P, V>,
         accum_satisfier: &mut Map<P, (bool, Term<V>)>,
-        all_assignments: &'a [Assignment<'a, P, V>],
-    ) -> Option<(&'a Assignment<'a, P, V>, &'a [Assignment<'a, P, V>])> {
+        all_assignments: &'a [Assignment<P, V>],
+    ) -> Option<(&'a Assignment<P, V>, &'a [Assignment<P, V>])> {
         for (idx, assignment) in all_assignments.iter().enumerate() {
             // We only care about packages related to the incompatibility.
             if let Some(incompat_term) = incompat.get(&assignment.package) {

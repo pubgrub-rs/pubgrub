@@ -16,34 +16,38 @@ use crate::version::Version;
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
-pub struct State<'a, P, V>
+pub struct State<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
 {
     root_package: P,
     root_version: V,
-    incompatibilities: Vec<&'a Incompatibility<'a, P, V>>,
-    partial_solution: PartialSolution<'a, P, V>,
-    incompatibility_store: Vec<Incompatibility<'a, P, V>>,
+    incompatibilities: Vec<Incompatibility<P, V>>,
+    partial_solution: PartialSolution<P, V>,
+    /// The store is the reference storage for all incompatibilities.
+    /// The id field in one incompatibility refers
+    /// to the position in the `incompatibility_store` vec,
+    /// NOT the position in the `incompatibilities` vec.
+    incompatibility_store: Vec<Incompatibility<P, V>>,
 }
 
-impl<'a, P, V> State<'a, P, V>
+impl<P, V> State<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
 {
     /// Initialization of PubGrub state.
     pub fn init(root_package: P, root_version: V) -> Self {
-        let mut temp = Self {
-            root_package: root_package.clone(),
-            root_version: root_version.clone(),
-            incompatibilities: Vec::new(),
+        let not_root_incompat =
+            Incompatibility::not_root(0, root_package.clone(), root_version.clone());
+        Self {
+            root_package,
+            root_version,
+            incompatibilities: vec![not_root_incompat.clone()],
             partial_solution: PartialSolution::empty(),
-            incompatibility_store: vec![Incompatibility::not_root(root_package, root_version)],
-        };
-        temp.incompatibilities.push(&temp.incompatibility_store[0]);
-        temp
+            incompatibility_store: vec![not_root_incompat],
+        }
     }
 
     /// Unit propagation is the core mechanism of the solving algorithm.
@@ -64,11 +68,10 @@ where
                     // If the partial solution satisfies the incompatibility
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
-                        // let root_cause = self.conflict_resolution(&incompat)?;
-                        let root_cause = todo!();
+                        let root_cause = self.conflict_resolution(&incompat)?;
                         // root_cause is guaranted to be almost satisfied by the partial solution
                         // according to PubGrub documentation.
-                        match self.partial_solution.relation(root_cause) {
+                        match self.partial_solution.relation(&root_cause) {
                             Relation::AlmostSatisfied(package_almost, term) => {
                                 changed = vec![package_almost.clone()];
                                 // Add (not term) to the partial solution with incompat as cause.
@@ -104,9 +107,9 @@ where
     /// CF https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation
     fn conflict_resolution(
         &mut self,
-        incompatibility: &'a Incompatibility<'a, P, V>,
-    ) -> Result<&'a Incompatibility<'a, P, V>, Box<dyn Error>> {
-        let mut current_incompat = incompatibility;
+        incompatibility: &Incompatibility<P, V>,
+    ) -> Result<Incompatibility<P, V>, Box<dyn Error>> {
+        let mut current_incompat = incompatibility.clone();
         let mut current_incompat_changed = false;
         loop {
             if current_incompat.is_terminal(&self.root_package, &self.root_version) {
@@ -115,7 +118,7 @@ where
                 let (satisfier, previous_satisfier_level) = self
                     .partial_solution
                     .find_satisfier_and_previous_satisfier_level(&current_incompat);
-                match satisfier.kind {
+                match &satisfier.kind {
                     Kind::Decision(_) => {
                         self.backtrack(
                             current_incompat.clone(),
@@ -124,7 +127,7 @@ where
                         );
                         return Ok(current_incompat);
                     }
-                    Kind::Derivation { term, cause } => {
+                    Kind::Derivation { cause, .. } => {
                         if previous_satisfier_level != satisfier.decision_level {
                             self.backtrack(
                                 current_incompat.clone(),
@@ -133,9 +136,11 @@ where
                             );
                             return Ok(current_incompat);
                         } else {
-                            let prior_cause = Incompatibility::prior_cause(current_incompat, cause);
-                            self.incompatibility_store.push(prior_cause);
-                            current_incompat = self.incompatibility_store.last().unwrap();
+                            let id = self.incompatibility_store.len();
+                            let prior_cause =
+                                Incompatibility::prior_cause(id, &current_incompat, &cause);
+                            self.incompatibility_store.push(prior_cause.clone());
+                            current_incompat = prior_cause;
                             current_incompat_changed = true;
                         }
                     }
@@ -147,13 +152,13 @@ where
     /// Backtracking.
     fn backtrack(
         &mut self,
-        incompat: Incompatibility<'a, P, V>,
+        incompat: Incompatibility<P, V>,
         incompat_changed: bool,
         decision_level: usize,
     ) {
         self.partial_solution.backtrack(decision_level);
         if incompat_changed {
-            self.incompatibilities = incompat.merge_into(self.incompatibilities);
+            incompat.merge_into(&mut self.incompatibilities);
         }
     }
 }
