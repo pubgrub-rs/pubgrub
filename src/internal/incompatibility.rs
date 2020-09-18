@@ -204,7 +204,7 @@ where
     /// It may not be trivial since those incompatibilities
     /// may already have derived others.
     /// Maybe this should not be persued.
-    pub fn merge_into(self, incompatibilities: Vec<Self>) -> Vec<Self> {
+    pub fn merge_into(&'a self, incompatibilities: Vec<&'a Self>) -> Vec<&Self> {
         let mut incompats = incompatibilities;
         incompats.push(self);
         incompats

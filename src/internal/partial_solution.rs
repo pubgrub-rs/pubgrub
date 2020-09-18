@@ -9,7 +9,6 @@ use std::collections::HashMap as Map;
 use std::hash::Hash;
 
 use crate::internal::assignment::Assignment;
-use crate::internal::assignment::Kind;
 use crate::internal::incompatibility::Incompatibility;
 use crate::internal::incompatibility::Relation;
 use crate::internal::memory::Memory;
@@ -82,7 +81,12 @@ where
     }
 
     /// Add a derivation to the partial solution.
-    pub fn add_derivation(&mut self, package: P, term: Term<V>, cause: Incompatibility<'a, P, V>) {
+    pub fn add_derivation(
+        &mut self,
+        package: P,
+        term: Term<V>,
+        cause: &'a Incompatibility<'a, P, V>,
+    ) {
         self.history.push(Assignment::new_derivation(
             self.decision_level,
             package.clone(),
@@ -190,7 +194,7 @@ where
     pub fn find_satisfier_and_previous_satisfier_level(
         &'a self,
         incompat: &Incompatibility<'a, P, V>,
-    ) -> (&Assignment<'a, P, V>, usize) {
+    ) -> (&'a Assignment<'a, P, V>, usize) {
         let (satisfier, previous_assignments) =
             Self::find_satisfier(incompat, self.history.as_slice())
                 .expect("We should always find a satisfier if called in the right context.");

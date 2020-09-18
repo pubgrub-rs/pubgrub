@@ -50,7 +50,7 @@ where
         /// Term of the derivation.
         term: Term<V>,
         /// Incompatibility cause of the derivation.
-        cause: Incompatibility<'a, P, V>,
+        cause: &'a Incompatibility<'a, P, V>,
     },
 }
 
@@ -83,7 +83,7 @@ where
         level: usize,
         package: P,
         term: Term<V>,
-        cause: Incompatibility<'a, P, V>,
+        cause: &'a Incompatibility<'a, P, V>,
     ) -> Self {
         Self {
             decision_level: level,

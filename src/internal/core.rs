@@ -23,8 +23,9 @@ where
 {
     root_package: P,
     root_version: V,
-    incompatibilities: Vec<Incompatibility<'a, P, V>>,
+    incompatibilities: Vec<&'a Incompatibility<'a, P, V>>,
     partial_solution: PartialSolution<'a, P, V>,
+    incompatibility_store: Vec<Incompatibility<'a, P, V>>,
 }
 
 impl<'a, P, V> State<'a, P, V>
@@ -34,12 +35,15 @@ where
 {
     /// Initialization of PubGrub state.
     pub fn init(root_package: P, root_version: V) -> Self {
-        Self {
+        let mut temp = Self {
             root_package: root_package.clone(),
             root_version: root_version.clone(),
-            incompatibilities: vec![Incompatibility::not_root(root_package, root_version)],
+            incompatibilities: Vec::new(),
             partial_solution: PartialSolution::empty(),
-        }
+            incompatibility_store: vec![Incompatibility::not_root(root_package, root_version)],
+        };
+        temp.incompatibilities.push(&temp.incompatibility_store[0]);
+        temp
     }
 
     /// Unit propagation is the core mechanism of the solving algorithm.
@@ -60,10 +64,11 @@ where
                     // If the partial solution satisfies the incompatibility
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
-                        let root_cause = self.conflict_resolution(&incompat)?;
+                        // let root_cause = self.conflict_resolution(&incompat)?;
+                        let root_cause = todo!();
                         // root_cause is guaranted to be almost satisfied by the partial solution
                         // according to PubGrub documentation.
-                        match self.partial_solution.relation(&root_cause) {
+                        match self.partial_solution.relation(root_cause) {
                             Relation::AlmostSatisfied(package_almost, term) => {
                                 changed = vec![package_almost.clone()];
                                 // Add (not term) to the partial solution with incompat as cause.
@@ -99,9 +104,9 @@ where
     /// CF https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation
     fn conflict_resolution(
         &mut self,
-        incompatibility: &Incompatibility<'a, P, V>,
-    ) -> Result<Incompatibility<'a, P, V>, Box<dyn Error>> {
-        let mut current_incompat = incompatibility.clone();
+        incompatibility: &'a Incompatibility<'a, P, V>,
+    ) -> Result<&'a Incompatibility<'a, P, V>, Box<dyn Error>> {
+        let mut current_incompat = incompatibility;
         let mut current_incompat_changed = false;
         loop {
             if current_incompat.is_terminal(&self.root_package, &self.root_version) {
@@ -128,9 +133,9 @@ where
                             );
                             return Ok(current_incompat);
                         } else {
-                            let prior_cause =
-                                Incompatibility::prior_cause(&current_incompat, &cause);
-                            current_incompat = prior_cause;
+                            let prior_cause = Incompatibility::prior_cause(current_incompat, cause);
+                            self.incompatibility_store.push(prior_cause);
+                            current_incompat = self.incompatibility_store.last().unwrap();
                             current_incompat_changed = true;
                         }
                     }
