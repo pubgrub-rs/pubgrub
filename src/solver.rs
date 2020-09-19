@@ -30,7 +30,7 @@
 //! The algorithm is generic and works for any type of dependency system
 //! as long as packages (P) and versions (V) implement the following traits:
 //!
-//! ```rust
+//! ```ignore
 //! P: Clone + Eq + Hash,
 //! V: Clone + Ord + Version,
 //! ```
@@ -44,7 +44,7 @@
 //!
 //! ## API
 //!
-//! ```rust
+//! ```ignore
 //! solution = solver.run(package, version)?;
 //! ```
 //!

@@ -16,7 +16,7 @@ pub trait Version {
 }
 
 /// Type for semantic versions: major.minor.patch.
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct SemanticVersion {
     major: usize,
     minor: usize,
