@@ -111,6 +111,7 @@ where
         dependencies: I,
     ) {
         let package_deps = dependencies.collect();
+        self.add_package_version(package.clone(), version.clone());
         self.dependencies.insert((package, version), package_deps);
     }
 
