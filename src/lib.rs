@@ -8,5 +8,6 @@
 
 pub mod cache;
 pub mod internal;
+pub mod pubgrub;
 pub mod range;
 pub mod version;
