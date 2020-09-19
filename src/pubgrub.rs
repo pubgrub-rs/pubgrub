@@ -51,12 +51,12 @@
 //! ### Direct synchronous call
 //!
 //! ```rust
-//! solution = pubgrub::solve(config, package, version)?;
+//! solution = pubgrub_config.solve(package, version)?;
 //! ```
 //!
-//! Where `config` provides the list of available packages and versions,
+//! Where `pubgrub_config` provides the list of available packages and versions,
 //! as well as the dependencies of every available package.
-//! The call to `pubgrub::solve` for a given package at a given version
+//! The call to `solve` for a given package at a given version
 //! will compute the set of packages and versions needed
 //! to satisfy the dependencies of that package and version pair.
 //! If there is no solution, the reason will be provided as clear as possible.
@@ -87,26 +87,67 @@
 //! The algorithm informs the caller that all is done
 //! when the `End` effect is returned.
 
+use std::collections::HashMap as Map;
 use std::error::Error;
 use std::hash::Hash;
 
+use crate::cache::Cache;
 use crate::internal::assignment::Assignment;
 use crate::internal::assignment::Kind;
 use crate::internal::incompatibility::Incompatibility;
 use crate::internal::incompatibility::Relation;
 use crate::internal::partial_solution::PartialSolution;
+use crate::range::Range;
 use crate::version::Version;
 
-// where
-//     P: Clone + Eq + Hash,
-//     V: Clone + Ord + Version,
-//
-// # Common to sync and async
-// @docs Solution
-//
+// -----------------------------------------------------------------------------
 // # Sync
-// @docs PackagesConfig, solve, packagesConfigFromCache
-//
+// -----------------------------------------------------------------------------
+
+/// Configuration of available packages to solve dependencies.
+/// Remark: for ease of use, the Config trait is automatically implemented
+/// for any type that implements Cache.
+pub trait Config<P, V>
+where
+    P: Clone + Eq + Hash,
+    V: Clone + Ord + Version,
+{
+    /// List available versions for a given package.
+    /// The strategy of which version should be preferably picked in the list of available versions
+    /// is implied by the order of the list: first version in the list will be tried first.
+    fn list_available_versions(&self, package: &P) -> Vec<V>;
+
+    /// Retrieve the package dependencies.
+    /// Return None if it's dependencies are unknown.
+    fn get_dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>>;
+
+    /// Solve dependencies of a given package.
+    fn solve(&self, package: &P, version: &V) -> Result<Map<P, V>, Box<dyn Error>> {
+        todo!()
+    }
+}
+
+/// Automatically implement Config if your type implements Cache.
+/// Versions are listed with newest versions first.
+impl<P, V, C> Config<P, V> for C
+where
+    P: Clone + Eq + Hash,
+    V: Clone + Ord + Version,
+    C: Cache<P, V>,
+{
+    fn list_available_versions(&self, package: &P) -> Vec<V> {
+        self.versions(package)
+            .map(|v| v.into_iter().rev().collect())
+            .unwrap_or(Vec::new())
+    }
+
+    fn get_dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>> {
+        self.dependencies(package, version)
+    }
+}
+
+// -----------------------------------------------------------------------------
 // # Async
 // @docs State, stateToString, Effect, effectToString, Msg
 // @docs init, update
+// -----------------------------------------------------------------------------

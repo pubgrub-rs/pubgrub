@@ -54,11 +54,11 @@ where
 
     /// List versions of a package already in cache.
     /// Return `None` if no information is available regarding that package.
-    fn versions(&self, package: &P) -> Option<&Set<V>>;
+    fn versions(&self, package: &P) -> Option<Set<V>>;
 
     /// List dependencies of a given package and version.
     /// Return `None` if no information is available regarding that package and version pair.
-    fn dependencies(&self, package: &P, version: &V) -> Option<&Map<P, Range<V>>>;
+    fn dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>>;
 }
 
 /// Basic default implementation of a Cache.
@@ -125,11 +125,13 @@ where
         self.dependencies.len()
     }
 
-    fn versions(&self, package: &P) -> Option<&Set<V>> {
-        self.package_versions.get(package)
+    fn versions(&self, package: &P) -> Option<Set<V>> {
+        self.package_versions.get(package).cloned()
     }
 
-    fn dependencies(&self, package: &P, version: &V) -> Option<&Map<P, Range<V>>> {
-        self.dependencies.get(&(package.clone(), version.clone()))
+    fn dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>> {
+        self.dependencies
+            .get(&(package.clone(), version.clone()))
+            .cloned()
     }
 }
