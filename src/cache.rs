@@ -54,9 +54,81 @@ where
 
     /// List versions of a package already in cache.
     /// Return `None` if no information is available regarding that package.
-    fn versions(&self, package: P) -> Option<&Set<V>>;
+    fn versions(&self, package: &P) -> Option<&Set<V>>;
 
     /// List dependencies of a given package and version.
     /// Return `None` if no information is available regarding that package and version pair.
-    fn dependencies(&self, package: P, version: V) -> Option<&Map<P, Range<V>>>;
+    fn dependencies(&self, package: &P, version: &V) -> Option<&Map<P, Range<V>>>;
+}
+
+/// Basic default implementation of a Cache.
+/// Remark: versions need to implement Hash
+/// in addition to the usual Clone + Ord + Version.
+pub struct SimpleCache<P, V>
+where
+    P: Clone + Eq + Hash,
+    V: Clone + Ord + Hash + Version,
+{
+    package_versions_count: usize,
+    package_versions: Map<P, Set<V>>,
+    dependencies: Map<(P, V), Map<P, Range<V>>>,
+}
+
+impl<P, V> Cache<P, V> for SimpleCache<P, V>
+where
+    P: Clone + Eq + Hash,
+    V: Clone + Ord + Hash + Version,
+{
+    fn new() -> Self {
+        Self {
+            package_versions_count: 0,
+            package_versions: Map::new(),
+            dependencies: Map::new(),
+        }
+    }
+
+    fn add_package_version(&mut self, package: P, version: V) {
+        match self.package_versions.get_mut(&package) {
+            None => {
+                self.package_versions_count += 1;
+                let mut v_set = Set::new();
+                v_set.insert(version);
+                self.package_versions.insert(package, v_set);
+            }
+            Some(v_set) => {
+                if !v_set.contains(&version) {
+                    self.package_versions_count += 1;
+                    v_set.insert(version);
+                }
+            }
+        }
+    }
+
+    fn add_dependencies<I: Iterator<Item = (P, Range<V>)>>(
+        &mut self,
+        package: P,
+        version: V,
+        dependencies: I,
+    ) {
+        let package_deps = dependencies.collect();
+        self.dependencies.insert((package, version), package_deps);
+    }
+
+    // Read stuff.
+
+    fn nb_package_versions(&self) -> usize {
+        self.package_versions_count
+    }
+
+    fn nb_dependencies(&self) -> usize {
+        self.dependencies.len()
+    }
+
+    fn versions(&self, package: &P) -> Option<&Set<V>> {
+        self.package_versions.get(package)
+    }
+
+    fn dependencies(&self, package: &P, version: &V) -> Option<&Map<P, Range<V>>> {
+        self.dependencies.get(&(package.clone(), version.clone()))
+    }
 }
