@@ -44,70 +44,35 @@
 //!
 //! ## API
 //!
-//! The algorithm is provided in two forms, synchronous and asynchronous.
-//! The synchronous API is quite straightforward.
-//!
-//!
-//! ### Direct synchronous call
-//!
 //! ```rust
-//! solution = pubgrub_config.solve(package, version)?;
+//! solution = solver.run(package, version)?;
 //! ```
 //!
-//! Where `pubgrub_config` provides the list of available packages and versions,
-//! as well as the dependencies of every available package.
-//! The call to `solve` for a given package at a given version
+//! Where `solver` provides the list of available packages and versions,
+//! as well as the dependencies of every available package
+//! by implementing the `Solver` trait.
+//! The call to `run` for a given package at a given version
 //! will compute the set of packages and versions needed
 //! to satisfy the dependencies of that package and version pair.
 //! If there is no solution, the reason will be provided as clear as possible.
-//!
-//!
-//! ### Asynchronous API
-//!
-//! Sometimes, it is too expensive to provide upfront
-//! the list of all packages and versions,
-//! as well as all dependencies for every one of those.
-//! This may very well require some network, file or other asynchronous code.
-//! For this reason, it is possible to run the PubGrub algorithm step by step.
-//! Every time an effect may be required, it stops and informs the caller,
-//! which may resume the algorithm once necessary data is retrieved.
-//!
-//! ```rust
-//! let effect = pubgrub_state.update(&cache, msg)?;
-//! ```
-//!
-//! The `Effect` type is public to enable the caller
-//! to identify and perform the required task before resuming.
-//! The `Msg` type is also public to drive the algorithm according
-//! to what was expected in the last effect when resuming.
-//!
-//! At any point between two `update` calls,
-//! the caller can update the `Cache` of already loaded data.
-//!
-//! The algorithm informs the caller that all is done
-//! when the `End` effect is returned.
 
 use std::collections::HashMap as Map;
 use std::error::Error;
 use std::hash::Hash;
 
 use crate::cache::Cache;
-use crate::internal::assignment::Assignment;
-use crate::internal::assignment::Kind;
-use crate::internal::incompatibility::Incompatibility;
-use crate::internal::incompatibility::Relation;
-use crate::internal::partial_solution::PartialSolution;
 use crate::range::Range;
 use crate::version::Version;
 
-// -----------------------------------------------------------------------------
-// # Sync
-// -----------------------------------------------------------------------------
-
-/// Configuration of available packages to solve dependencies.
-/// Remark: for ease of use, the Config trait is automatically implemented
-/// for any type that implements Cache.
-pub trait Config<P, V>
+/// Solver trait.
+/// Given functions to retrieve the list of available versions of a package,
+/// and their dependencies, this provides a `run` method,
+/// able to compute a complete set of direct and indirect dependencies
+/// satisfying the chosen package constraints.
+///
+/// Remark: for ease of use, the `Solver` trait is automatically implemented
+/// for any type that implements `Cache` such as `SimpleCache`.
+pub trait Solver<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
@@ -115,39 +80,42 @@ where
     /// List available versions for a given package.
     /// The strategy of which version should be preferably picked in the list of available versions
     /// is implied by the order of the list: first version in the list will be tried first.
-    fn list_available_versions(&self, package: &P) -> Vec<V>;
+    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>>;
 
     /// Retrieve the package dependencies.
     /// Return None if it's dependencies are unknown.
-    fn get_dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>>;
+    fn get_dependencies(
+        &self,
+        package: &P,
+        version: &V,
+    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>>;
 
     /// Solve dependencies of a given package.
-    fn solve(&self, package: &P, version: &V) -> Result<Map<P, V>, Box<dyn Error>> {
+    fn run(&self, package: &P, version: &V) -> Result<Map<P, V>, Box<dyn Error>> {
         todo!()
     }
 }
 
 /// Automatically implement Config if your type implements Cache.
 /// Versions are listed with newest versions first.
-impl<P, V, C> Config<P, V> for C
+impl<P, V, C> Solver<P, V> for C
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
     C: Cache<P, V>,
 {
-    fn list_available_versions(&self, package: &P) -> Vec<V> {
-        self.versions(package)
+    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
+        Ok(self
+            .versions(package)
             .map(|v| v.into_iter().rev().collect())
-            .unwrap_or(Vec::new())
+            .unwrap_or(Vec::new()))
     }
 
-    fn get_dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>> {
-        self.dependencies(package, version)
+    fn get_dependencies(
+        &self,
+        package: &P,
+        version: &V,
+    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
+        Ok(self.dependencies(package, version))
     }
 }
-
-// -----------------------------------------------------------------------------
-// # Async
-// @docs State, stateToString, Effect, effectToString, Msg
-// @docs init, update
-// -----------------------------------------------------------------------------
