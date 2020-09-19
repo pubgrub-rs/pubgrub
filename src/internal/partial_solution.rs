@@ -136,7 +136,7 @@ where
     /// version selected (no "decision")
     /// and if it contains at least one positive derivation term
     /// in the partial solution.
-    pub fn potential_packages(&self) -> impl Iterator<Item = (&P, &[Term<V>])> {
+    fn potential_packages(&self) -> impl Iterator<Item = (&P, &[Term<V>])> {
         self.memory.potential_packages()
     }
 

@@ -23,13 +23,20 @@ where
 {
     root_package: P,
     root_version: V,
-    incompatibilities: Vec<Incompatibility<P, V>>,
-    partial_solution: PartialSolution<P, V>,
+
+    /// TODO: remove pub.
+    pub incompatibilities: Vec<Incompatibility<P, V>>,
+
+    /// Partial solution.
+    /// TODO: remove pub.
+    pub partial_solution: PartialSolution<P, V>,
+
     /// The store is the reference storage for all incompatibilities.
     /// The id field in one incompatibility refers
     /// to the position in the `incompatibility_store` vec,
     /// NOT the position in the `incompatibilities` vec.
-    incompatibility_store: Vec<Incompatibility<P, V>>,
+    /// TODO: remove pub.
+    pub incompatibility_store: Vec<Incompatibility<P, V>>,
 }
 
 impl<P, V> State<P, V>
