@@ -83,59 +83,76 @@ where
     /// List available versions for a given package.
     /// The strategy of which version should be preferably picked in the list of available versions
     /// is implied by the order of the list: first version in the list will be tried first.
-    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>>;
+    fn list_available_versions(&mut self, package: &P) -> Result<Vec<V>, Box<dyn Error>>;
 
     /// Retrieve the package dependencies.
     /// Return None if it's dependencies are unknown.
     fn get_dependencies(
-        &self,
+        &mut self,
         package: &P,
         version: &V,
     ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>>;
 
     /// Solve dependencies of a given package.
-    fn run(&self, package: &P, version: &V) -> Result<Map<P, V>, Box<dyn Error>> {
+    fn run(&mut self, package: &P, version: &V) -> Result<Map<P, V>, Box<dyn Error>> {
         let mut state = State::init(package.clone(), version.clone());
         let mut next = package.clone();
         loop {
             state.unit_propagation(next)?;
-            // make a decision and set next to the package name returned
-            // by the decision-making process.
-            match state.partial_solution.pick_package() {
+
+            // Pick the next package.
+            let (p, term) = match state.partial_solution.pick_package() {
                 None => {
                     return state.partial_solution.extract_solution().ok_or(
                         "How did we end up with no package to choose but no solution?".into(),
                     )
                 }
-                Some((p, term)) => {
-                    let available_versions = self.list_available_versions(&p)?;
-                    match PartialSolution::<P, V>::pick_version(&available_versions[..], &term) {
-                        None => {
-                            let id = state.incompatibility_store.len();
-                            let no_version_incompat =
-                                Incompatibility::no_version(id, p.clone(), term);
-                            state
-                                .incompatibility_store
-                                .push(no_version_incompat.clone());
-                            no_version_incompat.merge_into(&mut state.incompatibilities);
-                            next = p;
-                        }
-                        Some(v) => match self.get_dependencies(&p, &v)? {
-                            None => {
-                                let id = state.incompatibility_store.len();
-                                let unavailable_deps_incompat =
-                                    Incompatibility::unavailable_dependencies(id, p.clone(), v);
-                                state
-                                    .incompatibility_store
-                                    .push(unavailable_deps_incompat.clone());
-                                unavailable_deps_incompat.merge_into(&mut state.incompatibilities);
-                                next = p;
-                            }
-                            Some(dependencies) => todo!("apply decision"),
-                        },
-                    };
-                }
+                Some(x) => x,
             };
+            next = p.clone();
+            let available_versions = self.list_available_versions(&p)?;
+
+            // Pick the next compatible version.
+            let v = match PartialSolution::<P, V>::pick_version(&available_versions[..], &term) {
+                None => {
+                    state.add_incompatibility(|id| {
+                        Incompatibility::no_version(id, p.clone(), term.clone())
+                    });
+                    continue;
+                }
+                Some(x) => x,
+            };
+
+            // Retrieve that package dependencies.
+            let dependencies = match self.get_dependencies(&p, &v)? {
+                None => {
+                    state.add_incompatibility(|id| {
+                        Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
+                    });
+                    continue;
+                }
+                Some(x) => x,
+            };
+
+            // Add that package and version if the dependencies are not problematic.
+            // applyDecision ( root, rootVersion ) deps package version pgModel
+            //    |> Result.map (solveStep ( root, rootVersion ) package)
+            //    |> failIfErr state
+            let start_id = state.incompatibility_store.len();
+            let dep_incompats =
+                Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
+            for incompat in dep_incompats.iter() {
+                state.add_incompatibility(|_| incompat.clone());
+            }
+            if dep_incompats
+                .iter()
+                .any(|incompat| state.is_terminal(incompat))
+            {
+                // For a dependency incompatibility to be terminal,
+                // it can only mean that root depend on not root?
+                Err("Root package depends on itself at a different version?")?
+            }
+            state.partial_solution.add_version(p, v, &dep_incompats);
         }
     }
 }
@@ -148,7 +165,7 @@ where
     V: Clone + Ord + Version,
     C: Cache<P, V>,
 {
-    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
+    fn list_available_versions(&mut self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
         Ok(self
             .versions(package)
             .map(|v| v.into_iter().rev().collect())
@@ -156,7 +173,7 @@ where
     }
 
     fn get_dependencies(
-        &self,
+        &mut self,
         package: &P,
         version: &V,
     ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {

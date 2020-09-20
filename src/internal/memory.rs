@@ -130,6 +130,14 @@ where
         }
     }
 
+    /// Remove a decision from a Memory.
+    pub fn remove_decision(&mut self, package: &P) {
+        match self.assignments.get_mut(package) {
+            None => {}
+            Some(package_assignments) => package_assignments.decision = None,
+        }
+    }
+
     /// Add a derivation to a Memory.
     pub fn add_derivation(&mut self, package: P, term: Term<V>) {
         match self.assignments.get_mut(&package) {

@@ -159,18 +159,26 @@ where
     /// (which are used to make the new incompatibilities)
     /// is already in the partial solution with an incompatible version.
     pub fn add_version(
-        &self,
+        &mut self,
         package: P,
         version: V,
         new_incompatibilities: &[Incompatibility<P, V>],
-    ) -> Option<PartialSolution<P, V>> {
-        let mut updated_partial_solution = self.clone();
-        updated_partial_solution.add_decision(package, version);
-        if updated_partial_solution.satisfies_any_of(new_incompatibilities) {
-            None
-        } else {
-            Some(updated_partial_solution)
+    ) {
+        self.add_decision(package, version);
+        if self.satisfies_any_of(new_incompatibilities) {
+            self.remove_last_decision();
         }
+    }
+
+    /// Can ONLY be called if the last assignment added was a decision.
+    fn remove_last_decision(&mut self) {
+        self.decision_level -= 1;
+        let last_assignment = self.history.pop().unwrap();
+        match last_assignment.kind {
+            super::assignment::Kind::Decision(_) => {}
+            _ => panic!("remove_last_decision was used on a derivation!"),
+        };
+        self.memory.remove_decision(&last_assignment.package);
     }
 
     fn satisfies_any_of(&self, incompatibilities: &[Incompatibility<P, V>]) -> bool {

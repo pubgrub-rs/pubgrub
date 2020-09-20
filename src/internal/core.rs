@@ -57,6 +57,18 @@ where
         }
     }
 
+    /// Add an incompatibility to the state.
+    pub fn add_incompatibility<F: Fn(usize) -> Incompatibility<P, V>>(&mut self, gen_incompat: F) {
+        let incompat = gen_incompat(self.incompatibility_store.len());
+        self.incompatibility_store.push(incompat.clone());
+        incompat.merge_into(&mut self.incompatibilities);
+    }
+
+    /// Check if an incompatibility is terminal.
+    pub fn is_terminal(&self, incompatibility: &Incompatibility<P, V>) -> bool {
+        incompatibility.is_terminal(&self.root_package, &self.root_version)
+    }
+
     /// Unit propagation is the core mechanism of the solving algorithm.
     /// CF https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation
     pub fn unit_propagation(&mut self, package: P) -> Result<(), Box<dyn Error>> {
