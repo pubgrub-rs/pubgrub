@@ -278,6 +278,10 @@ mod tests {
         })
     }
 
+    fn version_strat() -> impl Strategy<Value = NumberVersion> {
+        any::<usize>().prop_map(|x| NumberVersion(x))
+    }
+
     proptest! {
 
         // Testing negate ----------------------------------
@@ -329,6 +333,23 @@ mod tests {
         #[test]
         fn union_of_complements_is_any(range in strategy()) {
             assert_eq!(range.negate().union(&range), Range::any());
+        }
+
+        // Testing contains --------------------------------
+
+        #[test]
+        fn always_contains_exact(version in version_strat()) {
+            assert!(Range::exact(version).contains(&version));
+        }
+
+        #[test]
+        fn contains_negation(range in strategy(), version in version_strat()) {
+            assert_ne!(range.contains(&version), range.negate().contains(&version));
+        }
+
+        #[test]
+        fn contains_intersection(range in strategy(), version in version_strat()) {
+            assert_eq!(range.contains(&version), range.intersection(&Range::exact(version)) != Range::none());
         }
     }
 }
