@@ -6,15 +6,15 @@
 //!
 //! Concretely, those constraints correspond to any set of versions
 //! representable as the concatenation, union, and complement
-//! of the base version ranges building blocks.
+//! of the ranges building blocks.
 //!
 //! Those building blocks are:
 //!  - `none()`: the empty set
 //!  - `any()`: the set of all possible versions
 //!  - `exact(v)`: the set containing only the version v
-//!  - `higherThan(v)`: `v <= versions`
-//!  - `lowerThan(v)`: `versions < v` (note the "strictly" lower)
-//!  - `between(v1, v2)`: `v1 <= versions < v2`
+//!  - `higherThan(v)`: the set defined by `v <= versions`
+//!  - `lowerThan(v)`: the set defined by `versions < v` (note the "strictly" lower)
+//!  - `between(v1, v2)`: the set defined by `v1 <= versions < v2`
 
 use crate::version::Version;
 
@@ -133,6 +133,16 @@ impl<V: Clone + Ord + Version> Range<V> {
         complement_segments
     }
 
+    // Subsets and supersets ###################################################
+
+    fn is_subset_of(&self, other: &Self) -> bool {
+        self == &self.intersection(other)
+    }
+
+    fn is_superset_of(&self, other: &Self) -> bool {
+        self == &self.union(other)
+    }
+
     // Union and intersection ##################################################
 
     /// Compute the union of two sets of versions.
@@ -234,5 +244,73 @@ impl<V: Clone + Ord + Version> Range<V> {
             }
         }
         false
+    }
+}
+
+// TESTS #######################################################################
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::version::NumberVersion;
+    use proptest::prelude::*;
+
+    fn strategy() -> impl Strategy<Value = Range<NumberVersion>> {
+        prop::collection::vec(any::<usize>(), 0..10).prop_map(|mut vec| {
+            vec.sort();
+            vec.dedup();
+            let mut pair_iter = vec.chunks_exact(2);
+            let mut segments = Vec::with_capacity(vec.len() / 2 + 1);
+            while let Some([v1, v2]) = pair_iter.next() {
+                segments.push((NumberVersion(*v1), Some(NumberVersion(*v2))));
+            }
+            if let [v] = pair_iter.remainder() {
+                segments.push((NumberVersion(*v), None));
+            }
+            Range { segments }
+        })
+    }
+
+    // #[test]
+    // fn intersection_is_idempotent_0() {
+    //     let r1 = Range::any();
+    //     let r2 = Range { segments = vec![(NumberVersion(0), Some(NumberVersion(1))), ] };
+    // }
+
+    proptest! {
+        #[test]
+        fn negate_is_different(range in strategy()) {
+            assert_ne!(range.negate(), range);
+        }
+
+        #[test]
+        fn double_negate_is_identity(range in strategy()) {
+            assert_eq!(range.negate().negate(), range);
+        }
+
+        #[test]
+        fn intersection_is_symmetric(r1 in strategy(), r2 in strategy()) {
+            assert_eq!(r1.intersection(&r2), r2.intersection(&r1));
+        }
+
+        #[test]
+        fn intersection_with_any_is_identity(range in strategy()) {
+            assert_eq!(Range::any().intersection(&range), range);
+        }
+
+        // #[test]
+        // fn intersection_is_idempotent(r1 in strategy(), r2 in strategy()) {
+        //     assert_eq!(r1.intersection(&r2).intersection(&r2), r1.intersection(&r2));
+        // }
+
+        #[test]
+        fn intesection_of_complements_is_none(range in strategy()) {
+            assert_eq!(range.negate().intersection(&range), Range::none());
+        }
+
+        #[test]
+        fn union_of_complements_is_any(range in strategy()) {
+            assert_eq!(range.negate().union(&range), Range::any());
+        }
     }
 }

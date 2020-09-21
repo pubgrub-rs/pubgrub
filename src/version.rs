@@ -93,3 +93,16 @@ impl Version for SemanticVersion {
         self.bump_patch()
     }
 }
+
+/// Simplest versions possible, just a positive number.
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct NumberVersion(pub usize);
+
+impl Version for NumberVersion {
+    fn lowest() -> Self {
+        Self(0)
+    }
+    fn bump(self) -> Self {
+        Self(self.0 + 1)
+    }
+}
