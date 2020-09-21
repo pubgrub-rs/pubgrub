@@ -257,12 +257,12 @@ impl<V: Clone + Ord + Version> Range<V> {
 // TESTS #######################################################################
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::version::NumberVersion;
     use proptest::prelude::*;
 
-    fn strategy() -> impl Strategy<Value = Range<NumberVersion>> {
+    pub fn strategy() -> impl Strategy<Value = Range<NumberVersion>> {
         prop::collection::vec(any::<usize>(), 0..10).prop_map(|mut vec| {
             vec.sort();
             vec.dedup();

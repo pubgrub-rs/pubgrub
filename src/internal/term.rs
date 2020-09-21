@@ -169,3 +169,36 @@ impl<V: Clone + Ord + Version> AsRef<Term<V>> for Term<V> {
         &self
     }
 }
+
+// TESTS #######################################################################
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::version::NumberVersion;
+    use proptest::prelude::*;
+
+    pub fn strategy() -> impl Strategy<Value = Term<NumberVersion>> {
+        crate::range::tests::strategy().prop_map(|range| {
+            prop_oneof![Term::Positive(range.clone()), Term::Negative(range)].boxed()
+        })
+    }
+
+    proptest! {
+
+        // Testing relation --------------------------------
+
+        #[test]
+        fn relation_with(term in strategy(), set in prop::collection::vec(strategy(), 0..3)) {
+            match term.relation_with(set.iter()) {
+                Relation::Satisfied => assert!(term.satisfied_by(set.iter())),
+                Relation::Contradicted => assert!(term.contradicted_by(set.iter())),
+                Relation::Inconclusive => {
+                    assert!(!term.satisfied_by(set.iter()));
+                    assert!(!term.contradicted_by(set.iter()));
+                }
+            }
+        }
+
+    }
+}
