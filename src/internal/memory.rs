@@ -31,7 +31,7 @@ where
 /// that have already been made for a given package.
 #[derive(Clone)]
 struct PackageAssignments<V: Clone + Ord + Version> {
-    decision: Option<V>,
+    decision: Option<(V, Term<V>)>,
     derivations: Vec<Term<V>>,
 }
 
@@ -55,7 +55,7 @@ where
         assignments.insert(
             package,
             PackageAssignments {
-                decision: Some(version),
+                decision: Some((version.clone(), Term::Positive(Range::exact(version)))),
                 derivations: Vec::new(),
             },
         );
@@ -78,7 +78,7 @@ where
     }
 
     /// Retrieve all terms in memory.
-    pub fn all_terms(&self) -> Map<P, impl Iterator<Item = Term<V>> + '_> {
+    pub fn all_terms(&self) -> Map<P, impl Iterator<Item = &Term<V>> + '_> {
         let identity = |x| x;
         self.assignments
             .iter()
@@ -90,13 +90,13 @@ where
                     // otherwise the code would not compile.
                     std::iter::once(None)
                         .filter_map(identity)
-                        .chain(a.derivations.iter().cloned()),
+                        .chain(a.derivations.iter()),
                 ),
-                Some(version) => (
+                Some((_, term)) => (
                     p.clone(),
-                    std::iter::once(Some(Term::Positive(Range::exact(version.clone()))))
+                    std::iter::once(Some(term))
                         .filter_map(identity)
-                        .chain(a.derivations.iter().cloned()),
+                        .chain(a.derivations.iter()),
                 ),
             })
             .collect()
@@ -116,17 +116,18 @@ where
 
     /// Add a decision to a Memory.
     pub fn add_decision(&mut self, package: P, version: V) {
+        let decision = Some((version.clone(), Term::Positive(Range::exact(version))));
         match self.assignments.get_mut(&package) {
             None => {
                 self.assignments.insert(
                     package,
                     PackageAssignments {
-                        decision: Some(version),
+                        decision,
                         derivations: Vec::new(),
                     },
                 );
             }
-            Some(package_assignments) => package_assignments.decision = Some(version),
+            Some(package_assignments) => package_assignments.decision = decision,
         }
     }
 
@@ -190,7 +191,7 @@ where
             Some(
                 self.assignments
                     .iter()
-                    .filter_map(|(p, pa)| pa.decision.as_ref().map(|v| (p.clone(), v.clone())))
+                    .filter_map(|(p, pa)| pa.decision.as_ref().map(|v| (p.clone(), v.0.clone())))
                     .collect(),
             )
         } else {
