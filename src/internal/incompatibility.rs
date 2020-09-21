@@ -235,7 +235,7 @@ where
     ) -> Relation<P, V> {
         let mut relation = Relation::Satisfied;
         for (package, incompat_term) in self.package_terms.iter() {
-            let terms_in_set = terms_set.get_mut(package);
+            let terms_in_set = terms_set.get_mut(package).into_iter().flatten();
             match incompat_term.relation_with(terms_in_set) {
                 term::Relation::Satisfied => {}
                 term::Relation::Contradicted => {

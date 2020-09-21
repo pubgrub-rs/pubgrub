@@ -123,11 +123,9 @@ where
     /// TODO: improve?
     /// TODO: do not introduce any side effect if trying to improve.
     pub fn pick_package(&self) -> Option<(P, Term<V>)> {
-        self.potential_packages().next().map(|(p, all_terms)| {
-            let all_terms_intersection =
-                Term::intersect_all(all_terms.iter()).unwrap_or(Term::Negative(Range::none()));
-            (p.clone(), all_terms_intersection)
-        })
+        self.potential_packages()
+            .next()
+            .map(|(p, all_terms)| (p.clone(), Term::intersect_all(all_terms.iter())))
     }
 
     /// Extract all packages that may potentially be picked next
