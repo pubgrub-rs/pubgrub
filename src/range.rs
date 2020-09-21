@@ -285,6 +285,9 @@ mod tests {
     // }
 
     proptest! {
+
+        // Testing negate ----------------------------------
+
         #[test]
         fn negate_is_different(range in strategy()) {
             assert_ne!(range.negate(), range);
@@ -294,6 +297,8 @@ mod tests {
         fn double_negate_is_identity(range in strategy()) {
             assert_eq!(range.negate().negate(), range);
         }
+
+        // Testing intersection ----------------------------
 
         #[test]
         fn intersection_is_symmetric(r1 in strategy(), r2 in strategy()) {
@@ -305,15 +310,27 @@ mod tests {
             assert_eq!(Range::any().intersection(&range), range);
         }
 
-        // #[test]
-        // fn intersection_is_idempotent(r1 in strategy(), r2 in strategy()) {
-        //     assert_eq!(r1.intersection(&r2).intersection(&r2), r1.intersection(&r2));
-        // }
+        #[test]
+        fn intersection_with_none_is_none(range in strategy()) {
+            assert_eq!(Range::none().intersection(&range), Range::none());
+        }
+
+        #[test]
+        fn intersection_is_idempotent(r1 in strategy(), r2 in strategy()) {
+            assert_eq!(r1.intersection(&r2).intersection(&r2), r1.intersection(&r2));
+        }
+
+        #[test]
+        fn intersection_is_associative(r1 in strategy(), r2 in strategy(), r3 in strategy()) {
+            assert_eq!(r1.intersection(&r2).intersection(&r3), r1.intersection(&r2.intersection(&r3)));
+        }
 
         #[test]
         fn intesection_of_complements_is_none(range in strategy()) {
             assert_eq!(range.negate().intersection(&range), Range::none());
         }
+
+        // Testing union -----------------------------------
 
         #[test]
         fn union_of_complements_is_any(range in strategy()) {
