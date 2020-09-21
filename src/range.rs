@@ -217,6 +217,13 @@ impl<V: Clone + Ord + Version> Range<V> {
                     }
                 }
 
+                // Both sides contain an infinite interval:
+                (Some((l1, None)), Some((r1, None))) => {
+                    let start = l1.max(r1).to_owned();
+                    segments.push((start, None));
+                    break;
+                }
+
                 // Left or right has ended.
                 _ => {
                     break;
