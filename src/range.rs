@@ -278,12 +278,6 @@ mod tests {
         })
     }
 
-    // #[test]
-    // fn intersection_is_idempotent_0() {
-    //     let r1 = Range::any();
-    //     let r2 = Range { segments = vec![(NumberVersion(0), Some(NumberVersion(1))), ] };
-    // }
-
     proptest! {
 
         // Testing negate ----------------------------------
