@@ -78,26 +78,12 @@ where
     }
 
     /// Retrieve all terms in memory.
-    pub fn all_terms(&self) -> Map<P, impl Iterator<Item = &Term<V>> + '_> {
-        let identity = |x| x;
+    pub fn all_terms(&self) -> Map<P, impl Iterator<Item = &Term<V>>> {
         self.assignments
             .iter()
-            .map(|(p, a)| match &a.decision {
-                None => (
-                    p.clone(),
-                    // The once(None).filter_map(identity) is just to produce
-                    // the same type on both branches of the match,
-                    // otherwise the code would not compile.
-                    std::iter::once(None)
-                        .filter_map(identity)
-                        .chain(a.derivations.iter()),
-                ),
-                Some((_, term)) => (
-                    p.clone(),
-                    std::iter::once(Some(term))
-                        .filter_map(identity)
-                        .chain(a.derivations.iter()),
-                ),
+            .map(|(package, a)| {
+                let decision_iter = a.decision.iter().map(|(_, term)| term);
+                (package.clone(), decision_iter.chain(a.derivations.iter()))
             })
             .collect()
     }
