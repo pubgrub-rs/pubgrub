@@ -52,6 +52,7 @@ where
 }
 
 /// A Relation describes how a set of terms can be compared to an incompatibility.
+/// Typically, the set of terms comes from the partial solution.
 #[derive(Eq, PartialEq)]
 pub enum Relation<P, V>
 where
@@ -148,10 +149,7 @@ where
     fn union(id: usize, i1: &Map<P, Term<V>>, i2: &Map<P, Term<V>>, kind: Kind<P, V>) -> Self {
         let package_terms = Self::merge(i1, i2, |t1, t2| {
             let term_union = t1.union(t2);
-            if term_union == Term::Negative(Range::none()) {
-                // When the union of two terms is "not none",
-                // remove that term from the incompatibility
-                // since it will always be satisfied.
+            if term_union == Term::any() {
                 None
             } else {
                 Some(term_union)
@@ -171,26 +169,26 @@ where
     /// If the result is None, remove that key from the merged map,
     /// otherwise add the content of the Some(_).
     fn merge<T: Clone, F: Fn(&T, &T) -> Option<T>>(
-        t1: &Map<P, T>,
-        t2: &Map<P, T>,
+        hashmap_1: &Map<P, T>,
+        hashmap_2: &Map<P, T>,
         f: F,
     ) -> Map<P, T> {
-        let mut merged_map: Map<_, _> = t1.clone();
-        merged_map.reserve(t2.len());
+        let mut merged_map = hashmap_1.clone();
+        merged_map.reserve(hashmap_2.len());
         let mut to_delete = Vec::new();
-        for (package, term_2) in t2.iter() {
-            match merged_map.get_mut(package) {
+        for (key, val_2) in hashmap_2.iter() {
+            match merged_map.get_mut(key) {
                 None => {
-                    merged_map.insert(package.clone(), term_2.clone());
+                    merged_map.insert(key.clone(), val_2.clone());
                 }
-                Some(term_1) => match f(term_1, term_2) {
-                    None => to_delete.push(package),
-                    Some(term_union) => *term_1 = term_union,
+                Some(val_1) => match f(val_1, val_2) {
+                    None => to_delete.push(key),
+                    Some(merged_value) => *val_1 = merged_value,
                 },
             }
         }
-        for package in to_delete.iter() {
-            merged_map.remove(package);
+        for key in to_delete.iter() {
+            merged_map.remove(key);
         }
         merged_map
     }

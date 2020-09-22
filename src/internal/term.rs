@@ -24,12 +24,12 @@ pub enum Term<V: Clone + Ord + Version> {
 // Base methods.
 impl<V: Clone + Ord + Version> Term<V> {
     /// A term that is always true.
-    fn any() -> Self {
+    pub fn any() -> Self {
         Self::Negative(Range::none())
     }
 
     /// A term that is never true.
-    fn empty() -> Self {
+    pub fn empty() -> Self {
         Self::Positive(Range::none())
     }
 
