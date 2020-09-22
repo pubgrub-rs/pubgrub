@@ -8,8 +8,7 @@
 use std::collections::HashMap as Map;
 use std::hash::Hash;
 
-use crate::internal::assignment::Assignment;
-use crate::internal::assignment::Kind;
+use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::term::Term;
 use crate::range::Range;
 use crate::version::Version;
@@ -90,13 +89,9 @@ where
 
     /// Building step of a Memory from a given assignment.
     pub fn add_assignment(&mut self, assignment: &Assignment<P, V>) {
-        match &assignment.kind {
-            Kind::Decision(version) => {
-                self.add_decision(assignment.package.clone(), version.clone())
-            }
-            Kind::Derivation { term, .. } => {
-                self.add_derivation(assignment.package.clone(), term.clone())
-            }
+        match assignment {
+            Decision { package, version } => self.add_decision(package.clone(), version.clone()),
+            Derivation { package, term, .. } => self.add_derivation(package.clone(), term.clone()),
         }
     }
 

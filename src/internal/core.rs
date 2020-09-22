@@ -8,9 +8,8 @@
 use std::error::Error;
 use std::hash::Hash;
 
-use crate::internal::assignment::Kind;
-use crate::internal::incompatibility::Incompatibility;
-use crate::internal::incompatibility::Relation;
+use crate::internal::assignment::Assignment::{Decision, Derivation};
+use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::partial_solution::PartialSolution;
 use crate::version::Version;
 
@@ -134,11 +133,11 @@ where
             if current_incompat.is_terminal(&self.root_package, &self.root_version) {
                 Err("TODO: report explanation")?
             } else {
-                let (satisfier, previous_satisfier_level) = self
+                let (satisfier, satisfier_level, previous_satisfier_level) = self
                     .partial_solution
                     .find_satisfier_and_previous_satisfier_level(&current_incompat);
-                match &satisfier.kind {
-                    Kind::Decision(_) => {
+                match satisfier {
+                    Decision { .. } => {
                         self.backtrack(
                             current_incompat.clone(),
                             current_incompat_changed,
@@ -146,8 +145,8 @@ where
                         );
                         return Ok(current_incompat);
                     }
-                    Kind::Derivation { cause, .. } => {
-                        if previous_satisfier_level != satisfier.decision_level {
+                    Derivation { cause, .. } => {
+                        if previous_satisfier_level != satisfier_level {
                             self.backtrack(
                                 current_incompat.clone(),
                                 current_incompat_changed,
