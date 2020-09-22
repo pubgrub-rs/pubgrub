@@ -179,9 +179,10 @@ pub mod tests {
     use proptest::prelude::*;
 
     pub fn strategy() -> impl Strategy<Value = Term<NumberVersion>> {
-        crate::range::tests::strategy().prop_map(|range| {
-            prop_oneof![Term::Positive(range.clone()), Term::Negative(range)].boxed()
-        })
+        prop_oneof![
+            crate::range::tests::strategy().prop_map(|range| Term::Positive(range)),
+            crate::range::tests::strategy().prop_map(|range| Term::Negative(range)),
+        ]
     }
 
     proptest! {
