@@ -289,3 +289,41 @@ where
         self.package_terms.into_iter()
     }
 }
+
+// TESTS #######################################################################
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::internal::term::tests::strategy as term_strat;
+    use proptest::prelude::*;
+
+    proptest! {
+
+        /// For any three different packages p1, p2 and p3,
+        /// for any three terms t1, t2 and t3,
+        /// if we have the two following incompatibilities:
+        ///    { p1: t1, p2: not t2 }
+        ///    { p2: t2, p3: t3 }
+        /// the rule of resolution says that we can deduce the following incompatibility:
+        ///    { p1: t1, p3: t3 }
+        #[test]
+        fn rule_of_resolution(t1 in term_strat(), t2 in term_strat(), t3 in term_strat()) {
+            let mut i1 = Map::new();
+            i1.insert("p1", t1.clone());
+            i1.insert("p2", t2.negate());
+
+            let mut i2 = Map::new();
+            i2.insert("p2", t2.clone());
+            i2.insert("p3", t3.clone());
+
+            let mut i3 = Map::new();
+            i3.insert("p1", t1);
+            i3.insert("p3", t3);
+
+            let i_resolution = Incompatibility::union(0, &i1, &i2, Kind::NotRoot);
+            assert_eq!(i_resolution.package_terms, i3);
+        }
+
+    }
+}
