@@ -133,16 +133,6 @@ impl<V: Clone + Ord + Version> Range<V> {
         complement_segments
     }
 
-    // Subsets and supersets ###################################################
-
-    fn is_subset_of(&self, other: &Self) -> bool {
-        self == &self.intersection(other)
-    }
-
-    fn is_superset_of(&self, other: &Self) -> bool {
-        self == &self.union(other)
-    }
-
     // Union and intersection ##################################################
 
     /// Compute the union of two sets of versions.
