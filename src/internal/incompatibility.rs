@@ -105,10 +105,7 @@ where
     /// because its list of dependencies is unavailable.
     pub fn unavailable_dependencies(id: usize, package: P, version: V) -> Self {
         let mut package_terms = Map::with_capacity(1);
-        package_terms.insert(
-            package.clone(),
-            Term::Positive(Range::exact(version.clone())),
-        );
+        package_terms.insert(package.clone(), Term::exact(version.clone()));
         Self {
             id,
             package_terms,
@@ -135,10 +132,7 @@ where
     fn from_dependency(id: usize, package: P, version: V, dep: (&P, &Range<V>)) -> Self {
         let mut i1 = Map::with_capacity(1);
         let mut i2 = Map::with_capacity(1);
-        i1.insert(
-            package.clone(),
-            Term::Positive(Range::exact(version.clone())),
-        );
+        i1.insert(package.clone(), Term::exact(version.clone()));
         let (p, range) = dep;
         i2.insert(p.clone(), Term::Negative(range.clone()));
         Self::union(id, &i1, &i2, Kind::FromDependencyOf(package))

@@ -33,6 +33,11 @@ impl<V: Clone + Ord + Version> Term<V> {
         Self::Positive(Range::none())
     }
 
+    /// A positive term containing exactly that version.
+    pub fn exact(version: V) -> Self {
+        Self::Positive(Range::exact(version))
+    }
+
     /// Simply check if a term is positive.
     pub fn is_positive(&self) -> bool {
         match self {

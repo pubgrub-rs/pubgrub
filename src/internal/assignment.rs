@@ -9,7 +9,6 @@ use std::hash::Hash;
 
 use crate::internal::incompatibility::Incompatibility;
 use crate::internal::term::Term;
-use crate::range::Range;
 use crate::version::Version;
 
 /// An assignment is either a decision: a chosen version for a package,
@@ -57,7 +56,7 @@ where
     /// Otherwise, if this is a derivation, just returns its term.
     pub fn as_term(&self) -> Term<V> {
         match &self {
-            Self::Decision { version, .. } => Term::Positive(Range::exact(version.clone())),
+            Self::Decision { version, .. } => Term::exact(version.clone()),
             Self::Derivation { term, .. } => term.clone(),
         }
     }

@@ -10,7 +10,6 @@ use std::hash::Hash;
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::term::Term;
-use crate::range::Range;
 use crate::version::Version;
 
 /// A memory is the set of all assignments in the partial solution,
@@ -54,7 +53,7 @@ where
         assignments.insert(
             package,
             PackageAssignments {
-                decision: Some((version.clone(), Term::Positive(Range::exact(version)))),
+                decision: Some((version.clone(), Term::exact(version))),
                 derivations: Vec::new(),
             },
         );
@@ -97,7 +96,7 @@ where
 
     /// Add a decision to a Memory.
     pub fn add_decision(&mut self, package: P, version: V) {
-        let decision = Some((version.clone(), Term::Positive(Range::exact(version))));
+        let decision = Some((version.clone(), Term::exact(version)));
         match self.assignments.get_mut(&package) {
             None => {
                 self.assignments.insert(
