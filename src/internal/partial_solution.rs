@@ -29,6 +29,8 @@ where
 {
     decision_level: usize,
     /// Each assignment is stored with its decision level in the history.
+    /// The order in which assignments where added in the vec is kept,
+    /// so the oldest assignments are at the beginning of the vec.
     history: Vec<(usize, Assignment<P, V>)>,
     memory: Memory<P, V>,
 }
@@ -79,13 +81,17 @@ where
 
     /// Backtrack the partial solution to a given decision level.
     pub fn backtrack(&mut self, decision_level: usize) {
-        let index = Self::find_level_index(self.history.as_slice(), decision_level + 1)
+        // TODO: improve with dichotomic search.
+        let pos = self
+            .history
+            .iter()
+            .rposition(|(l, _)| *l == decision_level + 1)
             .unwrap_or(self.history.len());
         *self = Self::from_assignments(
             self.history
                 .to_owned()
                 .into_iter()
-                .take(index)
+                .take(pos)
                 .map(|(_, a)| a),
         );
     }
@@ -94,19 +100,6 @@ where
         let mut partial_solution = Self::empty();
         assignments.for_each(|a| partial_solution.add_assignment(a));
         partial_solution
-    }
-
-    // TODO: improve with dichotomic search.
-    fn find_level_index(
-        history: &[(usize, Assignment<P, V>)],
-        decision_level: usize,
-    ) -> Option<usize> {
-        for (index, level) in history.iter().map(|(l, _)| *l).enumerate() {
-            if level >= decision_level {
-                return Some(index);
-            }
-        }
-        None
     }
 
     /// Heuristic to pick the next package to add to the partial solution.
