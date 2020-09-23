@@ -85,13 +85,13 @@ where
         let pos = self
             .history
             .iter()
-            .rposition(|(l, _)| *l == decision_level + 1)
-            .unwrap_or(self.history.len());
+            .rposition(|(l, _)| *l == decision_level)
+            .unwrap_or(self.history.len() - 1);
         *self = Self::from_assignments(
             self.history
                 .to_owned()
                 .into_iter()
-                .take(pos)
+                .take(pos + 1)
                 .map(|(_, a)| a),
         );
     }
@@ -126,7 +126,7 @@ where
     /// that match the outstanding constraint.
     ///
     /// Here we just pick the first one that satisfies the terms.
-    /// It is the responsibility of the provider of `availableVersions`
+    /// It is the responsibility of the provider of `available_versions`
     /// to list them with preferred versions first.
     pub fn pick_version(available_versions: &[V], partial_solution_term: &Term<V>) -> Option<V> {
         available_versions
