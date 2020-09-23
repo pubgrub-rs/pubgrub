@@ -93,8 +93,6 @@ where
                             Relation::AlmostSatisfied(package_almost, term) => {
                                 changed = vec![package_almost.clone()];
                                 // Add (not term) to the partial solution with incompat as cause.
-                                // TODO: check if it is suposed to be "root_cause" (as in elm-pubgrub)
-                                // or "incompat" as PubGrub solver documentation says.
                                 self.partial_solution.add_derivation(package_almost, term.negate(), root_cause);
                             }
                             _ => Err("This should never happen, root_cause is guaranted to be almost satisfied by the partial solution")?,

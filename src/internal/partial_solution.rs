@@ -18,9 +18,6 @@ use crate::version::Version;
 /// of the solution being built by the algorithm.
 /// It is composed of a succession of assignments,
 /// defined as either decisions or derivations.
-///
-/// TODO: make sure that when I use the history,
-/// it is in the correct direction.
 #[derive(Clone)]
 pub struct PartialSolution<P, V>
 where
@@ -113,8 +110,7 @@ where
     /// But there's likely room for improvement in these heuristics.
     ///
     /// Here we just pick the first one.
-    /// TODO: improve?
-    /// TODO: do not introduce any side effect if trying to improve.
+    /// TODO: improve? (do not introduce any side effect if trying to improve)
     pub fn pick_package(&self) -> Option<(P, Term<V>)> {
         self.memory
             .potential_packages()
