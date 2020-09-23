@@ -179,8 +179,7 @@ where
             Self::find_satisfier(incompat, self.history.as_slice())
                 .expect("We should always find a satisfier if called in the right context.");
         let previous_satisfier_level =
-            Self::find_previous_satisfier(incompat, satisfier, previous_assignments)
-                .map_or(1, |((level, _), _)| level.max(1));
+            Self::find_previous_satisfier(incompat, satisfier, previous_assignments);
         (satisfier, satisfier_level, previous_satisfier_level)
     }
 
@@ -194,11 +193,7 @@ where
         (usize, &'a Assignment<P, V>),
         &'a [(usize, Assignment<P, V>)],
     )> {
-        let mut accum_satisfier: Map<P, (bool, Term<V>)> = incompat
-            .iter()
-            .map(|(p, _)| (p.clone(), (false, Term::any())))
-            .collect();
-        Self::find_satisfier_helper(incompat, &mut accum_satisfier, history)
+        Self::find_satisfier_helper(incompat, Self::new_accum_satisfied_from(incompat), history)
     }
 
     /// Earliest assignment in the partial solution before satisfier
@@ -208,23 +203,23 @@ where
         incompat: &Incompatibility<P, V>,
         satisfier: &Assignment<P, V>,
         previous_assignments: &'a [(usize, Assignment<P, V>)],
-    ) -> Option<(
-        (usize, &'a Assignment<P, V>),
-        &'a [(usize, Assignment<P, V>)],
-    )> {
-        let mut accum_satisfier: Map<P, (bool, Term<V>)> = incompat
-            .iter()
-            .map(|(p, _)| (p.clone(), (false, Term::any())))
-            .collect();
-        // Add the satisfier to accum_satisfier.
-        let incompat_term = incompat
-            .get(&satisfier.package())
-            .expect("This should exist");
+    ) -> usize {
+        let package = satisfier.package().clone();
+        let incompat_term = incompat.get(&package).expect("This should exist");
         let satisfier_term = satisfier.as_term();
         let is_satisfied = satisfier_term.subset_of(incompat_term);
-        accum_satisfier.insert(satisfier.package().clone(), (is_satisfied, satisfier_term));
+        let mut accum_satisfied = Self::new_accum_satisfied_from(incompat);
+        accum_satisfied.insert(package, (is_satisfied, satisfier_term));
         // Search previous satisfier.
-        Self::find_satisfier_helper(incompat, &mut accum_satisfier, previous_assignments)
+        Self::find_satisfier_helper(incompat, accum_satisfied, previous_assignments)
+            .map_or(1, |((level, _), _)| level.max(1))
+    }
+
+    fn new_accum_satisfied_from(incompat: &Incompatibility<P, V>) -> Map<P, (bool, Term<V>)> {
+        incompat
+            .iter()
+            .map(|(p, _)| (p.clone(), (false, Term::any())))
+            .collect()
     }
 
     /// Iterate over the assignments (oldest must be first)
@@ -232,31 +227,32 @@ where
     /// satisfies the given incompatibility.
     pub fn find_satisfier_helper<'a>(
         incompat: &Incompatibility<P, V>,
-        accum_satisfier: &mut Map<P, (bool, Term<V>)>,
+        accum_satisfied: Map<P, (bool, Term<V>)>,
         all_assignments: &'a [(usize, Assignment<P, V>)],
     ) -> Option<(
         (usize, &'a Assignment<P, V>),
         &'a [(usize, Assignment<P, V>)],
     )> {
+        let mut accum_satisfied = accum_satisfied;
         for (idx, (level, assignment)) in all_assignments.iter().enumerate() {
-            // We only care about packages related to the incompatibility.
-            if let Some(incompat_term) = incompat.get(assignment.package()) {
-                // Check if that incompat term is satisfied by our accumulated terms intersection.
-                match accum_satisfier.get_mut(assignment.package()) {
-                    None => panic!("A package in incompat should always exist in accum_satisfier"),
-                    Some((true, _)) => {} // If that package term is already satisfied, no need to check.
-                    Some((is_satisfied, accum_term)) => {
-                        accum_term.intersection(&assignment.as_term());
-                        *is_satisfied = accum_term.subset_of(incompat_term);
-                        // Check if we have found the satisfier
-                        // (all booleans in accum_satisfier are true).
-                        if *is_satisfied
-                            && accum_satisfier.iter().all(|(_, (satisfied, _))| *satisfied)
-                        {
-                            return Some(((*level, assignment), &all_assignments[0..idx]));
-                        }
-                    }
-                }
+            let package = assignment.package();
+            let incompat_term = match incompat.get(package) {
+                // We only care about packages related to the incompatibility.
+                None => continue,
+                Some(i) => i,
+            };
+            let (is_satisfied, accum_term) = match accum_satisfied.get_mut(package) {
+                None => panic!("A package in incompat should always exist in accum_satisfied"),
+                Some((true, _)) => continue, // If that package term is already satisfied, no need to check.
+                Some(x) => x,
+            };
+            // Check if that incompat term is satisfied by our accumulated terms intersection.
+            accum_term.intersection(&assignment.as_term());
+            *is_satisfied = accum_term.subset_of(incompat_term);
+            // Check if we have found the satisfier
+            // (all booleans in accum_satisfied are true).
+            if *is_satisfied && accum_satisfied.iter().all(|(_, (satisfied, _))| *satisfied) {
+                return Some(((*level, assignment), &all_assignments[0..idx]));
             }
         }
         None
