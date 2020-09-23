@@ -66,43 +66,27 @@ where
 
     /// Add a decision to a Memory.
     fn add_decision(&mut self, package: P, version: V) {
-        let decision = Some((version.clone(), Term::exact(version)));
-        match self.assignments.get_mut(&package) {
-            None => {
-                self.assignments.insert(
-                    package,
-                    PackageAssignments {
-                        decision,
-                        derivations: Vec::new(),
-                    },
-                );
-            }
-            Some(package_assignments) => package_assignments.decision = decision,
-        }
+        let pa = self
+            .assignments
+            .entry(package)
+            .or_insert(PackageAssignments::new());
+        pa.decision = Some((version.clone(), Term::exact(version)));
     }
 
     /// Remove a decision from a Memory.
     pub fn remove_decision(&mut self, package: &P) {
-        match self.assignments.get_mut(package) {
-            None => {}
-            Some(package_assignments) => package_assignments.decision = None,
-        }
+        self.assignments
+            .get_mut(package)
+            .map(|pa| pa.decision = None);
     }
 
     /// Add a derivation to a Memory.
     fn add_derivation(&mut self, package: P, term: Term<V>) {
-        match self.assignments.get_mut(&package) {
-            None => {
-                self.assignments.insert(
-                    package,
-                    PackageAssignments {
-                        decision: None,
-                        derivations: vec![term],
-                    },
-                );
-            }
-            Some(package_assignments) => package_assignments.derivations.push(term),
-        }
+        let pa = self
+            .assignments
+            .entry(package)
+            .or_insert(PackageAssignments::new());
+        pa.derivations.push(term);
     }
 
     /// Extract all packages that may potentially be picked next
@@ -151,6 +135,14 @@ where
 }
 
 impl<V: Clone + Ord + Version> PackageAssignments<V> {
+    /// Empty package assignment
+    fn new() -> Self {
+        Self {
+            decision: None,
+            derivations: Vec::new(),
+        }
+    }
+
     /// If a partial solution has, for every positive derivation,
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
