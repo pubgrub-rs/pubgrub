@@ -30,9 +30,11 @@ where
     /// because users of the Cache trait make the assumption that
     /// a call to `cache.dependencies(p, v)` provides all dependencies
     /// of a given package (p) and version (v) pair.
+    ///
     /// Since dependencies are supposed to be immutable,
-    /// this enables an optimization in the solver code,
-    /// which does not need to request package dependencies
+    /// this can enable an optimization in the solver implementation.
+    /// If you use a cache when implementing `Solver::get_dependencies`,
+    /// you do not need to request package dependencies
     /// if the call to `cache.dependencies(p, v)` returns `Some(_)`.
     fn add_dependencies<I: Iterator<Item = (P, Range<V>)>>(
         &mut self,
@@ -66,7 +68,6 @@ where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Hash + Version,
 {
-    package_versions_count: usize,
     package_versions: Map<P, Set<V>>,
     dependencies: Map<(P, V), Map<P, Range<V>>>,
 }
@@ -79,7 +80,6 @@ where
     /// Create an empty cache.
     pub fn new() -> Self {
         Self {
-            package_versions_count: 0,
             package_versions: Map::new(),
             dependencies: Map::new(),
         }
@@ -92,20 +92,8 @@ where
     V: Clone + Ord + Hash + Version,
 {
     fn add_package_version(&mut self, package: P, version: V) {
-        match self.package_versions.get_mut(&package) {
-            None => {
-                self.package_versions_count += 1;
-                let mut v_set = Set::new();
-                v_set.insert(version);
-                self.package_versions.insert(package, v_set);
-            }
-            Some(v_set) => {
-                if !v_set.contains(&version) {
-                    self.package_versions_count += 1;
-                    v_set.insert(version);
-                }
-            }
-        }
+        let v_set = self.package_versions.entry(package).or_insert(Set::new());
+        v_set.insert(version);
     }
 
     fn add_dependencies<I: Iterator<Item = (P, Range<V>)>>(
@@ -122,7 +110,7 @@ where
     // Read stuff.
 
     fn nb_package_versions(&self) -> usize {
-        self.package_versions_count
+        self.package_versions.values().map(|set| set.len()).sum()
     }
 
     fn nb_dependencies(&self) -> usize {
