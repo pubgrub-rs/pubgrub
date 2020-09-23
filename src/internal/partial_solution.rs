@@ -247,7 +247,7 @@ where
                 Some(x) => x,
             };
             // Check if that incompat term is satisfied by our accumulated terms intersection.
-            accum_term.intersection(&assignment.as_term());
+            *accum_term = accum_term.intersection(&assignment.as_term());
             *is_satisfied = accum_term.subset_of(incompat_term);
             // Check if we have found the satisfier
             // (all booleans in accum_satisfied are true).
