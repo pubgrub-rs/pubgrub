@@ -135,9 +135,6 @@ where
             };
 
             // Add that package and version if the dependencies are not problematic.
-            // applyDecision ( root, rootVersion ) deps package version pgModel
-            //    |> Result.map (solveStep ( root, rootVersion ) package)
-            //    |> failIfErr state
             let start_id = state.incompatibility_store.len();
             let dep_incompats =
                 Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
