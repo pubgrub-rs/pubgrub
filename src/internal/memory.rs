@@ -45,36 +45,6 @@ where
         }
     }
 
-    /// Initialize a Memory from a decision.
-    ///
-    /// TODO: is this actually used?
-    pub fn from_decision(package: P, version: V) -> Self {
-        let mut assignments = Map::new();
-        assignments.insert(
-            package,
-            PackageAssignments {
-                decision: Some((version.clone(), Term::exact(version))),
-                derivations: Vec::new(),
-            },
-        );
-        Memory { assignments }
-    }
-
-    /// Initialize a Memory from a derivation.
-    ///
-    /// TODO: is this actually used?
-    pub fn from_derivation(package: P, term: Term<V>) -> Self {
-        let mut assignments = Map::new();
-        assignments.insert(
-            package,
-            PackageAssignments {
-                decision: None,
-                derivations: vec![term],
-            },
-        );
-        Memory { assignments }
-    }
-
     /// Retrieve all terms in memory.
     pub fn all_terms(&self) -> Map<P, impl Iterator<Item = &Term<V>>> {
         self.assignments
@@ -95,7 +65,7 @@ where
     }
 
     /// Add a decision to a Memory.
-    pub fn add_decision(&mut self, package: P, version: V) {
+    fn add_decision(&mut self, package: P, version: V) {
         let decision = Some((version.clone(), Term::exact(version)));
         match self.assignments.get_mut(&package) {
             None => {
@@ -120,7 +90,7 @@ where
     }
 
     /// Add a derivation to a Memory.
-    pub fn add_derivation(&mut self, package: P, term: Term<V>) {
+    fn add_derivation(&mut self, package: P, term: Term<V>) {
         match self.assignments.get_mut(&package) {
             None => {
                 self.assignments.insert(
@@ -167,7 +137,7 @@ where
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
     pub fn extract_solution(&self) -> Option<Map<P, V>> {
-        if self.assignments.iter().all(|(_, pa)| pa.is_valid()) {
+        if self.assignments.values().all(|pa| pa.is_valid()) {
             Some(
                 self.assignments
                     .iter()
@@ -181,11 +151,13 @@ where
 }
 
 impl<V: Clone + Ord + Version> PackageAssignments<V> {
-    pub fn is_valid(&self) -> bool {
-        if self.decision == None {
-            !(self.derivations.iter().any(|t| t.is_positive()))
-        } else {
-            true
+    /// If a partial solution has, for every positive derivation,
+    /// a corresponding decision that satisfies that assignment,
+    /// it's a total solution and version solving has succeeded.
+    fn is_valid(&self) -> bool {
+        match self.decision {
+            None => self.derivations.iter().all(|t| t.is_negative()),
+            Some(_) => true,
         }
     }
 }

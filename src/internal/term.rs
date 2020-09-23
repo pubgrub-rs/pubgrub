@@ -46,6 +46,11 @@ impl<V: Clone + Ord + Version> Term<V> {
         }
     }
 
+    /// Simply check if a term is negative.
+    pub fn is_negative(&self) -> bool {
+        !self.is_positive()
+    }
+
     /// Negate a term.
     /// Evaluation of a negated term always returns
     /// the opposite of the evaluation of the original one.
