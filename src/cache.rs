@@ -18,9 +18,6 @@ where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Version,
 {
-    /// Create an empty new cache.
-    fn new() -> Self;
-
     /// Register in cache a package + version pair as existing.
     fn add_package_version(&mut self, package: P, version: V);
 
@@ -74,19 +71,26 @@ where
     dependencies: Map<(P, V), Map<P, Range<V>>>,
 }
 
-impl<P, V> Cache<P, V> for SimpleCache<P, V>
+impl<P, V> SimpleCache<P, V>
 where
     P: Clone + Eq + Hash,
     V: Clone + Ord + Hash + Version,
 {
-    fn new() -> Self {
+    /// Create an empty cache.
+    pub fn new() -> Self {
         Self {
             package_versions_count: 0,
             package_versions: Map::new(),
             dependencies: Map::new(),
         }
     }
+}
 
+impl<P, V> Cache<P, V> for SimpleCache<P, V>
+where
+    P: Clone + Eq + Hash,
+    V: Clone + Ord + Hash + Version,
+{
     fn add_package_version(&mut self, package: P, version: V) {
         match self.package_versions.get_mut(&package) {
             None => {
