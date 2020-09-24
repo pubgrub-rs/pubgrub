@@ -23,7 +23,8 @@ jobs:
         path: |
             ./target
             ~/.cargo
-        key: ${{ runner.os }}
+        key: ${{ runner.os }}-${{ hashFiles('Cargo.toml') }}
+        restore-keys: ${{ runner.os }}
 
     - name: Build
       run: cargo build --verbose
