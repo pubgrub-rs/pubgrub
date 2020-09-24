@@ -32,8 +32,6 @@ use crate::version::Version;
 /// [PubGrub documentation](https://github.com/dart-lang/pub/blob/master/doc/solver.md#incompatibility).
 #[derive(Debug, Clone)]
 pub struct Incompatibility<P: Package, V: Version> {
-    /// TODO: remove pub.
-    pub id: usize,
     package_terms: Map<P, Term<V>>,
     kind: Kind<P, V>,
 }
@@ -66,14 +64,13 @@ pub enum Relation<P: Package, V: Version> {
 
 impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Create the initial "not Root" incompatibility.
-    pub fn not_root(id: usize, package: P, version: V) -> Self {
+    pub fn not_root(package: P, version: V) -> Self {
         let mut package_terms = Map::with_capacity(1);
         package_terms.insert(
             package.clone(),
             Term::Negative(Range::exact(version.clone())),
         );
         Self {
-            id,
             package_terms,
             kind: Kind::NotRoot(package, version),
         }
@@ -81,7 +78,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Create an incompatibility to remember
     /// that a given range does not contain any version.
-    pub fn no_version(id: usize, package: P, term: Term<V>) -> Self {
+    pub fn no_version(package: P, term: Term<V>) -> Self {
         let range = match &term {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
@@ -89,7 +86,6 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         let mut package_terms = Map::with_capacity(1);
         package_terms.insert(package.clone(), term);
         Self {
-            id,
             package_terms,
             kind: Kind::NoVersion(package, range),
         }
@@ -98,41 +94,31 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Create an incompatibility to remember
     /// that a package version is not selectable
     /// because its list of dependencies is unavailable.
-    pub fn unavailable_dependencies(id: usize, package: P, version: V) -> Self {
+    pub fn unavailable_dependencies(package: P, version: V) -> Self {
         let range = Range::exact(version);
         let mut package_terms = Map::with_capacity(1);
         package_terms.insert(package.clone(), Term::Positive(range.clone()));
         Self {
-            id,
             package_terms,
             kind: Kind::UnavailableDependencies(package, range),
         }
     }
 
     /// Generate a list of incompatibilities from direct dependencies of a package.
-    pub fn from_dependencies(
-        start_id: usize,
-        package: P,
-        version: V,
-        deps: &Map<P, Range<V>>,
-    ) -> Vec<Self> {
+    pub fn from_dependencies(package: P, version: V, deps: &Map<P, Range<V>>) -> Vec<Self> {
         deps.iter()
-            .enumerate()
-            .map(|(i, dep)| {
-                Self::from_dependency(start_id + i, package.clone(), version.clone(), dep)
-            })
+            .map(|dep| Self::from_dependency(package.clone(), version.clone(), dep))
             .collect()
     }
 
     /// Build an incompatibility from a given dependency.
-    fn from_dependency(id: usize, package: P, version: V, dep: (&P, &Range<V>)) -> Self {
+    fn from_dependency(package: P, version: V, dep: (&P, &Range<V>)) -> Self {
         let mut package_terms = Map::with_capacity(2);
         let range1 = Range::exact(version);
         package_terms.insert(package.clone(), Term::Positive(range1.clone()));
         let (p2, range2) = dep;
         package_terms.insert(p2.clone(), Term::Negative(range2.clone()));
         Self {
-            id,
             package_terms,
             kind: Kind::FromDependencyOf(package, range1, p2.clone(), range2.clone()),
         }
@@ -140,7 +126,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Perform the union of two incompatibilities.
     /// Terms that are always satisfied are removed from the union.
-    fn union(id: usize, i1: &Map<P, Term<V>>, i2: &Map<P, Term<V>>, kind: Kind<P, V>) -> Self {
+    fn union(i1: &Map<P, Term<V>>, i2: &Map<P, Term<V>>, kind: Kind<P, V>) -> Self {
         let package_terms = Self::merge(i1, i2, |t1, t2| {
             let term_union = t1.union(t2);
             if term_union == Term::any() {
@@ -150,7 +136,6 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             }
         });
         Self {
-            id,
             package_terms,
             kind,
         }
@@ -209,15 +194,15 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// It may not be trivial since those incompatibilities
     /// may already have derived others.
     /// Maybe this should not be persued.
-    pub fn merge_into(self, incompatibilities: &mut Vec<Self>) {
-        incompatibilities.push(self);
+    pub fn merge_into(self, id: usize, incompatibilities: &mut Vec<(usize, Self)>) {
+        incompatibilities.push((id, self));
     }
 
     /// A prior cause is computed as the union of the terms in two incompatibilities.
     /// Terms that are always satisfied are removed from the union.
-    pub fn prior_cause(id: usize, i1: &Self, i2: &Self) -> Self {
-        let kind = Kind::DerivedFrom(i1.id, i2.id);
-        Self::union(id, &i1.package_terms, &i2.package_terms, kind)
+    pub fn prior_cause(id1: usize, i1: &Self, id2: usize, i2: &Self) -> Self {
+        let kind = Kind::DerivedFrom(id1, id2);
+        Self::union(&i1.package_terms, &i2.package_terms, kind)
     }
 
     /// CF definition of Relation enum.
@@ -283,16 +268,17 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Build a derivation tree for error reporting.
     pub fn build_derivation_tree(
         &self,
+        id: usize,
         shared_ids: &Set<usize>,
         store: &[Self],
     ) -> DerivationTree<P, V> {
         match &self.kind {
             Kind::DerivedFrom(id1, id2) => {
-                let cause1 = store[*id1].build_derivation_tree(shared_ids, store);
-                let cause2 = store[*id2].build_derivation_tree(shared_ids, store);
+                let cause1 = store[*id1].build_derivation_tree(*id1, shared_ids, store);
+                let cause2 = store[*id2].build_derivation_tree(*id2, shared_ids, store);
                 let derived = Derived {
                     terms: self.package_terms.clone(),
-                    shared_id: shared_ids.get(&self.id).cloned(),
+                    shared_id: shared_ids.get(&id).cloned(),
                     cause1: Box::new(cause1),
                     cause2: Box::new(cause2),
                 };
@@ -369,7 +355,7 @@ pub mod tests {
             i3.insert("p1", t1);
             i3.insert("p3", t3);
 
-            let i_resolution = Incompatibility::union(0, &i1, &i2, Kind::DerivedFrom(0, 0));
+            let i_resolution = Incompatibility::union(&i1, &i2, Kind::DerivedFrom(0, 0));
             assert_eq!(i_resolution.package_terms, i3);
         }
 

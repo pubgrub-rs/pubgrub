@@ -118,9 +118,7 @@ pub trait Solver<P: Package, V: Version> {
             // Pick the next compatible version.
             let v = match PartialSolution::<P, V>::pick_version(&available_versions[..], &term) {
                 None => {
-                    state.add_incompatibility(|id| {
-                        Incompatibility::no_version(id, p.clone(), term.clone())
-                    });
+                    state.add_incompatibility(Incompatibility::no_version(p.clone(), term.clone()));
                     continue;
                 }
                 Some(x) => x,
@@ -135,20 +133,20 @@ pub trait Solver<P: Package, V: Version> {
                 }
             })? {
                 None => {
-                    state.add_incompatibility(|id| {
-                        Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
-                    });
+                    state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                        p.clone(),
+                        v.clone(),
+                    ));
                     continue;
                 }
                 Some(x) => x,
             };
 
             // Add that package and version if the dependencies are not problematic.
-            let start_id = state.incompatibility_store.len();
             let dep_incompats =
-                Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
+                Incompatibility::from_dependencies(p.clone(), v.clone(), &dependencies);
             for incompat in dep_incompats.iter() {
-                state.add_incompatibility(|_| incompat.clone());
+                state.add_incompatibility(incompat.clone());
             }
             if dep_incompats
                 .iter()

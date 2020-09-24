@@ -30,6 +30,8 @@ pub enum Assignment<P: Package, V: Version> {
         term: Term<V>,
         /// Incompatibility cause of the derivation.
         cause: Incompatibility<P, V>,
+        /// Id of the incompatibility cause.
+        cause_id: usize,
     },
 }
 

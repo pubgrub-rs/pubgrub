@@ -53,11 +53,18 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Add a derivation to the partial solution.
-    pub fn add_derivation(&mut self, package: P, term: Term<V>, cause: Incompatibility<P, V>) {
+    pub fn add_derivation(
+        &mut self,
+        package: P,
+        term: Term<V>,
+        cause: Incompatibility<P, V>,
+        cause_id: usize,
+    ) {
         self.add_assignment(Derivation {
             package,
             term,
             cause,
+            cause_id,
         });
     }
 
@@ -162,13 +169,13 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn find_satisfier_and_previous_satisfier_level(
         &self,
         incompat: &Incompatibility<P, V>,
-    ) -> (&Assignment<P, V>, usize, usize) {
+    ) -> (Assignment<P, V>, usize, usize) {
         let ((satisfier_level, satisfier), previous_assignments) =
             Self::find_satisfier(incompat, self.history.as_slice())
                 .expect("We should always find a satisfier if called in the right context.");
         let previous_satisfier_level =
             Self::find_previous_satisfier(incompat, satisfier, previous_assignments);
-        (satisfier, satisfier_level, previous_satisfier_level)
+        (satisfier.clone(), satisfier_level, previous_satisfier_level)
     }
 
     /// A satisfier is the earliest assignment in partial solution such that the incompatibility
