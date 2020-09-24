@@ -20,7 +20,9 @@ jobs:
     - name: Cache
       uses: actions/cache@v2
       with:
-        path: ./target
+        path: |
+            ./target
+            ~/.cargo
         key: ${{ runner.os }}
 
     - name: Build
