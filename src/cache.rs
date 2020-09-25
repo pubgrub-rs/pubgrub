@@ -16,7 +16,7 @@ use crate::version::Version;
 pub trait Cache<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     /// Register in cache a package + version pair as existing.
     fn add_package_version(&mut self, package: P, version: V);
@@ -61,12 +61,11 @@ where
 }
 
 /// Basic default implementation of a Cache.
-/// Remark: versions need to implement Hash
-/// in addition to the usual Clone + Ord + Version.
+/// Remark: versions also need to implement Hash.
 pub struct SimpleCache<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Hash + Version,
+    V: Version + Hash,
 {
     package_versions: Map<P, Set<V>>,
     dependencies: Map<(P, V), Map<P, Range<V>>>,
@@ -75,7 +74,7 @@ where
 impl<P, V> SimpleCache<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Hash + Version,
+    V: Version + Hash,
 {
     /// Create an empty cache.
     pub fn new() -> Self {
@@ -89,7 +88,7 @@ where
 impl<P, V> Cache<P, V> for SimpleCache<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Hash + Version,
+    V: Version + Hash,
 {
     fn add_package_version(&mut self, package: P, version: V) {
         let v_set = self.package_versions.entry(package).or_insert(Set::new());

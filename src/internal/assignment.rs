@@ -18,7 +18,7 @@ use crate::version::Version;
 pub enum Assignment<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     /// The decision.
     Decision {
@@ -41,7 +41,7 @@ where
 impl<P, V> Assignment<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     /// Return the package for this assignment
     pub fn package(&self) -> &P {

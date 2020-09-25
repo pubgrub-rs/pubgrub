@@ -18,7 +18,7 @@ use crate::version::Version;
 pub struct State<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     root_package: P,
     root_version: V,
@@ -41,7 +41,7 @@ where
 impl<P, V> State<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     /// Initialization of PubGrub state.
     pub fn init(root_package: P, root_version: V) -> Self {

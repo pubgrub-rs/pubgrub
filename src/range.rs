@@ -20,14 +20,14 @@ use crate::version::Version;
 
 /// A Range is a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Range<V: Clone + Eq + Version> {
+pub struct Range<V: Version> {
     segments: Vec<Interval<V>>,
 }
 
 type Interval<V> = (V, Option<V>);
 
 // Range building blocks.
-impl<V: Clone + Ord + Version> Range<V> {
+impl<V: Version> Range<V> {
     /// Empty set of versions.
     pub fn none() -> Self {
         Self {
@@ -80,7 +80,7 @@ impl<V: Clone + Ord + Version> Range<V> {
 }
 
 // Set operations.
-impl<V: Clone + Ord + Version> Range<V> {
+impl<V: Version> Range<V> {
     // Negate ##################################################################
 
     /// Compute the complement set of versions.
@@ -225,7 +225,7 @@ impl<V: Clone + Ord + Version> Range<V> {
 }
 
 // Other useful functions.
-impl<V: Clone + Ord + Version> Range<V> {
+impl<V: Version> Range<V> {
     /// Check if a range contains a given version.
     pub fn contains(&self, version: &V) -> bool {
         for (v1, some_v2) in self.segments.iter() {

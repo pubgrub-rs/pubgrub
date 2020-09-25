@@ -8,7 +8,7 @@
 
 /// Versions have a minimal version (a "0" version)
 /// and are ordered such that every version has a next one.
-pub trait Version {
+pub trait Version: Clone + Ord {
     /// Returns the lowest version.
     fn lowest() -> Self;
     /// Returns the next version, the smallest strictly higher version.

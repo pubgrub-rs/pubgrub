@@ -20,7 +20,7 @@ use crate::version::Version;
 pub struct Memory<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     assignments: Map<P, PackageAssignments<V>>,
 }
@@ -28,7 +28,7 @@ where
 /// A package memory contains the potential decision and derivations
 /// that have already been made for a given package.
 #[derive(Clone)]
-struct PackageAssignments<V: Clone + Ord + Version> {
+struct PackageAssignments<V: Version> {
     decision: Option<(V, Term<V>)>,
     derivations: Vec<Term<V>>,
 }
@@ -36,7 +36,7 @@ struct PackageAssignments<V: Clone + Ord + Version> {
 impl<P, V> Memory<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     /// Initialize an empty memory.
     pub fn empty() -> Self {
@@ -134,7 +134,7 @@ where
     }
 }
 
-impl<V: Clone + Ord + Version> PackageAssignments<V> {
+impl<V: Version> PackageAssignments<V> {
     /// Empty package assignment
     fn new() -> Self {
         Self {

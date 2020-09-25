@@ -10,7 +10,7 @@ use crate::version::Version;
 
 ///  A positive or negative expression regarding a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Term<V: Clone + Ord + Version> {
+pub enum Term<V: Version> {
     /// For example, "1.0.0 <= v < 2.0.0" is a positive expression
     /// that is evaluated true if a version is selected
     /// and comprised between version 1.0.0 and version 2.0.0.
@@ -22,7 +22,7 @@ pub enum Term<V: Clone + Ord + Version> {
 }
 
 // Base methods.
-impl<V: Clone + Ord + Version> Term<V> {
+impl<V: Version> Term<V> {
     /// A term that is always true.
     pub fn any() -> Self {
         Self::Negative(Range::none())
@@ -80,7 +80,7 @@ impl<V: Clone + Ord + Version> Term<V> {
 }
 
 // Set operations with terms.
-impl<'a, V: 'a + Clone + Ord + Version> Term<V> {
+impl<V: Version> Term<V> {
     /// Compute the intersection of two terms.
     /// If at least one term is positive, the intersection is also positive.
     pub fn intersection(&self, other: &Term<V>) -> Term<V> {
@@ -132,7 +132,7 @@ pub enum Relation {
 }
 
 // Relation between terms.
-impl<'a, V: 'a + Clone + Ord + Version> Term<V> {
+impl<'a, V: 'a + Version> Term<V> {
     /// Check if a set of terms satisfies this term.
     ///
     /// We say that a set of terms S "satisfies" a term t
@@ -174,7 +174,7 @@ impl<'a, V: 'a + Clone + Ord + Version> Term<V> {
     }
 }
 
-impl<V: Clone + Ord + Version> AsRef<Term<V>> for Term<V> {
+impl<V: Version> AsRef<Term<V>> for Term<V> {
     fn as_ref(&self) -> &Term<V> {
         &self
     }

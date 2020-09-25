@@ -22,7 +22,7 @@ use crate::version::Version;
 pub struct PartialSolution<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     decision_level: usize,
     /// Each assignment is stored with its decision level in the history.
@@ -35,7 +35,7 @@ where
 impl<P, V> PartialSolution<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     /// Initialize an empty partial solution.
     pub fn empty() -> Self {

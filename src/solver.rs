@@ -32,7 +32,7 @@
 //!
 //! ```ignore
 //! P: Clone + Eq + Hash,
-//! V: Clone + Ord + Version,
+//! V: Version,
 //! ```
 //!
 //! Where the `Version` trait simply states that there should be
@@ -78,7 +78,7 @@ use crate::version::Version;
 pub trait Solver<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     /// List available versions for a given package.
     /// The strategy of which version should be preferably picked in the list of available versions
@@ -159,7 +159,7 @@ where
 impl<P, V, C> Solver<P, V> for C
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
     C: Cache<P, V>,
 {
     fn list_available_versions(&mut self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {

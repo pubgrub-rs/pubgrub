@@ -31,7 +31,7 @@ use crate::version::Version;
 pub struct Incompatibility<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     id: usize,
     package_terms: Map<P, Term<V>>,
@@ -42,7 +42,7 @@ where
 enum Kind<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     NotRoot,
     NoVersion,
@@ -57,7 +57,7 @@ where
 pub enum Relation<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     /// We say that a set of terms S satisfies an incompatibility I
     /// if S satisfies every term in I.
@@ -75,7 +75,7 @@ where
 impl<P, V> Incompatibility<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     /// Create the initial "not Root" incompatibility.
     pub fn not_root(id: usize, package: P, version: V) -> Self {
@@ -274,7 +274,7 @@ where
 impl<P, V> IntoIterator for Incompatibility<P, V>
 where
     P: Clone + Eq + Hash,
-    V: Clone + Ord + Version,
+    V: Version,
 {
     type Item = (P, Term<V>);
     type IntoIter = std::collections::hash_map::IntoIter<P, Term<V>>;
