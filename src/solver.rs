@@ -31,7 +31,7 @@
 //! as long as packages (P) and versions (V) implement the following traits:
 //!
 //! ```ignore
-//! P: Clone + Eq + Hash,
+//! P: Package,
 //! V: Version,
 //! ```
 //!
@@ -58,12 +58,12 @@
 
 use std::collections::HashMap as Map;
 use std::error::Error;
-use std::hash::Hash;
 
 use crate::cache::Cache;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
 use crate::internal::partial_solution::PartialSolution;
+use crate::package::Package;
 use crate::range::Range;
 use crate::version::Version;
 
@@ -77,7 +77,7 @@ use crate::version::Version;
 /// for any type that implements `Cache` such as `SimpleCache`.
 pub trait Solver<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     /// List available versions for a given package.
@@ -158,7 +158,7 @@ where
 /// Versions are listed with newest versions first.
 impl<P, V, C> Solver<P, V> for C
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
     C: Cache<P, V>,
 {

@@ -8,6 +8,7 @@ use std::collections::BTreeSet as Set;
 use std::collections::HashMap as Map;
 use std::hash::Hash;
 
+use crate::package::Package;
 use crate::range::Range;
 use crate::version::Version;
 
@@ -15,7 +16,7 @@ use crate::version::Version;
 /// to be used by the solver algorithm.
 pub trait Cache<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     /// Register in cache a package + version pair as existing.
@@ -64,7 +65,7 @@ where
 /// Remark: versions also need to implement Hash.
 pub struct SimpleCache<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version + Hash,
 {
     package_versions: Map<P, Set<V>>,
@@ -73,7 +74,7 @@ where
 
 impl<P, V> SimpleCache<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version + Hash,
 {
     /// Create an empty cache.
@@ -87,7 +88,7 @@ where
 
 impl<P, V> Cache<P, V> for SimpleCache<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version + Hash,
 {
     fn add_package_version(&mut self, package: P, version: V) {

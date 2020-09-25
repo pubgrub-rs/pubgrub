@@ -6,9 +6,9 @@
 //! that should never be satisfied all together.
 
 use std::collections::HashMap as Map;
-use std::hash::Hash;
 
 use crate::internal::term::{self, Term};
+use crate::package::Package;
 use crate::range::Range;
 use crate::version::Version;
 
@@ -30,7 +30,7 @@ use crate::version::Version;
 #[derive(Debug, Clone)]
 pub struct Incompatibility<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     id: usize,
@@ -41,7 +41,7 @@ where
 #[derive(Debug, Clone)]
 enum Kind<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     NotRoot,
@@ -56,7 +56,7 @@ where
 #[derive(Eq, PartialEq)]
 pub enum Relation<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     /// We say that a set of terms S satisfies an incompatibility I
@@ -74,7 +74,7 @@ where
 
 impl<P, V> Incompatibility<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     /// Create the initial "not Root" incompatibility.
@@ -273,7 +273,7 @@ where
 
 impl<P, V> IntoIterator for Incompatibility<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     type Item = (P, Term<V>);

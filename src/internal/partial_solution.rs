@@ -6,12 +6,12 @@
 //! of the solution being built by the algorithm.
 
 use std::collections::HashMap as Map;
-use std::hash::Hash;
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::memory::Memory;
 use crate::internal::term::Term;
+use crate::package::Package;
 use crate::version::Version;
 
 /// The partial solution is the current state
@@ -21,7 +21,7 @@ use crate::version::Version;
 #[derive(Clone)]
 pub struct PartialSolution<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     decision_level: usize,
@@ -34,7 +34,7 @@ where
 
 impl<P, V> PartialSolution<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     /// Initialize an empty partial solution.

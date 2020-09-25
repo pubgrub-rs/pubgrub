@@ -6,10 +6,10 @@
 //! where terms are regrouped by package in a hashmap.
 
 use std::collections::HashMap as Map;
-use std::hash::Hash;
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::term::Term;
+use crate::package::Package;
 use crate::version::Version;
 
 /// A memory is the set of all assignments in the partial solution,
@@ -19,7 +19,7 @@ use crate::version::Version;
 #[derive(Clone)]
 pub struct Memory<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     assignments: Map<P, PackageAssignments<V>>,
@@ -35,7 +35,7 @@ struct PackageAssignments<V: Version> {
 
 impl<P, V> Memory<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     /// Initialize an empty memory.

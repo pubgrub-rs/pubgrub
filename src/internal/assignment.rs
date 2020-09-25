@@ -5,10 +5,9 @@
 //! Assignments are the building blocks of a PubGrub partial solution.
 //! (partial solution = the current state of the solution we are building in the algorithm).
 
-use std::hash::Hash;
-
 use crate::internal::incompatibility::Incompatibility;
 use crate::internal::term::Term;
+use crate::package::Package;
 use crate::version::Version;
 
 /// An assignment is either a decision: a chosen version for a package,
@@ -17,7 +16,7 @@ use crate::version::Version;
 #[derive(Clone)]
 pub enum Assignment<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     /// The decision.
@@ -40,7 +39,7 @@ where
 
 impl<P, V> Assignment<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     /// Return the package for this assignment

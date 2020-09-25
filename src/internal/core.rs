@@ -6,18 +6,18 @@
 //! to write a functional PubGrub algorithm.
 
 use std::error::Error;
-use std::hash::Hash;
 
 use crate::internal::assignment::Assignment::{Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::partial_solution::PartialSolution;
+use crate::package::Package;
 use crate::version::Version;
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
 pub struct State<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     root_package: P,
@@ -40,7 +40,7 @@ where
 
 impl<P, V> State<P, V>
 where
-    P: Clone + Eq + Hash,
+    P: Package,
     V: Version,
 {
     /// Initialization of PubGrub state.

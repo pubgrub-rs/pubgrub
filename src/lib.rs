@@ -8,6 +8,7 @@
 
 pub mod cache;
 pub mod internal;
+pub mod package;
 pub mod range;
 pub mod solver;
 pub mod version;
