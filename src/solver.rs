@@ -75,11 +75,7 @@ use crate::version::Version;
 ///
 /// Remark: for ease of use, the `Solver` trait is automatically implemented
 /// for any type that implements `Cache` such as `SimpleCache`.
-pub trait Solver<P, V>
-where
-    P: Package,
-    V: Version,
-{
+pub trait Solver<P: Package, V: Version> {
     /// List available versions for a given package.
     /// The strategy of which version should be preferably picked in the list of available versions
     /// is implied by the order of the list: first version in the list will be tried first.
@@ -156,12 +152,7 @@ where
 
 /// Automatically implement Config if your type implements Cache.
 /// Versions are listed with newest versions first.
-impl<P, V, C> Solver<P, V> for C
-where
-    P: Package,
-    V: Version,
-    C: Cache<P, V>,
-{
+impl<P: Package, V: Version, C: Cache<P, V>> Solver<P, V> for C {
     fn list_available_versions(&mut self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
         Ok(self
             .versions(package)

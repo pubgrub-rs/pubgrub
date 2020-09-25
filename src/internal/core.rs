@@ -15,11 +15,7 @@ use crate::version::Version;
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
-pub struct State<P, V>
-where
-    P: Package,
-    V: Version,
-{
+pub struct State<P: Package, V: Version> {
     root_package: P,
     root_version: V,
 
@@ -38,11 +34,7 @@ where
     pub incompatibility_store: Vec<Incompatibility<P, V>>,
 }
 
-impl<P, V> State<P, V>
-where
-    P: Package,
-    V: Version,
-{
+impl<P: Package, V: Version> State<P, V> {
     /// Initialization of PubGrub state.
     pub fn init(root_package: P, root_version: V) -> Self {
         let not_root_incompat =

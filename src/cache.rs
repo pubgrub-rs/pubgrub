@@ -14,11 +14,7 @@ use crate::version::Version;
 
 /// Trait for a packages and dependencies cache
 /// to be used by the solver algorithm.
-pub trait Cache<P, V>
-where
-    P: Package,
-    V: Version,
-{
+pub trait Cache<P: Package, V: Version> {
     /// Register in cache a package + version pair as existing.
     fn add_package_version(&mut self, package: P, version: V);
 
@@ -63,20 +59,12 @@ where
 
 /// Basic default implementation of a Cache.
 /// Remark: versions also need to implement Hash.
-pub struct SimpleCache<P, V>
-where
-    P: Package,
-    V: Version + Hash,
-{
+pub struct SimpleCache<P: Package, V: Version + Hash> {
     package_versions: Map<P, Set<V>>,
     dependencies: Map<(P, V), Map<P, Range<V>>>,
 }
 
-impl<P, V> SimpleCache<P, V>
-where
-    P: Package,
-    V: Version + Hash,
-{
+impl<P: Package, V: Version + Hash> SimpleCache<P, V> {
     /// Create an empty cache.
     pub fn new() -> Self {
         Self {
@@ -86,11 +74,7 @@ where
     }
 }
 
-impl<P, V> Cache<P, V> for SimpleCache<P, V>
-where
-    P: Package,
-    V: Version + Hash,
-{
+impl<P: Package, V: Version + Hash> Cache<P, V> for SimpleCache<P, V> {
     fn add_package_version(&mut self, package: P, version: V) {
         let v_set = self.package_versions.entry(package).or_insert(Set::new());
         v_set.insert(version);

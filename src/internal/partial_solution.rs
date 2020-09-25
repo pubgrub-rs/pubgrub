@@ -19,11 +19,7 @@ use crate::version::Version;
 /// It is composed of a succession of assignments,
 /// defined as either decisions or derivations.
 #[derive(Clone)]
-pub struct PartialSolution<P, V>
-where
-    P: Package,
-    V: Version,
-{
+pub struct PartialSolution<P: Package, V: Version> {
     decision_level: usize,
     /// Each assignment is stored with its decision level in the history.
     /// The order in which assignments where added in the vec is kept,
@@ -32,11 +28,7 @@ where
     memory: Memory<P, V>,
 }
 
-impl<P, V> PartialSolution<P, V>
-where
-    P: Package,
-    V: Version,
-{
+impl<P: Package, V: Version> PartialSolution<P, V> {
     /// Initialize an empty partial solution.
     pub fn empty() -> Self {
         Self {

@@ -28,22 +28,14 @@ use crate::version::Version;
 /// during conflict resolution. More about all this in
 /// [PubGrub documentation](https://github.com/dart-lang/pub/blob/master/doc/solver.md#incompatibility).
 #[derive(Debug, Clone)]
-pub struct Incompatibility<P, V>
-where
-    P: Package,
-    V: Version,
-{
+pub struct Incompatibility<P: Package, V: Version> {
     id: usize,
     package_terms: Map<P, Term<V>>,
     kind: Kind<P, V>,
 }
 
 #[derive(Debug, Clone)]
-enum Kind<P, V>
-where
-    P: Package,
-    V: Version,
-{
+enum Kind<P: Package, V: Version> {
     NotRoot,
     NoVersion,
     UnavailableDependencies(P, V),
@@ -54,11 +46,7 @@ where
 /// A Relation describes how a set of terms can be compared to an incompatibility.
 /// Typically, the set of terms comes from the partial solution.
 #[derive(Eq, PartialEq)]
-pub enum Relation<P, V>
-where
-    P: Package,
-    V: Version,
-{
+pub enum Relation<P: Package, V: Version> {
     /// We say that a set of terms S satisfies an incompatibility I
     /// if S satisfies every term in I.
     Satisfied,
@@ -72,11 +60,7 @@ where
     Inconclusive,
 }
 
-impl<P, V> Incompatibility<P, V>
-where
-    P: Package,
-    V: Version,
-{
+impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Create the initial "not Root" incompatibility.
     pub fn not_root(id: usize, package: P, version: V) -> Self {
         let mut package_terms = Map::with_capacity(1);
@@ -271,11 +255,7 @@ where
     }
 }
 
-impl<P, V> IntoIterator for Incompatibility<P, V>
-where
-    P: Package,
-    V: Version,
-{
+impl<P: Package, V: Version> IntoIterator for Incompatibility<P, V> {
     type Item = (P, Term<V>);
     type IntoIter = std::collections::hash_map::IntoIter<P, Term<V>>;
 

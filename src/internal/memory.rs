@@ -17,11 +17,7 @@ use crate::version::Version;
 ///
 /// Contrary to PartialSolution, Memory does not store derivations causes, only the terms.
 #[derive(Clone)]
-pub struct Memory<P, V>
-where
-    P: Package,
-    V: Version,
-{
+pub struct Memory<P: Package, V: Version> {
     assignments: Map<P, PackageAssignments<V>>,
 }
 
@@ -33,11 +29,7 @@ struct PackageAssignments<V: Version> {
     derivations: Vec<Term<V>>,
 }
 
-impl<P, V> Memory<P, V>
-where
-    P: Package,
-    V: Version,
-{
+impl<P: Package, V: Version> Memory<P, V> {
     /// Initialize an empty memory.
     pub fn empty() -> Self {
         Self {
