@@ -28,17 +28,15 @@
 //! ```
 //!
 //! The algorithm is generic and works for any type of dependency system
-//! as long as packages (P) and versions (V) implement the following traits:
-//!
-//! ```ignore
-//! P: Package,
-//! V: Version,
-//! ```
-//!
-//! Where the `Version` trait simply states that there should be
+//! as long as packages (P) and versions (V) implement
+//! the `Package` and `Version` traits.
+//! `Package` is strictly equivalent and automatically generated
+//! for any type that implement `Clone + Eq + Hash`.
+//! `Version` simply states that versions are ordered,
+//! that there should be
 //! a minimal `lowest` version (like 0.0.0 in semantic versions),
 //! and that for any version, it is possible to compute
-//! what the next version closest to this one is.
+//! what the next version closest to this one is (`bump`).
 //! For semantic versions, `bump` corresponds to an increment of the patch number.
 //!
 //!
@@ -82,7 +80,7 @@ pub trait Solver<P: Package, V: Version> {
     fn list_available_versions(&mut self, package: &P) -> Result<Vec<V>, Box<dyn Error>>;
 
     /// Retrieve the package dependencies.
-    /// Return None if it's dependencies are unknown.
+    /// Return None if its dependencies are unknown.
     fn get_dependencies(
         &mut self,
         package: &P,

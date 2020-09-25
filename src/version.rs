@@ -2,9 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-//! Versions following the semantic versioning scheme of major.minor.patch.
-//!
-//! This module provides traits and types to create and compare versions.
+//! Traits and implementations to create and compare versions.
 
 /// Versions have a minimal version (a "0" version)
 /// and are ordered such that every version has a next one.
