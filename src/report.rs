@@ -392,7 +392,7 @@ impl DefaultStringReporter {
         self.ref_count = new_count;
         self.lines
             .last_mut()
-            .map(|line| format!("{} ({})", line, new_count));
+            .map(|line| *line = format!("{} ({})", line, new_count));
     }
 
     fn line_ref_of(&self, shared_id: Option<usize>) -> Option<usize> {
