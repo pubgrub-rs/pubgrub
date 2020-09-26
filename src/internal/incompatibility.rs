@@ -6,10 +6,13 @@
 //! that should never be satisfied all together.
 
 use std::collections::HashMap as Map;
+use std::collections::HashSet as Set;
+use std::rc::Rc;
 
 use crate::internal::term::{self, Term};
 use crate::package::Package;
 use crate::range::Range;
+use crate::report::{DerivationTree, Derived, External};
 use crate::version::Version;
 
 /// An incompatibility is a set of terms for different packages
@@ -29,7 +32,8 @@ use crate::version::Version;
 /// [PubGrub documentation](https://github.com/dart-lang/pub/blob/master/doc/solver.md#incompatibility).
 #[derive(Debug, Clone)]
 pub struct Incompatibility<P: Package, V: Version> {
-    id: usize,
+    /// TODO: remove pub.
+    pub id: usize,
     package_terms: Map<P, Term<V>>,
     kind: Kind<P, V>,
 }
@@ -252,6 +256,85 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Iterate over packages.
     pub fn iter(&self) -> std::collections::hash_map::Iter<P, Term<V>> {
         self.package_terms.iter()
+    }
+
+    // Reporting ###############################################################
+
+    /// Retrieve parent causes if of type DerivedFrom.
+    pub fn causes(&self) -> Option<(usize, usize)> {
+        match self.kind {
+            Kind::DerivedFrom(id1, id2) => Some((id1, id2)),
+            _ => None,
+        }
+    }
+
+    /// Build a derivation tree for error reporting.
+    pub fn build_derivation_tree(
+        &self,
+        shared_ids: &Set<usize>,
+        store: &[Self],
+    ) -> DerivationTree<P, V> {
+        match &self.kind {
+            Kind::DerivedFrom(id1, id2) => {
+                let cause1 = store[*id1].build_derivation_tree(shared_ids, store);
+                let cause2 = store[*id2].build_derivation_tree(shared_ids, store);
+                let derived = Derived {
+                    terms: self.package_terms.clone(),
+                    shared_id: shared_ids.get(&self.id).cloned(),
+                    cause1: Rc::new(cause1),
+                    cause2: Rc::new(cause2),
+                };
+                DerivationTree::Derived(derived)
+            }
+            Kind::NotRoot => {
+                // TODO: improve the Kind type to avoid doing this.
+                let (package, term) = self.package_terms.iter().next().unwrap();
+                let version = match term {
+                    Term::Positive(_) => panic!("NotRoot should be negative"),
+                    Term::Negative(range) => range.lowest_version().unwrap(),
+                };
+                DerivationTree::External(External::NotRoot(package.clone(), version))
+            }
+            Kind::NoVersion => {
+                // TODO: improve the Kind type to avoid doing this.
+                let (package, term) = self.package_terms.iter().next().unwrap();
+                let range = match term {
+                    Term::Positive(r) => r.clone(),
+                    Term::Negative(_) => panic!("NoVersion should be positive"),
+                };
+                DerivationTree::External(External::NoVersion(package.clone(), range))
+            }
+            Kind::UnavailableDependencies(package, version) => {
+                // TODO: improve by keeping a range of version in Kind.
+                DerivationTree::External(External::UnavailableDependencies(
+                    package.clone(),
+                    Range::exact(version.clone()),
+                ))
+            }
+            Kind::FromDependencyOf(package) => {
+                // TODO: improve the Kind type to avoid doing this.
+                let mut iter = self.package_terms.iter();
+                let (p1, t1) = iter.next().unwrap();
+                let (p2, t2) = iter.next().unwrap();
+                let dep = if p1 == package { p2 } else { p1 };
+                let term = if p1 == package { t1 } else { t2 };
+                let range = match term {
+                    Term::Positive(r) => r.clone(),
+                    Term::Negative(_) => panic!("Term should be positive"),
+                };
+                let dep_term = if p1 == package { t2 } else { t1 };
+                let dep_range = match dep_term {
+                    Term::Positive(_) => panic!("Term should be negative"),
+                    Term::Negative(r) => r.clone(),
+                };
+                DerivationTree::External(External::FromDependencyOf(
+                    package.clone(),
+                    range,
+                    dep.clone(),
+                    dep_range,
+                ))
+            }
+        }
     }
 }
 

@@ -38,6 +38,9 @@ pub enum DerivationTree<P: Package, V: Version> {
 /// they have their own reason.
 #[derive(Debug)]
 pub enum External<P: Package, V: Version> {
+    /// Initial incompatibility aiming at picking the root package
+    /// for the first decision.
+    NotRoot(P, V),
     /// No version exist in that range.
     NoVersion(P, Range<V>),
     /// Dependencies of the package are unavailable for versions in that range.
@@ -66,6 +69,9 @@ pub struct Derived<P: Package, V: Version> {
 impl<P: Package, V: Version> fmt::Display for External<P, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NotRoot(package, version) => {
+                write!(f, "we are solving dependencies of {} {}", package, version)
+            }
             Self::NoVersion(package, range) => {
                 if range == &Range::any() {
                     write!(f, "there is no available version for {}", package)

@@ -5,11 +5,14 @@
 //! Core model and functions
 //! to write a functional PubGrub algorithm.
 
+use std::collections::HashSet as Set;
+
 use crate::error::PubGrubError;
 use crate::internal::assignment::Assignment::{Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::partial_solution::PartialSolution;
 use crate::package::Package;
+use crate::report::DerivationTree;
 use crate::version::Version;
 
 /// Current state of the PubGrub algorithm.
@@ -120,7 +123,9 @@ impl<P: Package, V: Version> State<P, V> {
         let mut current_incompat_changed = false;
         loop {
             if current_incompat.is_terminal(&self.root_package, &self.root_version) {
-                return Err(PubGrubError::NoSolution(todo!("derivation tree")));
+                return Err(PubGrubError::NoSolution(
+                    self.build_derivation_tree(&current_incompat),
+                ));
             } else {
                 let (satisfier, satisfier_level, previous_satisfier_level) = self
                     .partial_solution
@@ -167,5 +172,31 @@ impl<P: Package, V: Version> State<P, V> {
         if incompat_changed {
             incompat.merge_into(&mut self.incompatibilities);
         }
+    }
+
+    // Error reporting #########################################################
+
+    fn build_derivation_tree(&self, incompat: &Incompatibility<P, V>) -> DerivationTree<P, V> {
+        let shared_ids = self.find_shared_ids(incompat);
+        incompat.build_derivation_tree(&shared_ids, self.incompatibility_store.as_slice())
+    }
+
+    fn find_shared_ids(&self, incompat: &Incompatibility<P, V>) -> Set<usize> {
+        let mut all_ids = Set::new();
+        let mut shared_ids = Set::new();
+        let mut stack = Vec::new();
+        stack.push(incompat);
+        while let Some(i) = stack.pop() {
+            if let Some((id1, id2)) = i.causes() {
+                if all_ids.contains(&i.id) {
+                    shared_ids.insert(i.id);
+                } else {
+                    all_ids.insert(i.id);
+                    stack.push(&self.incompatibility_store[id1]);
+                    stack.push(&self.incompatibility_store[id2]);
+                }
+            }
+        }
+        shared_ids
     }
 }

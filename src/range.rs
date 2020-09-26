@@ -243,6 +243,15 @@ impl<V: Version> Range<V> {
         }
         false
     }
+
+    /// Return the lowest version in the range (if there is one).
+    pub fn lowest_version(&self) -> Option<V> {
+        self.segments
+            .as_slice()
+            .first()
+            .map(|(start, _)| start)
+            .cloned()
+    }
 }
 
 // REPORT ######################################################################
