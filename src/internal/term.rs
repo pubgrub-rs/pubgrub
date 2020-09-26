@@ -7,6 +7,7 @@
 
 use crate::range::Range;
 use crate::version::Version;
+use std::fmt;
 
 ///  A positive or negative expression regarding a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -177,6 +178,17 @@ impl<'a, V: 'a + Version> Term<V> {
 impl<V: Version> AsRef<Term<V>> for Term<V> {
     fn as_ref(&self) -> &Term<V> {
         &self
+    }
+}
+
+// REPORT ######################################################################
+
+impl<V: Version + fmt::Display> fmt::Display for Term<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Positive(range) => write!(f, "{}", range),
+            Self::Negative(range) => write!(f, "Not ( {} )", range),
+        }
     }
 }
 

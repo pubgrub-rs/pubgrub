@@ -10,7 +10,7 @@ pub trait Version: Clone + Ord {
     /// Returns the lowest version.
     fn lowest() -> Self;
     /// Returns the next version, the smallest strictly higher version.
-    fn bump(self) -> Self;
+    fn bump(&self) -> Self;
 }
 
 /// Type for semantic versions: major.minor.patch.
@@ -87,7 +87,7 @@ impl Version for SemanticVersion {
     fn lowest() -> Self {
         Self::zero()
     }
-    fn bump(self) -> Self {
+    fn bump(&self) -> Self {
         self.bump_patch()
     }
 }
@@ -100,7 +100,7 @@ impl Version for NumberVersion {
     fn lowest() -> Self {
         Self(0)
     }
-    fn bump(self) -> Self {
+    fn bump(&self) -> Self {
         Self(self.0 + 1)
     }
 }

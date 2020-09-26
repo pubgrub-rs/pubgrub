@@ -17,6 +17,7 @@
 //!  - `between(v1, v2)`: the set defined by `v1 <= versions < v2`
 
 use crate::version::Version;
+use std::fmt;
 
 /// A Range is a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -241,6 +242,36 @@ impl<V: Version> Range<V> {
             }
         }
         false
+    }
+}
+
+// REPORT ######################################################################
+
+impl<V: Version + fmt::Display> fmt::Display for Range<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.segments.as_slice() {
+            [] => write!(f, "∅"),
+            [(start, None)] if start == &V::lowest() => write!(f, "∗"),
+            [(start, None)] => write!(f, "{} <= v", start),
+            [(start, Some(end))] if end == &start.bump() => write!(f, "{}", start),
+            [(start, Some(end))] if start == &V::lowest() => write!(f, "v < {}", end),
+            [(start, Some(end))] => write!(f, "{} <= v < {}", start, end),
+            more_than_one_interval => write!(
+                f,
+                "{}",
+                more_than_one_interval
+                    .iter()
+                    .map(interval_to_string)
+                    .fold(String::new(), |s1, s2| s1 + "  " + &s2)
+            ),
+        }
+    }
+}
+
+fn interval_to_string<V: Version + fmt::Display>(interval: &Interval<V>) -> String {
+    match interval {
+        (start, Some(end)) => format!("[ {}, {} [", start, end),
+        (start, None) => format!("[ {}, ∞ [", start),
     }
 }
 
