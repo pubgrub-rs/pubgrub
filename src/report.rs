@@ -26,6 +26,7 @@ pub trait Reporter<P: Package, V: Version> {
 
 /// Derivation tree resulting in the impossibility
 /// to solve the dependencies of our root package.
+#[derive(Debug)]
 pub enum DerivationTree<P: Package, V: Version> {
     /// External incompatibility.
     External(External<P, V>),
@@ -35,6 +36,7 @@ pub enum DerivationTree<P: Package, V: Version> {
 
 /// Incompatibilities that are not derived from others,
 /// they have their own reason.
+#[derive(Debug)]
 pub enum External<P: Package, V: Version> {
     /// No version exist in that range.
     NoVersion(P, Range<V>),
@@ -45,6 +47,7 @@ pub enum External<P: Package, V: Version> {
 }
 
 /// Incompatibility derived from two others.
+#[derive(Debug)]
 pub struct Derived<P: Package, V: Version> {
     /// Terms of the incompatibility.
     pub terms: Map<P, Term<V>>,
@@ -60,11 +63,7 @@ pub struct Derived<P: Package, V: Version> {
     pub cause2: Rc<DerivationTree<P, V>>,
 }
 
-impl<P, V> fmt::Display for External<P, V>
-where
-    P: Package + fmt::Display,
-    V: Version + fmt::Display,
-{
+impl<P: Package, V: Version> fmt::Display for External<P, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoVersion(package, range) => {
@@ -121,11 +120,7 @@ impl DefaultStringReporter {
         }
     }
 
-    fn build_recursive<P, V>(&mut self, derived: &Derived<P, V>)
-    where
-        P: Package + fmt::Display,
-        V: Version + fmt::Display,
-    {
+    fn build_recursive<P: Package, V: Version>(&mut self, derived: &Derived<P, V>) {
         self.build_recursive_helper(derived);
         derived.shared_id.map(|id| {
             if self.shared_with_ref.get(&id) == None {
@@ -135,11 +130,7 @@ impl DefaultStringReporter {
         });
     }
 
-    fn build_recursive_helper<P, V>(&mut self, current: &Derived<P, V>)
-    where
-        P: Package + fmt::Display,
-        V: Version + fmt::Display,
-    {
+    fn build_recursive_helper<P: Package, V: Version>(&mut self, current: &Derived<P, V>) {
         match (&*current.cause1, &*current.cause2) {
             (DerivationTree::External(external1), DerivationTree::External(external2)) => {
                 // Simplest case, we just combine two external incompatibilities.
@@ -217,7 +208,7 @@ impl DefaultStringReporter {
     ///
     /// The result will depend on the fact that the derived incompatibility
     /// has already been explained or not.
-    fn report_one_each<P: Package + fmt::Display, V: Version + fmt::Display>(
+    fn report_one_each<P: Package, V: Version>(
         &mut self,
         derived: &Derived<P, V>,
         external: &External<P, V>,
@@ -235,7 +226,7 @@ impl DefaultStringReporter {
     }
 
     /// Report one derived (without a line ref yet) and one external.
-    fn report_recurse_one_each<P: Package + fmt::Display, V: Version + fmt::Display>(
+    fn report_recurse_one_each<P: Package, V: Version>(
         &mut self,
         derived: &Derived<P, V>,
         external: &External<P, V>,
@@ -273,7 +264,7 @@ impl DefaultStringReporter {
     // String explanations #####################################################
 
     /// Simplest case, we just combine two external incompatibilities.
-    fn explain_both_external<P: Package + fmt::Display, V: Version + fmt::Display>(
+    fn explain_both_external<P: Package, V: Version>(
         external1: &External<P, V>,
         external2: &External<P, V>,
         current_terms: &Map<P, Term<V>>,
@@ -288,7 +279,7 @@ impl DefaultStringReporter {
     }
 
     /// Both causes have already been explained so we use their refs.
-    fn explain_both_ref<P: Package + fmt::Display, V: Version + fmt::Display>(
+    fn explain_both_ref<P: Package, V: Version>(
         ref_id1: usize,
         derived1: &Derived<P, V>,
         ref_id2: usize,
@@ -309,7 +300,7 @@ impl DefaultStringReporter {
     /// One cause is derived (already explained so one-line),
     /// the other is a one-line external cause,
     /// and finally we conclude with the current incompatibility.
-    fn explain_ref_and_external<P: Package + fmt::Display, V: Version + fmt::Display>(
+    fn explain_ref_and_external<P: Package, V: Version>(
         ref_id: usize,
         derived: &Derived<P, V>,
         external: &External<P, V>,
@@ -326,7 +317,7 @@ impl DefaultStringReporter {
     }
 
     /// Add an external cause to the chain of explanations.
-    fn and_explain_external<P: Package + fmt::Display, V: Version + fmt::Display>(
+    fn and_explain_external<P: Package, V: Version>(
         external: &External<P, V>,
         current_terms: &Map<P, Term<V>>,
     ) -> String {
@@ -338,7 +329,7 @@ impl DefaultStringReporter {
     }
 
     /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_ref<P: Package + fmt::Display, V: Version + fmt::Display>(
+    fn and_explain_ref<P: Package, V: Version>(
         ref_id: usize,
         derived: &Derived<P, V>,
         current_terms: &Map<P, Term<V>>,
@@ -352,7 +343,7 @@ impl DefaultStringReporter {
     }
 
     /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_prior_and_external<P: Package + fmt::Display, V: Version + fmt::Display>(
+    fn and_explain_prior_and_external<P: Package, V: Version>(
         prior_external: &External<P, V>,
         external: &External<P, V>,
         current_terms: &Map<P, Term<V>>,
@@ -365,9 +356,7 @@ impl DefaultStringReporter {
         )
     }
 
-    fn string_terms<P: Package + fmt::Display, V: Version + fmt::Display>(
-        terms: &Map<P, Term<V>>,
-    ) -> String {
+    fn string_terms<P: Package, V: Version>(terms: &Map<P, Term<V>>) -> String {
         let terms_vec: Vec<_> = terms.iter().collect();
         match terms_vec.as_slice() {
             [] => "version solving failed".into(),
@@ -405,11 +394,7 @@ impl DefaultStringReporter {
     }
 }
 
-impl<P, V> Reporter<P, V> for DefaultStringReporter
-where
-    P: Package + fmt::Display,
-    V: Version + fmt::Display,
-{
+impl<P: Package, V: Version> Reporter<P, V> for DefaultStringReporter {
     type Output = String;
 
     fn report(derivation_tree: &DerivationTree<P, V>) -> Self::Output {

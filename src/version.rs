@@ -4,9 +4,11 @@
 
 //! Traits and implementations to create and compare versions.
 
+use std::fmt::{self, Debug, Display};
+
 /// Versions have a minimal version (a "0" version)
 /// and are ordered such that every version has a next one.
-pub trait Version: Clone + Ord {
+pub trait Version: Clone + Ord + Debug + Display {
     /// Returns the lowest version.
     fn lowest() -> Self;
     /// Returns the next version, the smallest strictly higher version.
@@ -82,6 +84,12 @@ impl SemanticVersion {
     }
 }
 
+impl Display for SemanticVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
 // Implement Version for SemanticVersion.
 impl Version for SemanticVersion {
     fn lowest() -> Self {
@@ -95,6 +103,12 @@ impl Version for SemanticVersion {
 /// Simplest versions possible, just a positive number.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct NumberVersion(pub usize);
+
+impl Display for NumberVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Version for NumberVersion {
     fn lowest() -> Self {

@@ -7,6 +7,7 @@
 #![warn(missing_docs)]
 
 pub mod cache;
+pub mod error;
 pub mod internal;
 pub mod package;
 pub mod range;

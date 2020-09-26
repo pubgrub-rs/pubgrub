@@ -58,6 +58,7 @@ use std::collections::HashMap as Map;
 use std::error::Error;
 
 use crate::cache::Cache;
+use crate::error::PubGrubError;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
 use crate::internal::partial_solution::PartialSolution;
@@ -88,7 +89,7 @@ pub trait Solver<P: Package, V: Version> {
     ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>>;
 
     /// Solve dependencies of a given package.
-    fn run(&mut self, package: &P, version: &V) -> Result<Map<P, V>, Box<dyn Error>> {
+    fn run(&mut self, package: &P, version: &V) -> Result<Map<P, V>, PubGrubError<P, V>> {
         let mut state = State::init(package.clone(), version.clone());
         let mut next = package.clone();
         loop {
@@ -97,14 +98,22 @@ pub trait Solver<P: Package, V: Version> {
             // Pick the next package.
             let (p, term) = match state.partial_solution.pick_package() {
                 None => {
-                    return state.partial_solution.extract_solution().ok_or(
-                        "How did we end up with no package to choose but no solution?".into(),
-                    )
+                    return state
+                        .partial_solution
+                        .extract_solution()
+                        .ok_or(PubGrubError::Failure(
+                            "How did we end up with no package to choose but no solution?".into(),
+                        ))
                 }
                 Some(x) => x,
             };
             next = p.clone();
-            let available_versions = self.list_available_versions(&p)?;
+            let available_versions = self.list_available_versions(&p).map_err(|err| {
+                PubGrubError::ErrorRetrievingVersions {
+                    package: p.clone(),
+                    source: err,
+                }
+            })?;
 
             // Pick the next compatible version.
             let v = match PartialSolution::<P, V>::pick_version(&available_versions[..], &term) {
@@ -118,7 +127,13 @@ pub trait Solver<P: Package, V: Version> {
             };
 
             // Retrieve that package dependencies.
-            let dependencies = match self.get_dependencies(&p, &v)? {
+            let dependencies = match self.get_dependencies(&p, &v).map_err(|err| {
+                PubGrubError::ErrorRetrievingDependencies {
+                    package: p.clone(),
+                    version: v.clone(),
+                    source: err,
+                }
+            })? {
                 None => {
                     state.add_incompatibility(|id| {
                         Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
@@ -141,7 +156,9 @@ pub trait Solver<P: Package, V: Version> {
             {
                 // For a dependency incompatibility to be terminal,
                 // it can only mean that root depend on not root?
-                Err("Root package depends on itself at a different version?")?
+                Err(PubGrubError::Failure(
+                    "Root package depends on itself at a different version?".into(),
+                ))?;
             }
             state.partial_solution.add_version(p, v, &dep_incompats);
         }

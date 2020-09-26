@@ -247,7 +247,7 @@ impl<V: Version> Range<V> {
 
 // REPORT ######################################################################
 
-impl<V: Version + fmt::Display> fmt::Display for Range<V> {
+impl<V: Version> fmt::Display for Range<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.segments.as_slice() {
             [] => write!(f, "∅"),
@@ -268,7 +268,7 @@ impl<V: Version + fmt::Display> fmt::Display for Range<V> {
     }
 }
 
-fn interval_to_string<V: Version + fmt::Display>(interval: &Interval<V>) -> String {
+fn interval_to_string<V: Version>(interval: &Interval<V>) -> String {
     match interval {
         (start, Some(end)) => format!("[ {}, {} [", start, end),
         (start, None) => format!("[ {}, ∞ [", start),

@@ -5,8 +5,7 @@
 //! Core model and functions
 //! to write a functional PubGrub algorithm.
 
-use std::error::Error;
-
+use crate::error::PubGrubError;
 use crate::internal::assignment::Assignment::{Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::partial_solution::PartialSolution;
@@ -62,7 +61,7 @@ impl<P: Package, V: Version> State<P, V> {
 
     /// Unit propagation is the core mechanism of the solving algorithm.
     /// CF https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation
-    pub fn unit_propagation(&mut self, package: P) -> Result<(), Box<dyn Error>> {
+    pub fn unit_propagation(&mut self, package: P) -> Result<(), PubGrubError<P, V>> {
         let mut current_package = package.clone();
         let mut changed = vec![package];
         loop {
@@ -87,7 +86,7 @@ impl<P: Package, V: Version> State<P, V> {
                                 // Add (not term) to the partial solution with incompat as cause.
                                 self.partial_solution.add_derivation(package_almost, term.negate(), root_cause);
                             }
-                            _ => Err("This should never happen, root_cause is guaranted to be almost satisfied by the partial solution")?,
+                            _ => return Err(PubGrubError::Failure("This should never happen, root_cause is guaranted to be almost satisfied by the partial solution".into())),
                         }
                     }
                     Relation::AlmostSatisfied(package_almost, term) => {
@@ -116,12 +115,12 @@ impl<P: Package, V: Version> State<P, V> {
     fn conflict_resolution(
         &mut self,
         incompatibility: &Incompatibility<P, V>,
-    ) -> Result<Incompatibility<P, V>, Box<dyn Error>> {
+    ) -> Result<Incompatibility<P, V>, PubGrubError<P, V>> {
         let mut current_incompat = incompatibility.clone();
         let mut current_incompat_changed = false;
         loop {
             if current_incompat.is_terminal(&self.root_package, &self.root_version) {
-                Err("TODO: report explanation")?
+                return Err(PubGrubError::NoSolution(todo!("derivation tree")));
             } else {
                 let (satisfier, satisfier_level, previous_satisfier_level) = self
                     .partial_solution
