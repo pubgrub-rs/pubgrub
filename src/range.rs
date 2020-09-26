@@ -265,14 +265,13 @@ impl<V: Version> fmt::Display for Range<V> {
             [(start, Some(end))] if end == &start.bump() => write!(f, "{}", start),
             [(start, Some(end))] if start == &V::lowest() => write!(f, "v < {}", end),
             [(start, Some(end))] => write!(f, "{} <= v < {}", start, end),
-            more_than_one_interval => write!(
-                f,
-                "{}",
-                more_than_one_interval
+            more_than_one_interval => {
+                let string_intervals: Vec<_> = more_than_one_interval
                     .iter()
                     .map(interval_to_string)
-                    .fold(String::new(), |s1, s2| s1 + "  " + &s2)
-            ),
+                    .collect();
+                write!(f, "{}", string_intervals.join("  "))
+            }
         }
     }
 }
