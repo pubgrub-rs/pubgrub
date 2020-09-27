@@ -51,18 +51,4 @@ impl<P: Package, V: Version> Assignment<P, V> {
             Self::Derivation { term, .. } => term.clone(),
         }
     }
-
-    /// Constructor for a decision.
-    pub fn decision(package: P, version: V) -> Self {
-        Self::Decision { package, version }
-    }
-
-    /// Constructor for a derivation.
-    pub fn derivation(package: P, term: Term<V>, cause: Incompatibility<P, V>) -> Self {
-        Self::Derivation {
-            package,
-            term,
-            cause,
-        }
-    }
 }
