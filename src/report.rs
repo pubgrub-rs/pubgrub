@@ -25,7 +25,7 @@ pub trait Reporter<P: Package, V: Version> {
 
 /// Derivation tree resulting in the impossibility
 /// to solve the dependencies of our root package.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DerivationTree<P: Package, V: Version> {
     /// External incompatibility.
     External(External<P, V>),
@@ -35,7 +35,7 @@ pub enum DerivationTree<P: Package, V: Version> {
 
 /// Incompatibilities that are not derived from others,
 /// they have their own reason.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum External<P: Package, V: Version> {
     /// Initial incompatibility aiming at picking the root package
     /// for the first decision.
@@ -49,7 +49,7 @@ pub enum External<P: Package, V: Version> {
 }
 
 /// Incompatibility derived from two others.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Derived<P: Package, V: Version> {
     /// Terms of the incompatibility.
     pub terms: Map<P, Term<V>>,
@@ -63,6 +63,80 @@ pub struct Derived<P: Package, V: Version> {
     pub cause1: Box<DerivationTree<P, V>>,
     /// Second cause.
     pub cause2: Box<DerivationTree<P, V>>,
+}
+
+impl<P: Package, V: Version> DerivationTree<P, V> {
+    /// Merge the `NoVersion` external incompatibilities
+    /// with the other one they are matched with
+    /// in a derived incompatibility.
+    /// This cleans up quite nicely the generated report.
+    /// You might want to do this if you know that the solver
+    /// was not run in some kind of offline mode that may not
+    /// have access to all versions existing.
+    pub fn collapse_noversion(&mut self) {
+        match self {
+            DerivationTree::External(_) => {}
+            DerivationTree::Derived(derived) => {
+                match (&mut *derived.cause1, &mut *derived.cause2) {
+                    (DerivationTree::External(External::NoVersion(p, r)), ref mut cause2) => {
+                        cause2.collapse_noversion();
+                        *self = cause2
+                            .clone()
+                            .merge_noversion(p.to_owned(), r.to_owned())
+                            .unwrap_or(self.to_owned());
+                    }
+                    (ref mut cause1, DerivationTree::External(External::NoVersion(p, r))) => {
+                        cause1.collapse_noversion();
+                        *self = cause1
+                            .clone()
+                            .merge_noversion(p.to_owned(), r.to_owned())
+                            .unwrap_or(self.to_owned());
+                    }
+                    _ => {
+                        derived.cause1.collapse_noversion();
+                        derived.cause2.collapse_noversion();
+                    }
+                }
+            }
+        }
+    }
+
+    fn merge_noversion(self, package: P, range: Range<V>) -> Option<Self> {
+        match self {
+            // TODO: take care of the Derived case.
+            // Once done, we can remove the Option.
+            DerivationTree::Derived(_) => Some(self),
+            DerivationTree::External(External::NotRoot(_, _)) => {
+                panic!("How did we end up with a NoVersion merged with a NotRoot?")
+            }
+            DerivationTree::External(External::NoVersion(_, r)) => Some(DerivationTree::External(
+                External::NoVersion(package, range.union(&r)),
+            )),
+            DerivationTree::External(External::UnavailableDependencies(_, r)) => {
+                Some(DerivationTree::External(External::UnavailableDependencies(
+                    package,
+                    range.union(&r),
+                )))
+            }
+            DerivationTree::External(External::FromDependencyOf(p1, r1, p2, r2)) => {
+                if p1 == package {
+                    Some(DerivationTree::External(External::FromDependencyOf(
+                        p1,
+                        r1.union(&range),
+                        p2,
+                        r2,
+                    )))
+                } else {
+                    Some(DerivationTree::External(External::FromDependencyOf(
+                        p1,
+                        r1,
+                        p2,
+                        r2.union(&range),
+                    )))
+                }
+            }
+        }
+    }
 }
 
 impl<P: Package, V: Version> fmt::Display for External<P, V> {

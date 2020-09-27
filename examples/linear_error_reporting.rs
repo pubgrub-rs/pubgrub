@@ -36,7 +36,8 @@ fn main() {
     // Run the solver.
     match solver.run(&"root", &version(1, 0, 0)) {
         Ok(sol) => println!("{:?}", sol),
-        Err(PubGrubError::NoSolution(derivation_tree)) => {
+        Err(PubGrubError::NoSolution(mut derivation_tree)) => {
+            derivation_tree.collapse_noversion();
             eprintln!("{}", DefaultStringReporter::report(&derivation_tree));
             std::process::exit(1);
         }
