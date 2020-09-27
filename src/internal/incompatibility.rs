@@ -40,10 +40,10 @@ pub struct Incompatibility<P: Package, V: Version> {
 
 #[derive(Debug, Clone)]
 enum Kind<P: Package, V: Version> {
-    NotRoot,
-    NoVersion,
-    UnavailableDependencies(P, V),
-    FromDependencyOf(P),
+    NotRoot(P, V),
+    NoVersion(P, Range<V>),
+    UnavailableDependencies(P, Range<V>),
+    FromDependencyOf(P, Range<V>, P, Range<V>),
     DerivedFrom(usize, usize),
 }
 
@@ -68,23 +68,30 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Create the initial "not Root" incompatibility.
     pub fn not_root(id: usize, package: P, version: V) -> Self {
         let mut package_terms = Map::with_capacity(1);
-        package_terms.insert(package, Term::Negative(Range::exact(version)));
+        package_terms.insert(
+            package.clone(),
+            Term::Negative(Range::exact(version.clone())),
+        );
         Self {
             id,
             package_terms,
-            kind: Kind::NotRoot,
+            kind: Kind::NotRoot(package, version),
         }
     }
 
     /// Create an incompatibility to remember
     /// that a given range does not contain any version.
     pub fn no_version(id: usize, package: P, term: Term<V>) -> Self {
+        let range = match &term {
+            Term::Positive(r) => r.clone(),
+            Term::Negative(_) => panic!("No version should have a positive term"),
+        };
         let mut package_terms = Map::with_capacity(1);
-        package_terms.insert(package, term);
+        package_terms.insert(package.clone(), term);
         Self {
             id,
             package_terms,
-            kind: Kind::NoVersion,
+            kind: Kind::NoVersion(package, range),
         }
     }
 
@@ -92,12 +99,13 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// that a package version is not selectable
     /// because its list of dependencies is unavailable.
     pub fn unavailable_dependencies(id: usize, package: P, version: V) -> Self {
+        let range = Range::exact(version);
         let mut package_terms = Map::with_capacity(1);
-        package_terms.insert(package.clone(), Term::exact(version.clone()));
+        package_terms.insert(package.clone(), Term::Positive(range.clone()));
         Self {
             id,
             package_terms,
-            kind: Kind::UnavailableDependencies(package, version),
+            kind: Kind::UnavailableDependencies(package, range),
         }
     }
 
@@ -118,12 +126,16 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Build an incompatibility from a given dependency.
     fn from_dependency(id: usize, package: P, version: V, dep: (&P, &Range<V>)) -> Self {
-        let mut i1 = Map::with_capacity(1);
-        let mut i2 = Map::with_capacity(1);
-        i1.insert(package.clone(), Term::exact(version.clone()));
-        let (p, range) = dep;
-        i2.insert(p.clone(), Term::Negative(range.clone()));
-        Self::union(id, &i1, &i2, Kind::FromDependencyOf(package))
+        let mut package_terms = Map::with_capacity(2);
+        let range1 = Range::exact(version);
+        package_terms.insert(package.clone(), Term::Positive(range1.clone()));
+        let (p2, range2) = dep;
+        package_terms.insert(p2.clone(), Term::Negative(range2.clone()));
+        Self {
+            id,
+            package_terms,
+            kind: Kind::FromDependencyOf(package, range1, p2.clone(), range2.clone()),
+        }
     }
 
     /// Perform the union of two incompatibilities.
@@ -286,52 +298,21 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                 };
                 DerivationTree::Derived(derived)
             }
-            Kind::NotRoot => {
-                // TODO: improve the Kind type to avoid doing this.
-                let (package, term) = self.package_terms.iter().next().unwrap();
-                let version = match term {
-                    Term::Positive(_) => panic!("NotRoot should be negative"),
-                    Term::Negative(range) => range.lowest_version().unwrap(),
-                };
-                DerivationTree::External(External::NotRoot(package.clone(), version))
+            Kind::NotRoot(package, version) => {
+                DerivationTree::External(External::NotRoot(package.clone(), version.clone()))
             }
-            Kind::NoVersion => {
-                // TODO: improve the Kind type to avoid doing this.
-                let (package, term) = self.package_terms.iter().next().unwrap();
-                let range = match term {
-                    Term::Positive(r) => r.clone(),
-                    Term::Negative(_) => panic!("NoVersion should be positive"),
-                };
-                DerivationTree::External(External::NoVersion(package.clone(), range))
+            Kind::NoVersion(package, range) => {
+                DerivationTree::External(External::NoVersion(package.clone(), range.clone()))
             }
-            Kind::UnavailableDependencies(package, version) => {
-                // TODO: improve by keeping a range of version in Kind.
-                DerivationTree::External(External::UnavailableDependencies(
-                    package.clone(),
-                    Range::exact(version.clone()),
-                ))
-            }
-            Kind::FromDependencyOf(package) => {
-                // TODO: improve the Kind type to avoid doing this.
-                let mut iter = self.package_terms.iter();
-                let (p1, t1) = iter.next().unwrap();
-                let (p2, t2) = iter.next().unwrap();
-                let dep = if p1 == package { p2 } else { p1 };
-                let term = if p1 == package { t1 } else { t2 };
-                let range = match term {
-                    Term::Positive(r) => r.clone(),
-                    Term::Negative(_) => panic!("Term should be positive"),
-                };
-                let dep_term = if p1 == package { t2 } else { t1 };
-                let dep_range = match dep_term {
-                    Term::Positive(_) => panic!("Term should be negative"),
-                    Term::Negative(r) => r.clone(),
-                };
+            Kind::UnavailableDependencies(package, range) => DerivationTree::External(
+                External::UnavailableDependencies(package.clone(), range.clone()),
+            ),
+            Kind::FromDependencyOf(package, range, dep_package, dep_range) => {
                 DerivationTree::External(External::FromDependencyOf(
                     package.clone(),
-                    range,
-                    dep.clone(),
-                    dep_range,
+                    range.clone(),
+                    dep_package.clone(),
+                    dep_range.clone(),
                 ))
             }
         }
@@ -378,7 +359,7 @@ pub mod tests {
             i3.insert("p1", t1);
             i3.insert("p3", t3);
 
-            let i_resolution = Incompatibility::union(0, &i1, &i2, Kind::NotRoot);
+            let i_resolution = Incompatibility::union(0, &i1, &i2, Kind::DerivedFrom(0, 0));
             assert_eq!(i_resolution.package_terms, i3);
         }
 
