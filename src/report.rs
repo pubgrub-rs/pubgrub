@@ -8,9 +8,9 @@
 use std::collections::HashMap as Map;
 use std::fmt;
 
-use crate::internal::term::Term;
 use crate::package::Package;
 use crate::range::Range;
+use crate::term::Term;
 use crate::version::Version;
 
 /// Reporter trait.

@@ -13,4 +13,5 @@ pub mod package;
 pub mod range;
 pub mod report;
 pub mod solver;
+pub mod term;
 pub mod version;

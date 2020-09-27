@@ -8,10 +8,10 @@
 use std::collections::HashMap as Map;
 use std::collections::HashSet as Set;
 
-use crate::internal::term::{self, Term};
 use crate::package::Package;
 use crate::range::Range;
 use crate::report::{DerivationTree, Derived, External};
+use crate::term::{self, Term};
 use crate::version::Version;
 
 /// An incompatibility is a set of terms for different packages
@@ -332,7 +332,7 @@ impl<P: Package, V: Version> IntoIterator for Incompatibility<P, V> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::internal::term::tests::strategy as term_strat;
+    use crate::term::tests::strategy as term_strat;
     use proptest::prelude::*;
 
     proptest! {

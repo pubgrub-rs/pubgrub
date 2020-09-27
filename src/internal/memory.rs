@@ -8,8 +8,8 @@
 use std::collections::HashMap as Map;
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
-use crate::internal::term::Term;
 use crate::package::Package;
+use crate::term::Term;
 use crate::version::Version;
 
 /// A memory is the set of all assignments in the partial solution,

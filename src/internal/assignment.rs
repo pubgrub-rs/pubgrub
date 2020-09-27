@@ -6,8 +6,8 @@
 //! (partial solution = the current state of the solution we are building in the algorithm).
 
 use crate::internal::incompatibility::Incompatibility;
-use crate::internal::term::Term;
 use crate::package::Package;
+use crate::term::Term;
 use crate::version::Version;
 
 /// An assignment is either a decision: a chosen version for a package,
