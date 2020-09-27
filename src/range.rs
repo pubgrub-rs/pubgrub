@@ -42,21 +42,23 @@ impl<V: Version> Range<V> {
     }
 
     /// Set containing exactly one version.
-    pub fn exact(v: V) -> Self {
+    pub fn exact(v: impl Into<V>) -> Self {
+        let v = v.into();
         Self {
             segments: vec![(v.clone(), Some(v.bump()))],
         }
     }
 
     /// Set of all versions higher or equal to some version.
-    pub fn higher_than(v: V) -> Self {
+    pub fn higher_than(v: impl Into<V>) -> Self {
         Self {
-            segments: vec![(v, None)],
+            segments: vec![(v.into(), None)],
         }
     }
 
     /// Set of all versions strictly lower than some version.
-    pub fn strictly_lower_than(v: V) -> Self {
+    pub fn strictly_lower_than(v: impl Into<V>) -> Self {
+        let v = v.into();
         if v == V::lowest() {
             Self::none()
         } else {
@@ -69,7 +71,9 @@ impl<V: Version> Range<V> {
     /// Set of all versions comprised between two given versions.
     /// The lower bound is included and the higher bound excluded.
     /// `v1 <= v < v2`.
-    pub fn between(v1: V, v2: V) -> Self {
+    pub fn between(v1: impl Into<V>, v2: impl Into<V>) -> Self {
+        let v1 = v1.into();
+        let v2 = v2.into();
         if v1 < v2 {
             Self {
                 segments: vec![(v1, Some(v2))],

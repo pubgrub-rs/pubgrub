@@ -89,9 +89,9 @@ pub trait Solver<P: Package, V: Version> {
     ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>>;
 
     /// Solve dependencies of a given package.
-    fn run(&mut self, package: &P, version: &V) -> Result<Map<P, V>, PubGrubError<P, V>> {
-        let mut state = State::init(package.clone(), version.clone());
-        let mut next = package.clone();
+    fn run(&mut self, package: P, version: impl Into<V>) -> Result<Map<P, V>, PubGrubError<P, V>> {
+        let mut state = State::init(package.clone(), version.into());
+        let mut next = package;
         loop {
             state.unit_propagation(next)?;
 

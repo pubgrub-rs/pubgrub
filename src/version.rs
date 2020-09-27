@@ -104,6 +104,20 @@ impl Version for SemanticVersion {
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct NumberVersion(pub usize);
 
+// Convert an usize into a version.
+impl From<usize> for NumberVersion {
+    fn from(v: usize) -> Self {
+        Self(v)
+    }
+}
+
+// Convert a version into an usize.
+impl Into<usize> for NumberVersion {
+    fn into(self) -> usize {
+        self.0
+    }
+}
+
 impl Display for NumberVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)

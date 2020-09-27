@@ -16,7 +16,8 @@ use crate::version::Version;
 /// to be used by the solver algorithm.
 pub trait Cache<P: Package, V: Version> {
     /// Register in cache a package + version pair as existing.
-    fn add_package_version(&mut self, package: P, version: V);
+    /// TODO: use Into<P> and Into<V>
+    fn add_package_version(&mut self, package: P, version: impl Into<V>);
 
     /// Register in cache the dependencies of a package and version pair.
     /// Dependencies must be added with a single call to `add_dependencies`.
@@ -33,10 +34,10 @@ pub trait Cache<P: Package, V: Version> {
     /// If you use a cache when implementing `Solver::get_dependencies`,
     /// you do not need to request package dependencies
     /// if the call to `cache.dependencies(p, v)` returns `Some(_)`.
-    fn add_dependencies<I: Iterator<Item = (P, Range<V>)>>(
+    fn add_dependencies<I: IntoIterator<Item = (P, Range<V>)>>(
         &mut self,
         package: P,
-        version: V,
+        version: impl Into<V>,
         dependencies: I,
     );
 
@@ -75,20 +76,21 @@ impl<P: Package, V: Version + Hash> SimpleCache<P, V> {
 }
 
 impl<P: Package, V: Version + Hash> Cache<P, V> for SimpleCache<P, V> {
-    fn add_package_version(&mut self, package: P, version: V) {
+    fn add_package_version(&mut self, package: P, version: impl Into<V>) {
         let v_set = self.package_versions.entry(package).or_insert(Set::new());
-        v_set.insert(version);
+        v_set.insert(version.into());
     }
 
-    fn add_dependencies<I: Iterator<Item = (P, Range<V>)>>(
+    fn add_dependencies<I: IntoIterator<Item = (P, Range<V>)>>(
         &mut self,
         package: P,
-        version: V,
+        version: impl Into<V>,
         dependencies: I,
     ) {
-        let package_deps = dependencies.collect();
-        self.add_package_version(package.clone(), version.clone());
-        self.dependencies.insert((package, version), package_deps);
+        let package_deps = dependencies.into_iter().collect();
+        let v = version.into();
+        self.add_package_version(package.clone(), v.clone());
+        self.dependencies.insert((package, v), package_deps);
     }
 
     // Read stuff.
