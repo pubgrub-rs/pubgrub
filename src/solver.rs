@@ -31,7 +31,7 @@
 //! as long as packages (P) and versions (V) implement
 //! the `Package` and `Version` traits.
 //! `Package` is strictly equivalent and automatically generated
-//! for any type that implement `Clone + Eq + Hash`.
+//! for any type that implement `Clone + Eq + Hash + Debug + Display`.
 //! `Version` simply states that versions are ordered,
 //! that there should be
 //! a minimal `lowest` version (like 0.0.0 in semantic versions),
