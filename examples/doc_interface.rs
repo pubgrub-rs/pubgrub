@@ -18,5 +18,6 @@ fn main() {
     solver.add_dependencies("icons", 1, vec![]);
 
     // Run the solver.
-    let _solution = solver.run("root", 1).unwrap();
+    let solution = solver.run("root", 1).unwrap();
+    println!("Solution: {:?}", solution);
 }
