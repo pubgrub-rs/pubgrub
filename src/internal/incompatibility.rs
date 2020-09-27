@@ -7,10 +7,11 @@
 
 use std::collections::HashMap as Map;
 use std::collections::HashSet as Set;
+use std::fmt;
 
 use crate::package::Package;
 use crate::range::Range;
-use crate::report::{DerivationTree, Derived, External};
+use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
 use crate::term::{self, Term};
 use crate::version::Version;
 
@@ -315,6 +316,16 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                 ))
             }
         }
+    }
+}
+
+impl<P: Package, V: Version> fmt::Display for Incompatibility<P, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            DefaultStringReporter::string_terms(&self.package_terms)
+        )
     }
 }
 

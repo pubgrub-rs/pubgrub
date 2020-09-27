@@ -435,7 +435,8 @@ impl DefaultStringReporter {
         )
     }
 
-    fn string_terms<P: Package, V: Version>(terms: &Map<P, Term<V>>) -> String {
+    /// Try to print terms of an incompatiblity in a human-readable way.
+    pub fn string_terms<P: Package, V: Version>(terms: &Map<P, Term<V>>) -> String {
         let terms_vec: Vec<_> = terms.iter().collect();
         match terms_vec.as_slice() {
             [] => "version solving failed".into(),
@@ -449,11 +450,8 @@ impl DefaultStringReporter {
                 External::FromDependencyOf(p2, r2.clone(), p1, r1.clone()).to_string()
             }
             slice => {
-                slice
-                    .iter()
-                    .map(|(p, t)| format!("{} {}", p, t))
-                    .fold(String::new(), |x, y| x + ", " + &y)
-                    + " are incompatible"
+                let str_terms: Vec<_> = slice.iter().map(|(p, t)| format!("{} {}", p, t)).collect();
+                str_terms.join(", ") + " are incompatible"
             }
         }
     }
