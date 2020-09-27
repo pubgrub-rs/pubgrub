@@ -7,7 +7,6 @@
 
 use std::collections::HashMap as Map;
 use std::fmt;
-use std::rc::Rc;
 
 use crate::internal::term::Term;
 use crate::package::Package;
@@ -61,9 +60,9 @@ pub struct Derived<P: Package, V: Version> {
     /// and refer to the explanation for the other times.
     pub shared_id: Option<usize>,
     /// First cause.
-    pub cause1: Rc<DerivationTree<P, V>>,
+    pub cause1: Box<DerivationTree<P, V>>,
     /// Second cause.
-    pub cause2: Rc<DerivationTree<P, V>>,
+    pub cause2: Box<DerivationTree<P, V>>,
 }
 
 impl<P: Package, V: Version> fmt::Display for External<P, V> {

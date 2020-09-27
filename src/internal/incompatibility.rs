@@ -7,7 +7,6 @@
 
 use std::collections::HashMap as Map;
 use std::collections::HashSet as Set;
-use std::rc::Rc;
 
 use crate::internal::term::{self, Term};
 use crate::package::Package;
@@ -293,8 +292,8 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                 let derived = Derived {
                     terms: self.package_terms.clone(),
                     shared_id: shared_ids.get(&self.id).cloned(),
-                    cause1: Rc::new(cause1),
-                    cause2: Rc::new(cause2),
+                    cause1: Box::new(cause1),
+                    cause2: Box::new(cause2),
                 };
                 DerivationTree::Derived(derived)
             }
