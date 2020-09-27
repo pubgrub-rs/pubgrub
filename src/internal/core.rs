@@ -151,6 +151,9 @@ impl<P: Package, V: Version> State<P, V> {
                             let id = self.incompatibility_store.len();
                             let prior_cause =
                                 Incompatibility::prior_cause(id, &current_incompat, &cause);
+                            // eprintln!("\ncause 1: {}", &current_incompat);
+                            // eprintln!("cause 2: {}", &cause);
+                            // eprintln!("prior cause: {}\n", &prior_cause);
                             self.incompatibility_store.push(prior_cause.clone());
                             current_incompat = prior_cause;
                             current_incompat_changed = true;
