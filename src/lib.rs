@@ -8,10 +8,11 @@
 
 pub mod cache;
 pub mod error;
-pub mod internal;
 pub mod package;
 pub mod range;
 pub mod report;
 pub mod solver;
 pub mod term;
 pub mod version;
+
+mod internal;
