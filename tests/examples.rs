@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 
-use pubgrub::cache::{Cache, SimpleCache};
 use pubgrub::range::Range;
-use pubgrub::solver::Solver;
+use pubgrub::solver::{OfflineSolver, Solver};
 use pubgrub::version::SemanticVersion;
 
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#no-conflicts
 fn no_conflict() {
-    let mut solver = SimpleCache::<&str, SemanticVersion>::new();
+    let mut solver = OfflineSolver::<&str, SemanticVersion>::new();
     #[rustfmt::skip]
     solver.add_dependencies(
         "root", (1, 0, 0),
@@ -38,7 +37,7 @@ fn no_conflict() {
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#avoiding-conflict-during-decision-making
 fn avoiding_conflict_during_decision_making() {
-    let mut solver = SimpleCache::<&str, SemanticVersion>::new();
+    let mut solver = OfflineSolver::<&str, SemanticVersion>::new();
     #[rustfmt::skip]
     solver.add_dependencies(
         "root", (1, 0, 0),
@@ -73,7 +72,7 @@ fn avoiding_conflict_during_decision_making() {
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#performing-conflict-resolution
 fn conflict_resolution() {
-    let mut solver = SimpleCache::<&str, SemanticVersion>::new();
+    let mut solver = OfflineSolver::<&str, SemanticVersion>::new();
     #[rustfmt::skip]
     solver.add_dependencies(
         "root", (1, 0, 0),
@@ -106,7 +105,7 @@ fn conflict_resolution() {
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#conflict-resolution-with-a-partial-satisfier
 fn conflict_with_partial_satisfier() {
-    let mut solver = SimpleCache::<&str, SemanticVersion>::new();
+    let mut solver = OfflineSolver::<&str, SemanticVersion>::new();
     #[rustfmt::skip]
     // root 1.0.0 depends on foo ^1.0.0 and target ^2.0.0
     solver.add_dependencies(

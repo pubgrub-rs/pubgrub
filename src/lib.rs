@@ -44,9 +44,8 @@
 //! - `icons` has no dependency
 //!
 //! We can model that scenario with this library as follows
-//! (don't worry about the `SimpleCache` name for now):
 //! ```ignore
-//! let mut solver = SimpleCache::<&str, NumberVersion>::new();
+//! let mut solver = OfflineSolver::<&str, NumberVersion>::new();
 //! solver.add_dependencies(
 //!     "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
 //! );
@@ -60,11 +59,8 @@
 //!
 //! # Solver trait
 //!
-//! In our previous example we used the `SimpleCache` type
-//! to initialiaze the solver.
-//! `SimpleCache` is a basic implementation of the `Cache`
-//! trait, that we will explain in a moment and that automatically
-//! implements the `Solver` trait for convenience.
+//! In our previous example we used the `OfflineSolver`,
+//! which is a basic implementation of the `Solver` trait.
 //!
 //! But we might want to implement the `Solver` trait for our own type.
 //! Let's say that we will use `String` for packages,
@@ -96,7 +92,7 @@
 //!
 //! On a real scenario, these two methods may involve reading the file system
 //! or doing network request, so you may want to hold a cache in your `MySolver` type.
-//! You could use the `SimpleCache` type provided by the crate as guidance,
+//! You could use the `OfflineSolver` type provided by the crate as guidance,
 //! but you are free to use whatever approach
 //! makes sense in your situation.
 //!
@@ -163,7 +159,6 @@
 
 #![warn(missing_docs)]
 
-pub mod cache;
 pub mod error;
 pub mod package;
 pub mod range;
