@@ -184,7 +184,7 @@ impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
     /// package version pair will replace the dependencies by the new ones.
     ///
     /// The API does not allow to add dependencies one at a time
-    /// to uphold an assumption that `OfflineSolver.dependencies(p, v)`
+    /// to uphold an assumption that `OfflineSolver.get_dependencies(p, v)`
     /// provides all dependencies of a given package (p) and version (v) pair.
     pub fn add_dependencies<I: IntoIterator<Item = (P, Range<V>)>>(
         &mut self,
