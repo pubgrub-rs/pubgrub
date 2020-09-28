@@ -1,6 +1,5 @@
-use pubgrub::cache::{Cache, SimpleCache};
 use pubgrub::range::Range;
-use pubgrub::solver::Solver;
+use pubgrub::solver::{OfflineSolver, Solver};
 use pubgrub::version::NumberVersion;
 
 // `root` depends on `menu` and `icons`
@@ -9,7 +8,7 @@ use pubgrub::version::NumberVersion;
 // `icons` has no dependency
 #[rustfmt::skip]
 fn main() {
-    let mut solver = SimpleCache::<&str, NumberVersion>::new();
+    let mut solver = OfflineSolver::<&str, NumberVersion>::new();
     solver.add_dependencies(
         "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
     );

@@ -141,7 +141,8 @@ impl<'a, V: 'a + Version> Term<V> {
     ///
     /// It turns out that this can also be expressed with set operations:
     ///    S satisfies t if and only if  ⋂ S ⊆ t
-    pub fn satisfied_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
+    #[allow(dead_code)] // Used by proptest
+    fn satisfied_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
         Self::intersect_all(terms).subset_of(self)
     }
 
@@ -153,7 +154,8 @@ impl<'a, V: 'a + Version> Term<V> {
     /// It turns out that this can also be expressed with set operations:
     ///    S contradicts t if and only if ⋂ S is disjoint with t
     ///    S contradicts t if and only if  (⋂ S) ⋂ t = ∅
-    pub fn contradicted_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
+    #[allow(dead_code)] // Used by proptest
+    fn contradicted_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
         Self::intersect_all(terms).intersection(self) == Self::empty()
     }
 
