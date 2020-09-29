@@ -81,7 +81,7 @@ impl<P: Package, V: Version> State<P, V> {
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
                         let root_cause = self.conflict_resolution(&incompat)?;
-                        // root_cause is guaranted to be almost satisfied by the partial solution
+                        // root_cause is guaranteed to be almost satisfied by the partial solution
                         // according to PubGrub documentation.
                         match self.partial_solution.relation(&root_cause) {
                             Relation::AlmostSatisfied(package_almost, term) => {
@@ -89,7 +89,7 @@ impl<P: Package, V: Version> State<P, V> {
                                 // Add (not term) to the partial solution with incompat as cause.
                                 self.partial_solution.add_derivation(package_almost, term.negate(), root_cause);
                             }
-                            _ => return Err(PubGrubError::Failure("This should never happen, root_cause is guaranted to be almost satisfied by the partial solution".into())),
+                            _ => return Err(PubGrubError::Failure("This should never happen, root_cause is guaranteed to be almost satisfied by the partial solution".into())),
                         }
                     }
                     Relation::AlmostSatisfied(package_almost, term) => {

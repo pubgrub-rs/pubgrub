@@ -7,8 +7,8 @@ that satisfy all the constraints of a given project dependencies.
 In addition, when that is not possible,
 PubGrub tries to provide a very human-readable and clear
 explanation as to why that failed.
-Below is an example of explanation present in
-the introductory blog post about PubGrub
+Below is an example of an explanation present in
+the introductory blog post about PubGrub.
 
 ```txt
 Because dropdown >=2.0.0 depends on icons >=2.0.0 and
@@ -65,7 +65,7 @@ An introductory blog post was
 
 The detailed explanation of the algorithm is
 [provided on GitHub][github-pubgrub].
-The foundation of the algorithm is based on ASP (Answer Set Programming)
+The foundation of the algorithm is based on ASP (Answer Set Programming),
 and a book called
 "[Answer Set Solving in Practice][potassco-book]"
 by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.

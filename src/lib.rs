@@ -28,7 +28,7 @@
 //! strictly higher than the current one.
 //! For convenience, this library already provides two implementations of `Version`.
 //! The first one is `NumberVersion`, basically a newtype for `usize`.
-//! The second one is `SemanticVersion` that implements semantic versionning rules.
+//! The second one is `SemanticVersion` that implements semantic versioning rules.
 //!
 //! # Basic example
 //!
@@ -109,7 +109,7 @@
 //!
 //! All the items in the tree are called incompatibilities
 //! and may be of two types, either "external" or "derived".
-//! Leafs of the tree are external incompatibilities,
+//! Leaves of the tree are external incompatibilities,
 //! and nodes are derived.
 //! External incompatibilities have reasons that are independent
 //! of the way this solver is implemented such as
@@ -143,7 +143,7 @@
 //! Notice that we also used `collapse_noversion()` above.
 //! This method simplifies the derivation tree to get rid
 //! of the `NoVersion` external incompatibilities in the derivation tree.
-//! So instead of seing things like this in the report:
+//! So instead of seeing things like this in the report:
 //! ```txt
 //! Because there is no version of foo in 1.0.1 <= v < 2.0.0
 //! and foo 1.0.0 depends on bar 2.0.0 <= v < 3.0.0,

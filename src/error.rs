@@ -17,7 +17,7 @@ pub enum PubGrubError<P: Package, V: Version> {
     #[error("No solution")]
     NoSolution(DerivationTree<P, V>),
 
-    /// Error arising when the implenter of `Solver`
+    /// Error arising when the implementer of `Solver`
     /// returned an error in the method `list_available_versions`.
     #[error("Retrieving available versions of package {package} failed)")]
     ErrorRetrievingVersions {
