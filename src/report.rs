@@ -435,7 +435,7 @@ impl DefaultStringReporter {
         )
     }
 
-    /// Try to print terms of an incompatiblity in a human-readable way.
+    /// Try to print terms of an incompatibility in a human-readable way.
     pub fn string_terms<P: Package, V: Version>(terms: &Map<P, Term<V>>) -> String {
         let terms_vec: Vec<_> = terms.iter().collect();
         match terms_vec.as_slice() {
