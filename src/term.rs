@@ -25,22 +25,22 @@ pub enum Term<V: Version> {
 // Base methods.
 impl<V: Version> Term<V> {
     /// A term that is always true.
-    pub fn any() -> Self {
+    pub(crate) fn any() -> Self {
         Self::Negative(Range::none())
     }
 
     /// A term that is never true.
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self::Positive(Range::none())
     }
 
     /// A positive term containing exactly that version.
-    pub fn exact(version: V) -> Self {
+    pub(crate) fn exact(version: V) -> Self {
         Self::Positive(Range::exact(version))
     }
 
     /// Simply check if a term is positive.
-    pub fn is_positive(&self) -> bool {
+    pub(crate) fn is_positive(&self) -> bool {
         match self {
             Self::Positive(_) => true,
             Self::Negative(_) => false,
@@ -48,31 +48,22 @@ impl<V: Version> Term<V> {
     }
 
     /// Simply check if a term is negative.
-    pub fn is_negative(&self) -> bool {
+    pub(crate) fn is_negative(&self) -> bool {
         !self.is_positive()
     }
 
     /// Negate a term.
     /// Evaluation of a negated term always returns
     /// the opposite of the evaluation of the original one.
-    pub fn negate(&self) -> Self {
+    pub(crate) fn negate(&self) -> Self {
         match self {
             Self::Positive(range) => Self::Negative(range.clone()),
             Self::Negative(range) => Self::Positive(range.clone()),
         }
     }
 
-    /// Evaluate a term regarding a given choice (or absence) of version.
-    pub fn accept_optional_version(&self, v_option: &Option<V>) -> bool {
-        match (self, v_option) {
-            (Self::Negative(_), None) => true,
-            (Self::Positive(_), None) => false,
-            (_, Some(v)) => self.accept_version(v),
-        }
-    }
-
     /// Evaluate a term regarding a given choice of version.
-    pub fn accept_version(&self, v: &V) -> bool {
+    pub(crate) fn accept_version(&self, v: &V) -> bool {
         match self {
             Self::Positive(range) => range.contains(v),
             Self::Negative(range) => !(range.contains(v)),
@@ -84,7 +75,7 @@ impl<V: Version> Term<V> {
 impl<V: Version> Term<V> {
     /// Compute the intersection of two terms.
     /// If at least one term is positive, the intersection is also positive.
-    pub fn intersection(&self, other: &Term<V>) -> Term<V> {
+    pub(crate) fn intersection(&self, other: &Term<V>) -> Term<V> {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => Self::Positive(r1.intersection(r2)),
             (Self::Positive(r1), Self::Negative(r2)) => {
@@ -99,20 +90,20 @@ impl<V: Version> Term<V> {
 
     /// Compute the union of two terms.
     /// If at least one term is negative, the union is also negative.
-    pub fn union(&self, other: &Term<V>) -> Term<V> {
+    pub(crate) fn union(&self, other: &Term<V>) -> Term<V> {
         (self.negate().intersection(&other.negate())).negate()
     }
 
     /// Compute the intersection of multiple terms.
     /// Return None if the iterator is empty.
-    pub fn intersect_all<T: AsRef<Term<V>>>(all_terms: impl Iterator<Item = T>) -> Term<V> {
+    pub(crate) fn intersect_all<T: AsRef<Term<V>>>(all_terms: impl Iterator<Item = T>) -> Term<V> {
         all_terms.fold(Self::any(), |acc, term| acc.intersection(term.as_ref()))
     }
 
     /// Indicate if this term is a subset of another term.
     /// Just like for sets, we say that t1 is a subset of t2
     /// if and only if t1 ∩ t2 = t1.
-    pub fn subset_of(&self, other: &Term<V>) -> bool {
+    pub(crate) fn subset_of(&self, other: &Term<V>) -> bool {
         self == &self.intersection(other)
     }
 }
@@ -121,7 +112,7 @@ impl<V: Version> Term<V> {
 ///
 /// As a shorthand, we say that a term v
 /// satisfies or contradicts a term t if {v} satisfies or contradicts it.
-pub enum Relation {
+pub(crate) enum Relation {
     /// We say that a set of terms S "satisfies" a term t
     /// if t must be true whenever every term in S is true.
     Satisfied,
@@ -141,7 +132,7 @@ impl<'a, V: 'a + Version> Term<V> {
     ///
     /// It turns out that this can also be expressed with set operations:
     ///    S satisfies t if and only if  ⋂ S ⊆ t
-    #[allow(dead_code)] // Used by proptest
+    #[cfg(test)]
     fn satisfied_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
         Self::intersect_all(terms).subset_of(self)
     }
@@ -154,14 +145,14 @@ impl<'a, V: 'a + Version> Term<V> {
     /// It turns out that this can also be expressed with set operations:
     ///    S contradicts t if and only if ⋂ S is disjoint with t
     ///    S contradicts t if and only if  (⋂ S) ⋂ t = ∅
-    #[allow(dead_code)] // Used by proptest
+    #[cfg(test)]
     fn contradicted_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
         Self::intersect_all(terms).intersection(self) == Self::empty()
     }
 
     /// Check if a set of terms satisfies or contradicts a given term.
     /// Otherwise the relation is inconclusive.
-    pub fn relation_with<T: AsRef<Term<V>>>(
+    pub(crate) fn relation_with<T: AsRef<Term<V>>>(
         &self,
         other_terms: impl Iterator<Item = T>,
     ) -> Relation {
