@@ -1,13 +1,12 @@
-use pubgrub::cache::{Cache, SimpleCache};
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, Reporter};
-use pubgrub::solver::Solver;
+use pubgrub::solver::{OfflineSolver, Solver};
 use pubgrub::version::SemanticVersion;
 
 // https://github.com/dart-lang/pub/blob/master/doc/solver.md#branching-error-reporting
 fn main() {
-    let mut solver = SimpleCache::<&str, SemanticVersion>::new();
+    let mut solver = OfflineSolver::<&str, SemanticVersion>::new();
     #[rustfmt::skip]
     // root 1.0.0 depends on foo ^1.0.0
     solver.add_dependencies(

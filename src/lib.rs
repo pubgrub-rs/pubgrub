@@ -28,7 +28,7 @@
 //! strictly higher than the current one.
 //! For convenience, this library already provides two implementations of `Version`.
 //! The first one is `NumberVersion`, basically a newtype for `usize`.
-//! The second one is `SemanticVersion` that implements semantic versionning rules.
+//! The second one is `SemanticVersion` that implements semantic versioning rules.
 //!
 //! # Basic example
 //!
@@ -44,9 +44,8 @@
 //! - `icons` has no dependency
 //!
 //! We can model that scenario with this library as follows
-//! (don't worry about the `SimpleCache` name for now):
 //! ```ignore
-//! let mut solver = SimpleCache::<&str, NumberVersion>::new();
+//! let mut solver = OfflineSolver::<&str, NumberVersion>::new();
 //! solver.add_dependencies(
 //!     "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
 //! );
@@ -60,11 +59,8 @@
 //!
 //! # Solver trait
 //!
-//! In our previous example we used the `SimpleCache` type
-//! to initialiaze the solver.
-//! `SimpleCache` is a basic implementation of the `Cache`
-//! trait, that we will explain in a moment and that automatically
-//! implements the `Solver` trait for convenience.
+//! In our previous example we used the `OfflineSolver`,
+//! which is a basic implementation of the `Solver` trait.
 //!
 //! But we might want to implement the `Solver` trait for our own type.
 //! Let's say that we will use `String` for packages,
@@ -96,7 +92,7 @@
 //!
 //! On a real scenario, these two methods may involve reading the file system
 //! or doing network request, so you may want to hold a cache in your `MySolver` type.
-//! You could use the `SimpleCache` type provided by the crate as guidance,
+//! You could use the `OfflineSolver` type provided by the crate as guidance,
 //! but you are free to use whatever approach
 //! makes sense in your situation.
 //!
@@ -113,7 +109,7 @@
 //!
 //! All the items in the tree are called incompatibilities
 //! and may be of two types, either "external" or "derived".
-//! Leafs of the tree are external incompatibilities,
+//! Leaves of the tree are external incompatibilities,
 //! and nodes are derived.
 //! External incompatibilities have reasons that are independent
 //! of the way this solver is implemented such as
@@ -147,7 +143,7 @@
 //! Notice that we also used `collapse_noversion()` above.
 //! This method simplifies the derivation tree to get rid
 //! of the `NoVersion` external incompatibilities in the derivation tree.
-//! So instead of seing things like this in the report:
+//! So instead of seeing things like this in the report:
 //! ```txt
 //! Because there is no version of foo in 1.0.1 <= v < 2.0.0
 //! and foo 1.0.0 depends on bar 2.0.0 <= v < 3.0.0,
@@ -163,7 +159,6 @@
 
 #![warn(missing_docs)]
 
-pub mod cache;
 pub mod error;
 pub mod package;
 pub mod range;

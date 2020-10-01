@@ -54,10 +54,11 @@
 //! to satisfy the dependencies of that package and version pair.
 //! If there is no solution, the reason will be provided as clear as possible.
 
+use std::collections::BTreeSet as Set;
 use std::collections::HashMap as Map;
 use std::error::Error;
+use std::hash::Hash;
 
-use crate::cache::Cache;
 use crate::error::PubGrubError;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
@@ -71,9 +72,6 @@ use crate::version::Version;
 /// and their dependencies, this provides a `run` method,
 /// able to compute a complete set of direct and indirect dependencies
 /// satisfying the chosen package constraints.
-///
-/// Remark: for ease of use, the `Solver` trait is automatically implemented
-/// for any type that implements `Cache` such as `SimpleCache`.
 pub trait Solver<P: Package, V: Version> {
     /// List available versions for a given package.
     /// The strategy of which version should be preferably picked in the list of available versions
@@ -165,9 +163,65 @@ pub trait Solver<P: Package, V: Version> {
     }
 }
 
-/// Automatically implement Config if your type implements Cache.
-/// Versions are listed with newest versions first.
-impl<P: Package, V: Version, C: Cache<P, V>> Solver<P, V> for C {
+/// A basic implementation of Solver.
+pub struct OfflineSolver<P: Package, V: Version + Hash> {
+    package_versions: Map<P, Set<V>>,
+    dependencies: Map<(P, V), Map<P, Range<V>>>,
+}
+
+impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
+    /// Creates an empty OfflineSolver with no dependencies.
+    pub fn new() -> Self {
+        Self {
+            package_versions: Map::new(),
+            dependencies: Map::new(),
+        }
+    }
+
+    /// Registers the dependencies of a package and version pair.
+    /// Dependencies must be added with a single call to `add_dependencies`.
+    /// All subsequent calls to `add_dependencies` for a given
+    /// package version pair will replace the dependencies by the new ones.
+    ///
+    /// The API does not allow to add dependencies one at a time
+    /// to uphold an assumption that `OfflineSolver.get_dependencies(p, v)`
+    /// provides all dependencies of a given package (p) and version (v) pair.
+    pub fn add_dependencies<I: IntoIterator<Item = (P, Range<V>)>>(
+        &mut self,
+        package: P,
+        version: impl Into<V>,
+        dependencies: I,
+    ) {
+        let package_deps = dependencies.into_iter().collect();
+        let v = version.into();
+        self.add_package_version(package.clone(), v.clone());
+        self.dependencies.insert((package, v), package_deps);
+    }
+
+    // TODO: use Into<P> and Into<V>
+    fn add_package_version(&mut self, package: P, version: impl Into<V>) {
+        let v_set = self.package_versions.entry(package).or_insert(Set::new());
+        v_set.insert(version.into());
+    }
+
+    /// Lists versions of saved packages.
+    /// Returns `None` if no information is available regarding that package.
+    fn versions(&self, package: &P) -> Option<Set<V>> {
+        self.package_versions.get(package).cloned()
+    }
+
+    /// Lists dependencies of a given package and version.
+    /// Returns `None` if no information is available regarding that package and version pair.
+    fn dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>> {
+        self.dependencies
+            .get(&(package.clone(), version.clone()))
+            .cloned()
+    }
+}
+
+/// An implementation of Solver.
+/// Versions are listed with the newest versions first.
+impl<P: Package, V: Version + Hash> Solver<P, V> for OfflineSolver<P, V> {
     fn list_available_versions(&mut self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
         Ok(self
             .versions(package)

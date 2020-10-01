@@ -1,8 +1,7 @@
-use pubgrub::cache::{Cache, SimpleCache};
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, Reporter};
-use pubgrub::solver::Solver;
+use pubgrub::solver::{OfflineSolver, Solver};
 use pubgrub::version::SemanticVersion;
 
 // `root` depends on `menu` and `icons 1.0.0`
@@ -13,7 +12,7 @@ use pubgrub::version::SemanticVersion;
 // `icons` has no dependency
 #[rustfmt::skip]
 fn main() {
-    let mut solver = SimpleCache::<&str, SemanticVersion>::new();
+    let mut solver = OfflineSolver::<&str, SemanticVersion>::new();
     // Direct dependencies: menu and icons.
     solver.add_dependencies("root", (1, 0, 0), vec![
         ("menu", Range::any()),

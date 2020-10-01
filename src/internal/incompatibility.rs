@@ -201,14 +201,14 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// they are collapsed together into the single incompatibility {foo ^1.0.0, not bar ^1.0.0}
     /// (provided that no other version of foo exists between 1.0.0 and 2.0.0).
     /// We could collapse them into { foo (1.0.0 ∪ 1.1.0), not bar ^1.0.0 }
-    /// without having to check existance of other versions though.
+    /// without having to check the existence of other versions though.
     /// And it would even keep the same `Kind`: `FromDependencyOf foo`.
     ///
     /// Here we do the simple stupid thing of just growing the Vec.
     /// TODO: improve this.
     /// It may not be trivial since those incompatibilities
     /// may already have derived others.
-    /// Maybe this should not be persued.
+    /// Maybe this should not be pursued.
     pub fn merge_into(self, incompatibilities: &mut Vec<Self>) {
         incompatibilities.push(self);
     }
