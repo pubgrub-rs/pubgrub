@@ -71,58 +71,57 @@ pub fn registry_strategy(
     )
         .prop_map(
             move |(crate_vers_by_name, raw_dependencies, reverse_alphabetical)| {
-                let list_of_pkgid: Vec<((String, NumberVersion), bool)> = crate_vers_by_name
+                let mut list_of_pkgid: Vec<(
+                    (String, NumberVersion),
+                    Option<Vec<(String, Range<NumberVersion>)>>,
+                )> = crate_vers_by_name
                     .iter()
                     .flat_map(|(name, vers)| {
-                        vers.iter()
-                            .map(move |x| ((name.clone(), NumberVersion::from(x.0)), x.1))
+                        vers.iter().map(move |x| {
+                            (
+                                (name.clone(), NumberVersion::from(x.0)),
+                                if x.1 { Some(vec![]) } else { None },
+                            )
+                        })
                     })
                     .collect();
                 let len_all_pkgid = list_of_pkgid.len();
-                let mut dependency_by_pkgid: Vec<Vec<(String, Range<NumberVersion>)>> =
-                    vec![vec![]; len_all_pkgid];
                 for (a, b, (c, d)) in raw_dependencies {
                     let (a, b) = order_index(a, b, len_all_pkgid);
                     let (a, b) = if reverse_alphabetical { (b, a) } else { (a, b) };
-                    let ((dep_name, _), _) = &list_of_pkgid[a];
-                    if &(list_of_pkgid[b].0).0 == dep_name {
+                    let ((dep_name, _), _) = list_of_pkgid[a].to_owned();
+                    if &(list_of_pkgid[b].0).0 == &dep_name {
                         continue;
                     }
-                    let s = &crate_vers_by_name[dep_name];
+                    let s = &crate_vers_by_name[&dep_name];
                     let s_last_index = s.len() - 1;
                     let (c, d) = order_index(c, d, s.len());
 
-                    dependency_by_pkgid[b].push((
-                        dep_name.to_owned(),
-                        if c == 0 && d == s_last_index {
-                            Range::any()
-                        } else if c == 0 {
-                            Range::strictly_lower_than(s[d].0 + 1)
-                        } else if d == s_last_index {
-                            Range::higher_than(s[c].0)
-                        } else if c == d {
-                            Range::exact(s[c].0)
-                        } else {
-                            Range::between(s[c].0, s[d].0 + 1)
-                        },
-                    ))
+                    if let (_, Some(deps)) = &mut list_of_pkgid[b] {
+                        deps.push((
+                            dep_name,
+                            if c == 0 && d == s_last_index {
+                                Range::any()
+                            } else if c == 0 {
+                                Range::strictly_lower_than(s[d].0 + 1)
+                            } else if d == s_last_index {
+                                Range::higher_than(s[c].0)
+                            } else if c == d {
+                                Range::exact(s[c].0)
+                            } else {
+                                Range::between(s[c].0, s[d].0 + 1)
+                            },
+                        ))
+                    }
                 }
 
                 let mut out: Vec<_> = list_of_pkgid
                     .into_iter()
-                    .zip(dependency_by_pkgid.into_iter())
-                    .map(|(((name, ver), allow_deps), deps)| {
+                    .map(|((name, ver), deps)| {
                         (
                             name,
                             ver,
-                            if !allow_deps {
-                                vec![("bad".to_owned(), Range::any())]
-                            } else {
-                                let mut deps = deps;
-                                deps.sort_by_key(|(ref d, _)| d.clone());
-                                deps.dedup_by_key(|(ref d, _)| d.clone());
-                                deps
-                            },
+                            deps.unwrap_or_else(|| vec![("bad".to_owned(), Range::any())]),
                         )
                     })
                     .collect();
