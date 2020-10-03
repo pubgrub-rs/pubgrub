@@ -102,18 +102,18 @@ impl Version for SemanticVersion {
 
 /// Simplest versions possible, just a positive number.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct NumberVersion(pub usize);
+pub struct NumberVersion(pub u32);
 
 // Convert an usize into a version.
-impl From<usize> for NumberVersion {
-    fn from(v: usize) -> Self {
+impl From<u32> for NumberVersion {
+    fn from(v: u32) -> Self {
         Self(v)
     }
 }
 
 // Convert a version into an usize.
-impl Into<usize> for NumberVersion {
-    fn into(self) -> usize {
+impl Into<u32> for NumberVersion {
+    fn into(self) -> u32 {
         self.0
     }
 }
