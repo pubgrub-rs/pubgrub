@@ -296,7 +296,7 @@ pub mod tests {
     use proptest::prelude::*;
 
     pub fn strategy() -> impl Strategy<Value = Range<NumberVersion>> {
-        prop::collection::vec(any::<usize>(), 0..10).prop_map(|mut vec| {
+        prop::collection::vec(any::<u32>(), 0..10).prop_map(|mut vec| {
             vec.sort();
             vec.dedup();
             let mut pair_iter = vec.chunks_exact(2);
@@ -312,7 +312,7 @@ pub mod tests {
     }
 
     fn version_strat() -> impl Strategy<Value = NumberVersion> {
-        any::<usize>().prop_map(|x| NumberVersion(x))
+        any::<u32>().prop_map(|x| NumberVersion(x))
     }
 
     proptest! {
