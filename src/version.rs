@@ -18,16 +18,16 @@ pub trait Version: Clone + Ord + Debug + Display {
 /// Type for semantic versions: major.minor.patch.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct SemanticVersion {
-    major: usize,
-    minor: usize,
-    patch: usize,
+    major: u32,
+    minor: u32,
+    patch: u32,
 }
 
 // Constructors
 impl SemanticVersion {
     /// Create a version with "major", "minor" and "patch" values.
     /// `version = major.minor.patch`
-    pub fn new(major: usize, minor: usize, patch: usize) -> Self {
+    pub fn new(major: u32, minor: u32, patch: u32) -> Self {
         Self {
             major,
             minor,
@@ -52,16 +52,16 @@ impl SemanticVersion {
 }
 
 // Convert a tuple (major, minor, patch) into a version.
-impl From<(usize, usize, usize)> for SemanticVersion {
-    fn from(tuple: (usize, usize, usize)) -> Self {
+impl From<(u32, u32, u32)> for SemanticVersion {
+    fn from(tuple: (u32, u32, u32)) -> Self {
         let (major, minor, patch) = tuple;
         Self::new(major, minor, patch)
     }
 }
 
 // Convert a version into a tuple (major, minor, patch).
-impl Into<(usize, usize, usize)> for SemanticVersion {
-    fn into(self) -> (usize, usize, usize) {
+impl Into<(u32, u32, u32)> for SemanticVersion {
+    fn into(self) -> (u32, u32, u32) {
         (self.major, self.minor, self.patch)
     }
 }
