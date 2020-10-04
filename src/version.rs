@@ -5,6 +5,8 @@
 //! Traits and implementations to create and compare versions.
 
 use std::fmt::{self, Debug, Display};
+use std::str::FromStr;
+use thiserror::Error;
 
 /// Versions have a minimal version (a "0" version)
 /// and are ordered such that every version has a next one.
@@ -82,6 +84,109 @@ impl SemanticVersion {
     pub fn bump_major(self) -> Self {
         Self::new(self.major + 1, self.minor, self.patch)
     }
+}
+
+/// Error creating SemanticVersion from string
+#[derive(Error, Debug, PartialEq)]
+pub enum VersionParseError {
+    /// SemanticVersion must contain major, minor, patch versions
+    #[error("version {full_version} must contain 3 numbers separated by dot")]
+    NotThreeParts {
+        /// SemanticVersion that was being parsed
+        full_version: String,
+    },
+    /// Wrapper around core::num::error::ParseIntError
+    #[error("cannot parse '{version_part}' in '{full_version}' as u32: {parse_error}")]
+    ParseIntError {
+        /// SemanticVersion that was being parsed
+        full_version: String,
+        /// A version part where parsing failed
+        version_part: String,
+        /// A specific error resulted from parsing a part of the version as u32
+        parse_error: String,
+    },
+}
+
+impl FromStr for SemanticVersion {
+    type Err = VersionParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parse_u32 = |part: &str| {
+            part.parse::<u32>().map_err(|e| Self::Err::ParseIntError {
+                full_version: s.to_string(),
+                version_part: part.to_string(),
+                parse_error: e.to_string(),
+            })
+        };
+
+        let mut parts = s.split('.');
+        match (parts.next(), parts.next(), parts.next(), parts.next()) {
+            (Some(major), Some(minor), Some(patch), None) => {
+                let major = parse_u32(major)?;
+                let minor = parse_u32(minor)?;
+                let patch = parse_u32(patch)?;
+                Ok(Self {
+                    major,
+                    minor,
+                    patch,
+                })
+            }
+            _ => Err(Self::Err::NotThreeParts {
+                full_version: s.to_string(),
+            }),
+        }
+    }
+}
+
+#[test]
+fn from_str_for_semantic_version() {
+    let parse = |str: &str| str.parse::<SemanticVersion>();
+    assert!(parse(
+        &SemanticVersion {
+            major: 0,
+            minor: 1,
+            patch: 0
+        }
+        .to_string()
+    )
+    .is_ok());
+    assert!(parse("1.2.3").is_ok());
+    assert_eq!(
+        parse("1.abc.3"),
+        Err(VersionParseError::ParseIntError {
+            full_version: "1.abc.3".to_owned(),
+            version_part: "abc".to_owned(),
+            parse_error: "invalid digit found in string".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse("1.2.-3"),
+        Err(VersionParseError::ParseIntError {
+            full_version: "1.2.-3".to_owned(),
+            version_part: "-3".to_owned(),
+            parse_error: "invalid digit found in string".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse("1.2.9876543210"),
+        Err(VersionParseError::ParseIntError {
+            full_version: "1.2.9876543210".to_owned(),
+            version_part: "9876543210".to_owned(),
+            parse_error: "number too large to fit in target type".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse("1.2"),
+        Err(VersionParseError::NotThreeParts {
+            full_version: "1.2".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse("1.2.3."),
+        Err(VersionParseError::NotThreeParts {
+            full_version: "1.2.3.".to_owned(),
+        })
+    );
 }
 
 impl Display for SemanticVersion {
