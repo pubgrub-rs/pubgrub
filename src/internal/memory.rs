@@ -5,7 +5,7 @@
 //! A Memory acts like a structured partial solution
 //! where terms are regrouped by package in a hashmap.
 
-use std::collections::BTreeMap as Map;
+use indexmap::map::IndexMap as Map;
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::package::Package;

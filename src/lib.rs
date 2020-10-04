@@ -100,7 +100,7 @@
 //!
 //! When everything goes well, the solver finds and returns the complete
 //! set of direct and indirect dependencies satisfying all the constraints.
-//! The packages and versions selected are returned in a `BTreeMap<P, V>`.
+//! The packages and versions selected are returned in a `IndexMap<P, V>`.
 //! But sometimes there is no solution because dependencies are incompatible.
 //! In such cases, `solver.run(...)` returns a
 //! `PubGrubError::NoSolution(derivation_tree)`,

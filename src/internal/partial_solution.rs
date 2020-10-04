@@ -5,7 +5,7 @@
 //! The partial solution is the current state
 //! of the solution being built by the algorithm.
 
-use std::collections::BTreeMap as Map;
+use indexmap::map::IndexMap as Map;
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};

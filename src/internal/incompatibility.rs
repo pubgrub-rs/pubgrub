@@ -5,7 +5,7 @@
 //! An incompatibility is a set of terms for different packages
 //! that should never be satisfied all together.
 
-use std::collections::BTreeMap as Map;
+use indexmap::map::IndexMap as Map;
 use std::collections::HashSet as Set;
 use std::fmt;
 
@@ -180,7 +180,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                 },
             }
         }
-        for key in to_delete.iter() {
+        for key in to_delete.into_iter() {
             merged_map.remove(key);
         }
         merged_map
@@ -265,7 +265,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// Iterate over packages.
-    pub fn iter(&self) -> std::collections::btree_map::Iter<P, Term<V>> {
+    pub fn iter(&self) -> indexmap::map::Iter<P, Term<V>> {
         self.package_terms.iter()
     }
 
@@ -330,7 +330,7 @@ impl<P: Package, V: Version> fmt::Display for Incompatibility<P, V> {
 
 impl<P: Package, V: Version> IntoIterator for Incompatibility<P, V> {
     type Item = (P, Term<V>);
-    type IntoIter = std::collections::btree_map::IntoIter<P, Term<V>>;
+    type IntoIter = indexmap::map::IntoIter<P, Term<V>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.package_terms.into_iter()

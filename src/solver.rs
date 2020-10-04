@@ -54,7 +54,7 @@
 //! to satisfy the dependencies of that package and version pair.
 //! If there is no solution, the reason will be provided as clear as possible.
 
-use std::collections::BTreeMap as Map;
+use indexmap::map::IndexMap as Map;
 use std::collections::BTreeSet as Set;
 use std::error::Error;
 use std::hash::Hash;
