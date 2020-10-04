@@ -74,9 +74,9 @@
 //! ```
 //! # use pubgrub::solver::DependencyProvider;
 //! # use pubgrub::version::SemanticVersion;
-//! # use std::collections::HashMap;
 //! # use std::error::Error;
 //! # use pubgrub::range::Range;
+//! # use pubgrub::Map;
 //! #
 //! # struct MyDependencyProvider;
 //! #
@@ -92,7 +92,7 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Option<HashMap<String, Range<SemanticVersion>>>, Box<dyn Error>> {
+//!     ) -> Result<Option<Map<String, Range<SemanticVersion>>>, Box<dyn Error>> {
 //!         unimplemented!()
 //!     }
 //! }
@@ -113,7 +113,7 @@
 //!
 //! When everything goes well, the algorithm finds and returns the complete
 //! set of direct and indirect dependencies satisfying all the constraints.
-//! The packages and versions selected are returned in a `HashMap<P, V>`.
+//! The packages and versions selected are returned in a [Map<P, V>](Map).
 //! But sometimes there is no solution because dependencies are incompatible.
 //! In such cases, [resolve(...)](solver::resolve) returns a
 //! [PubGrubError::NoSolution(derivation_tree)](error::PubGrubError::NoSolution),
@@ -155,7 +155,7 @@
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
 //! # use pubgrub::report::{DefaultStringReporter, Reporter};
 //! # use pubgrub::error::PubGrubError;
-//! use pubgrub::version::NumberVersion;
+//! # use pubgrub::version::NumberVersion;
 //! #
 //! # let dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
 //! # let root_package = "root";
@@ -188,6 +188,9 @@
 //! do not exist in your cache.
 
 #![warn(missing_docs)]
+
+/// Map implementation used by the library
+pub type Map<K, V> = rustc_hash::FxHashMap<K, V>;
 
 pub mod error;
 pub mod package;

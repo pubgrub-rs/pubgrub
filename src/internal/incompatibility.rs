@@ -5,7 +5,6 @@
 //! An incompatibility is a set of terms for different packages
 //! that should never be satisfied all together.
 
-use std::collections::HashMap as Map;
 use std::collections::HashSet as Set;
 use std::fmt;
 
@@ -14,6 +13,7 @@ use crate::range::Range;
 use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
 use crate::term::{self, Term};
 use crate::version::Version;
+use crate::Map;
 
 /// An incompatibility is a set of terms for different packages
 /// that should never be satisfied all together.
@@ -67,7 +67,7 @@ pub enum Relation<P: Package, V: Version> {
 impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Create the initial "not Root" incompatibility.
     pub fn not_root(id: usize, package: P, version: V) -> Self {
-        let mut package_terms = Map::with_capacity(1);
+        let mut package_terms = Map::with_capacity_and_hasher(1, Default::default());
         package_terms.insert(
             package.clone(),
             Term::Negative(Range::exact(version.clone())),
@@ -86,7 +86,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
         };
-        let mut package_terms = Map::with_capacity(1);
+        let mut package_terms = Map::with_capacity_and_hasher(1, Default::default());
         package_terms.insert(package.clone(), term);
         Self {
             id,
@@ -100,7 +100,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// because its list of dependencies is unavailable.
     pub fn unavailable_dependencies(id: usize, package: P, version: V) -> Self {
         let range = Range::exact(version);
-        let mut package_terms = Map::with_capacity(1);
+        let mut package_terms = Map::with_capacity_and_hasher(1, Default::default());
         package_terms.insert(package.clone(), Term::Positive(range.clone()));
         Self {
             id,
@@ -126,7 +126,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Build an incompatibility from a given dependency.
     fn from_dependency(id: usize, package: P, version: V, dep: (&P, &Range<V>)) -> Self {
-        let mut package_terms = Map::with_capacity(2);
+        let mut package_terms = Map::with_capacity_and_hasher(2, Default::default());
         let range1 = Range::exact(version);
         package_terms.insert(package.clone(), Term::Positive(range1.clone()));
         let (p2, range2) = dep;
@@ -163,14 +163,14 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// If the result is None, remove that key from the merged map,
     /// otherwise add the content of the Some(_).
     fn merge<T: Clone, F: Fn(&T, &T) -> Option<T>>(
-        hashmap_1: &Map<P, T>,
-        hashmap_2: &Map<P, T>,
+        map_1: &Map<P, T>,
+        map_2: &Map<P, T>,
         f: F,
     ) -> Map<P, T> {
-        let mut merged_map = hashmap_1.clone();
-        merged_map.reserve(hashmap_2.len());
+        let mut merged_map = map_1.clone();
+        merged_map.reserve(map_2.len());
         let mut to_delete = Vec::new();
-        for (key, val_2) in hashmap_2.iter() {
+        for (key, val_2) in map_2.iter() {
             match merged_map.get_mut(key) {
                 None => {
                     merged_map.insert(key.clone(), val_2.clone());
@@ -266,7 +266,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// Iterate over packages.
-    pub fn iter(&self) -> std::collections::hash_map::Iter<P, Term<V>> {
+    pub fn iter(&self) -> impl Iterator<Item = (&P, &Term<V>)> {
         self.package_terms.iter()
     }
 
@@ -357,15 +357,15 @@ pub mod tests {
         ///    { p1: t1, p3: t3 }
         #[test]
         fn rule_of_resolution(t1 in term_strat(), t2 in term_strat(), t3 in term_strat()) {
-            let mut i1 = Map::new();
+            let mut i1 = Map::default();
             i1.insert("p1", t1.clone());
             i1.insert("p2", t2.negate());
 
-            let mut i2 = Map::new();
+            let mut i2 = Map::default();
             i2.insert("p2", t2.clone());
             i2.insert("p3", t3.clone());
 
-            let mut i3 = Map::new();
+            let mut i3 = Map::default();
             i3.insert("p1", t1);
             i3.insert("p3", t3);
 

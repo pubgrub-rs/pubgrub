@@ -1,22 +1,20 @@
-use proptest::std_facade::hash_map::RandomState;
-use proptest::std_facade::HashMap;
 use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, DependencyProvider, OfflineDependencyProvider};
 use pubgrub::version::{NumberVersion, Version};
+use pubgrub::Map;
 use std::cell::RefCell;
 use std::error::Error;
 use std::hash::Hash;
 
 // An example implementing caching dependency provider that will
 // store queried dependencies in memory and check them before querying more from remote.
-struct CachingDependencyProvider<P: Package + Ord, V: Version + Hash, DP: DependencyProvider<P, V>>
-{
+struct CachingDependencyProvider<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>> {
     remote_dependencies: DP,
     cached_dependencies: RefCell<OfflineDependencyProvider<P, V>>,
 }
 
-impl<P: Package + Ord, V: Version + Hash, DP: DependencyProvider<P, V>>
+impl<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>>
     CachingDependencyProvider<P, V, DP>
 {
     pub fn new(remote_dependencies_provider: DP) -> Self {
@@ -27,7 +25,7 @@ impl<P: Package + Ord, V: Version + Hash, DP: DependencyProvider<P, V>>
     }
 }
 
-impl<P: Package + Ord, V: Version + Hash, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
+impl<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
     for CachingDependencyProvider<P, V, DP>
 {
     // Lists only from remote for simplicity
@@ -40,7 +38,7 @@ impl<P: Package + Ord, V: Version + Hash, DP: DependencyProvider<P, V>> Dependen
         &self,
         package: &P,
         version: &V,
-    ) -> Result<Option<HashMap<P, Range<V>, RandomState>>, Box<dyn Error>> {
+    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
             Ok(None) => {

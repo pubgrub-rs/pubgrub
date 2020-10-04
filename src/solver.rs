@@ -67,9 +67,7 @@
 //! to satisfy the dependencies of that package and version pair.
 //! If there is no solution, the reason will be provided as clear as possible.
 
-use std::collections::BTreeMap;
 use std::collections::BTreeSet as Set;
-use std::collections::HashMap as Map;
 use std::error::Error;
 use std::hash::Hash;
 
@@ -80,6 +78,7 @@ use crate::internal::partial_solution::PartialSolution;
 use crate::package::Package;
 use crate::range::Range;
 use crate::version::Version;
+use crate::Map;
 
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
@@ -184,15 +183,15 @@ pub trait DependencyProvider<P: Package, V: Version> {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct OfflineDependencyProvider<P: Package + Ord, V: Version + Hash> {
-    dependencies: BTreeMap<P, BTreeMap<V, BTreeMap<P, Range<V>>>>,
+pub struct OfflineDependencyProvider<P: Package, V: Version + Hash> {
+    dependencies: Map<P, Map<V, Map<P, Range<V>>>>,
 }
 
-impl<P: Package + Ord, V: Version + Hash> OfflineDependencyProvider<P, V> {
+impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
     /// Creates an empty OfflineDependencyProvider with no dependencies.
     pub fn new() -> Self {
         Self {
-            dependencies: BTreeMap::new(),
+            dependencies: Map::default(),
         }
     }
 
@@ -241,7 +240,7 @@ impl<P: Package + Ord, V: Version + Hash> OfflineDependencyProvider<P, V> {
 /// An implementation of [DependencyProvider] that
 /// contains all dependency information available in memory.
 /// Versions are listed with the newest versions first.
-impl<P: Package + Ord, V: Version + Hash> DependencyProvider<P, V> for OfflineDependencyProvider<P, V> {
+impl<P: Package, V: Version + Hash> DependencyProvider<P, V> for OfflineDependencyProvider<P, V> {
     fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
         Ok(self
             .versions(package)
