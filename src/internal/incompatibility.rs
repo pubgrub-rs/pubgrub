@@ -5,7 +5,7 @@
 //! An incompatibility is a set of terms for different packages
 //! that should never be satisfied all together.
 
-use std::collections::HashMap as Map;
+use std::collections::BTreeMap as Map;
 use std::collections::HashSet as Set;
 use std::fmt;
 
@@ -67,7 +67,7 @@ pub enum Relation<P: Package, V: Version> {
 impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Create the initial "not Root" incompatibility.
     pub fn not_root(id: usize, package: P, version: V) -> Self {
-        let mut package_terms = Map::with_capacity(1);
+        let mut package_terms = Map::new();
         package_terms.insert(
             package.clone(),
             Term::Negative(Range::exact(version.clone())),
@@ -86,7 +86,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
         };
-        let mut package_terms = Map::with_capacity(1);
+        let mut package_terms = Map::new();
         package_terms.insert(package.clone(), term);
         Self {
             id,
@@ -100,7 +100,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// because its list of dependencies is unavailable.
     pub fn unavailable_dependencies(id: usize, package: P, version: V) -> Self {
         let range = Range::exact(version);
-        let mut package_terms = Map::with_capacity(1);
+        let mut package_terms = Map::new();
         package_terms.insert(package.clone(), Term::Positive(range.clone()));
         Self {
             id,
@@ -126,7 +126,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Build an incompatibility from a given dependency.
     fn from_dependency(id: usize, package: P, version: V, dep: (&P, &Range<V>)) -> Self {
-        let mut package_terms = Map::with_capacity(2);
+        let mut package_terms = Map::new();
         let range1 = Range::exact(version);
         package_terms.insert(package.clone(), Term::Positive(range1.clone()));
         let (p2, range2) = dep;
@@ -168,7 +168,6 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         f: F,
     ) -> Map<P, T> {
         let mut merged_map = hashmap_1.clone();
-        merged_map.reserve(hashmap_2.len());
         let mut to_delete = Vec::new();
         for (key, val_2) in hashmap_2.iter() {
             match merged_map.get_mut(key) {
@@ -266,7 +265,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// Iterate over packages.
-    pub fn iter(&self) -> std::collections::hash_map::Iter<P, Term<V>> {
+    pub fn iter(&self) -> std::collections::btree_map::Iter<P, Term<V>> {
         self.package_terms.iter()
     }
 
@@ -331,7 +330,7 @@ impl<P: Package, V: Version> fmt::Display for Incompatibility<P, V> {
 
 impl<P: Package, V: Version> IntoIterator for Incompatibility<P, V> {
     type Item = (P, Term<V>);
-    type IntoIter = std::collections::hash_map::IntoIter<P, Term<V>>;
+    type IntoIter = std::collections::btree_map::IntoIter<P, Term<V>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.package_terms.into_iter()

@@ -5,7 +5,7 @@
 //! Build a report as clear as possible as to why
 //! dependency solving failed.
 
-use std::collections::HashMap as Map;
+use std::collections::BTreeMap as Map;
 use std::fmt;
 
 use crate::package::Package;

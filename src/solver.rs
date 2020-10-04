@@ -54,8 +54,8 @@
 //! to satisfy the dependencies of that package and version pair.
 //! If there is no solution, the reason will be provided as clear as possible.
 
+use std::collections::BTreeMap as Map;
 use std::collections::BTreeSet as Set;
-use std::collections::HashMap as Map;
 use std::error::Error;
 use std::hash::Hash;
 
@@ -101,7 +101,7 @@ pub trait Solver<P: Package, V: Version> {
                         .extract_solution()
                         .ok_or(PubGrubError::Failure(
                             "How did we end up with no package to choose but no solution?".into(),
-                        ))
+                        ));
                 }
                 Some(x) => x,
             };
