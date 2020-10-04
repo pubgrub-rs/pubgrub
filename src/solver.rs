@@ -101,7 +101,7 @@ pub trait Solver<P: Package, V: Version> {
                         .extract_solution()
                         .ok_or(PubGrubError::Failure(
                             "How did we end up with no package to choose but no solution?".into(),
-                        ));
+                        ))
                 }
                 Some(x) => x,
             };
