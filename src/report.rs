@@ -19,7 +19,7 @@ pub trait Reporter<P: Package, V: Version> {
     type Output;
 
     /// Generate a report from the derivation tree
-    /// describing the solver failure.
+    /// describing the resolution failure.
     fn report(derivation_tree: &DerivationTree<P, V>) -> Self::Output;
 }
 
@@ -70,7 +70,7 @@ impl<P: Package, V: Version> DerivationTree<P, V> {
     /// with the other one they are matched with
     /// in a derived incompatibility.
     /// This cleans up quite nicely the generated report.
-    /// You might want to do this if you know that the solver
+    /// You might want to do this if you know that the [DependencyProvider](crate::solver::DependencyProvider)
     /// was not run in some kind of offline mode that may not
     /// have access to all versions existing.
     pub fn collapse_noversion(&mut self) {

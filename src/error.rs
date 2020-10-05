@@ -17,17 +17,17 @@ pub enum PubGrubError<P: Package, V: Version> {
     #[error("No solution")]
     NoSolution(DerivationTree<P, V>),
 
-    /// Error arising when the implementer of `Solver`
+    /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method `list_available_versions`.
     #[error("Retrieving available versions of package {package} failed)")]
     ErrorRetrievingVersions {
         /// Package for which we want the list of versions.
         package: P,
-        /// Error raised by the implementer of `Solver`.
+        /// Error raised by the implementer of [DependencyProvider](crate::solver::DependencyProvider).
         source: Box<dyn std::error::Error>,
     },
 
-    /// Error arising when the implementer of `Solver`
+    /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method `get_dependencies`.
     #[error("Retrieving dependencies of {package} {version} failed)")]
     ErrorRetrievingDependencies {
@@ -35,7 +35,7 @@ pub enum PubGrubError<P: Package, V: Version> {
         package: P,
         /// Version of the package for which we want the dependencies.
         version: V,
-        /// Error raised by the implementer of `Solver`.
+        /// Error raised by the implementer of [DependencyProvider](crate::solver::DependencyProvider).
         source: Box<dyn std::error::Error>,
     },
 

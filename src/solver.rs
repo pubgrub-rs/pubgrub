@@ -42,14 +42,27 @@
 //!
 //! ## API
 //!
-//! ```ignore
-//! solution = solver.run(package, version)?;
+//! ```
+//! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
+//! # use pubgrub::version::NumberVersion;
+//! # use pubgrub::error::PubGrubError;
+//! #
+//! # fn try_main() -> Result<(), PubGrubError<&'static str, NumberVersion>> {
+//! #     let dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//! #     let package = "root";
+//! #     let version = 1;
+//! let solution = resolve(&dependency_provider, package, version)?;
+//! #     Ok(())
+//! # }
+//! # fn main() {
+//! #     assert!(matches!(try_main(), Err(PubGrubError::NoSolution(_))));
+//! # }
 //! ```
 //!
-//! Where `solver` provides the list of available packages and versions,
+//! Where `dependency_provider` supplies the list of available packages and versions,
 //! as well as the dependencies of every available package
-//! by implementing the `Solver` trait.
-//! The call to `run` for a given package at a given version
+//! by implementing the [DependencyProvider] trait.
+//! The call to [resolve] for a given package at a given version
 //! will compute the set of packages and versions needed
 //! to satisfy the dependencies of that package and version pair.
 //! If there is no solution, the reason will be provided as clear as possible.
@@ -67,110 +80,113 @@ use crate::package::Package;
 use crate::range::Range;
 use crate::version::Version;
 
-/// Solver trait.
-/// Given functions to retrieve the list of available versions of a package,
-/// and their dependencies, this provides a `run` method,
-/// able to compute a complete set of direct and indirect dependencies
-/// satisfying the chosen package constraints.
-pub trait Solver<P: Package, V: Version> {
-    /// List available versions for a given package.
-    /// The strategy of which version should be preferably picked in the list of available versions
-    /// is implied by the order of the list: first version in the list will be tried first.
-    fn list_available_versions(&mut self, package: &P) -> Result<Vec<V>, Box<dyn Error>>;
+/// Main function of the library.
+/// Finds a set of packages satisfying dependency bounds for a given package + version pair.
+pub fn resolve<P: Package, V: Version>(
+    dependency_provider: &impl DependencyProvider<P, V>,
+    package: P,
+    version: impl Into<V>,
+) -> Result<Map<P, V>, PubGrubError<P, V>> {
+    let mut state = State::init(package.clone(), version.into());
+    let mut next = package;
+    loop {
+        state.unit_propagation(next)?;
 
-    /// Retrieve the package dependencies.
-    /// Return None if its dependencies are unknown.
-    fn get_dependencies(
-        &mut self,
-        package: &P,
-        version: &V,
-    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>>;
-
-    /// Solve dependencies of a given package.
-    fn run(&mut self, package: P, version: impl Into<V>) -> Result<Map<P, V>, PubGrubError<P, V>> {
-        let mut state = State::init(package.clone(), version.into());
-        let mut next = package;
-        loop {
-            state.unit_propagation(next)?;
-
-            // Pick the next package.
-            let (p, term) = match state.partial_solution.pick_package() {
-                None => {
-                    return state
-                        .partial_solution
-                        .extract_solution()
-                        .ok_or(PubGrubError::Failure(
-                            "How did we end up with no package to choose but no solution?".into(),
-                        ))
-                }
-                Some(x) => x,
-            };
-            next = p.clone();
-            let available_versions = self.list_available_versions(&p).map_err(|err| {
-                PubGrubError::ErrorRetrievingVersions {
+        // Pick the next package.
+        let (p, term) = match state.partial_solution.pick_package() {
+            None => {
+                return state
+                    .partial_solution
+                    .extract_solution()
+                    .ok_or(PubGrubError::Failure(
+                        "How did we end up with no package to choose but no solution?".into(),
+                    ))
+            }
+            Some(x) => x,
+        };
+        next = p.clone();
+        let available_versions =
+            dependency_provider
+                .list_available_versions(&p)
+                .map_err(|err| PubGrubError::ErrorRetrievingVersions {
                     package: p.clone(),
                     source: err,
-                }
-            })?;
+                })?;
 
-            // Pick the next compatible version.
-            let v = match PartialSolution::<P, V>::pick_version(&available_versions[..], &term) {
-                None => {
-                    state.add_incompatibility(|id| {
-                        Incompatibility::no_version(id, p.clone(), term.clone())
-                    });
-                    continue;
-                }
-                Some(x) => x,
-            };
+        // Pick the next compatible version.
+        let v = match PartialSolution::<P, V>::pick_version(&available_versions[..], &term) {
+            None => {
+                state.add_incompatibility(|id| {
+                    Incompatibility::no_version(id, p.clone(), term.clone())
+                });
+                continue;
+            }
+            Some(x) => x,
+        };
 
-            // Retrieve that package dependencies.
-            let dependencies = match self.get_dependencies(&p, &v).map_err(|err| {
-                PubGrubError::ErrorRetrievingDependencies {
-                    package: p.clone(),
-                    version: v.clone(),
-                    source: err,
-                }
+        // Retrieve that package dependencies.
+        let dependencies = match dependency_provider
+            .get_dependencies(&p, &v)
+            .map_err(|err| PubGrubError::ErrorRetrievingDependencies {
+                package: p.clone(),
+                version: v.clone(),
+                source: err,
             })? {
-                None => {
-                    state.add_incompatibility(|id| {
-                        Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
-                    });
-                    continue;
-                }
-                Some(x) => x,
-            };
+            None => {
+                state.add_incompatibility(|id| {
+                    Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
+                });
+                continue;
+            }
+            Some(x) => x,
+        };
 
-            // Add that package and version if the dependencies are not problematic.
-            let start_id = state.incompatibility_store.len();
-            let dep_incompats =
-                Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
-            for incompat in dep_incompats.iter() {
-                state.add_incompatibility(|_| incompat.clone());
-            }
-            if dep_incompats
-                .iter()
-                .any(|incompat| state.is_terminal(incompat))
-            {
-                // For a dependency incompatibility to be terminal,
-                // it can only mean that root depend on not root?
-                Err(PubGrubError::Failure(
-                    "Root package depends on itself at a different version?".into(),
-                ))?;
-            }
-            state.partial_solution.add_version(p, v, &dep_incompats);
+        // Add that package and version if the dependencies are not problematic.
+        let start_id = state.incompatibility_store.len();
+        let dep_incompats =
+            Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
+        for incompat in dep_incompats.iter() {
+            state.add_incompatibility(|_| incompat.clone());
         }
+        if dep_incompats
+            .iter()
+            .any(|incompat| state.is_terminal(incompat))
+        {
+            // For a dependency incompatibility to be terminal,
+            // it can only mean that root depend on not root?
+            Err(PubGrubError::Failure(
+                "Root package depends on itself at a different version?".into(),
+            ))?;
+        }
+        state.partial_solution.add_version(p, v, &dep_incompats);
     }
 }
 
-/// A basic implementation of Solver.
-pub struct OfflineSolver<P: Package, V: Version + Hash> {
+/// Trait that allows the algorithm to retrieve available packages and their dependencies.
+/// An implementor needs to be supplied to the [resolve] function.
+pub trait DependencyProvider<P: Package, V: Version> {
+    /// Lists available versions for a given package.
+    /// The strategy of which version should be preferably picked in the list of available versions
+    /// is implied by the order of the list: first version in the list will be tried first.
+    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>>;
+
+    /// Retrieves the package dependencies.
+    /// Return None if its dependencies are unknown.
+    fn get_dependencies(
+        &self,
+        package: &P,
+        version: &V,
+    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>>;
+}
+
+/// A basic implementation of [DependencyProvider].
+pub struct OfflineDependencyProvider<P: Package, V: Version + Hash> {
     package_versions: Map<P, Set<V>>,
     dependencies: Map<(P, V), Map<P, Range<V>>>,
 }
 
-impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
-    /// Creates an empty OfflineSolver with no dependencies.
+impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
+    /// Creates an empty OfflineDependencyProvider with no dependencies.
     pub fn new() -> Self {
         Self {
             package_versions: Map::new(),
@@ -184,7 +200,7 @@ impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
     /// package version pair will replace the dependencies by the new ones.
     ///
     /// The API does not allow to add dependencies one at a time
-    /// to uphold an assumption that `OfflineSolver.get_dependencies(p, v)`
+    /// to uphold an assumption that `OfflineDependencyProvider.get_dependencies(p, v)`
     /// provides all dependencies of a given package (p) and version (v) pair.
     pub fn add_dependencies<I: IntoIterator<Item = (P, Range<V>)>>(
         &mut self,
@@ -219,10 +235,11 @@ impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
     }
 }
 
-/// An implementation of Solver.
+/// An implementation of [DependencyProvider] that
+/// contains all dependency information available in memory.
 /// Versions are listed with the newest versions first.
-impl<P: Package, V: Version + Hash> Solver<P, V> for OfflineSolver<P, V> {
-    fn list_available_versions(&mut self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
+impl<P: Package, V: Version + Hash> DependencyProvider<P, V> for OfflineDependencyProvider<P, V> {
+    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
         Ok(self
             .versions(package)
             .map(|v| v.into_iter().rev().collect())
@@ -230,7 +247,7 @@ impl<P: Package, V: Version + Hash> Solver<P, V> for OfflineSolver<P, V> {
     }
 
     fn get_dependencies(
-        &mut self,
+        &self,
         package: &P,
         version: &V,
     ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
