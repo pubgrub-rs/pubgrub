@@ -1,5 +1,5 @@
 use pubgrub::range::Range;
-use pubgrub::solver::{OfflineSolver, Solver};
+use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::NumberVersion;
 
 // `root` depends on `menu` and `icons`
@@ -8,15 +8,15 @@ use pubgrub::version::NumberVersion;
 // `icons` has no dependency
 #[rustfmt::skip]
 fn main() {
-    let mut solver = OfflineSolver::<&str, NumberVersion>::new();
-    solver.add_dependencies(
+    let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+    dependency_provider.add_dependencies(
         "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
     );
-    solver.add_dependencies("menu", 1, vec![("dropdown", Range::any())]);
-    solver.add_dependencies("dropdown", 1, vec![("icons", Range::any())]);
-    solver.add_dependencies("icons", 1, vec![]);
+    dependency_provider.add_dependencies("menu", 1, vec![("dropdown", Range::any())]);
+    dependency_provider.add_dependencies("dropdown", 1, vec![("icons", Range::any())]);
+    dependency_provider.add_dependencies("icons", 1, vec![]);
 
-    // Run the solver.
-    let solution = solver.run("root", 1).unwrap();
+    // Run the algorithm.
+    let solution = resolve(&dependency_provider, "root", 1).unwrap();
     println!("Solution: {:?}", solution);
 }

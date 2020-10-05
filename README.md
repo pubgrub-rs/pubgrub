@@ -41,13 +41,13 @@ For semantic versions, `bump` corresponds to an increment of the patch number.
 ## API
 
 ```rust
-solution = solver.run(package, version)?;
+let solution = resolve(&dependency_provider, package, version)?;
 ```
 
-Where `solver` provides the list of available packages and versions,
+Where `dependency_provider` supplies the list of available packages and versions,
 as well as the dependencies of every available package
-by implementing the `Solver` trait.
-The call to `run` for a given package at a given version
+by implementing the `DependencyProvider` trait.
+The call to `resolve` for a given package at a given version
 will compute the set of packages and versions needed
 to satisfy the dependencies of that package and version pair.
 If there is no solution, the reason will be provided as clear as possible.

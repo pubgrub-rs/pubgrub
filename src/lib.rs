@@ -44,43 +44,56 @@
 //! - `icons` has no dependency
 //!
 //! We can model that scenario with this library as follows
-//! ```ignore
-//! let mut solver = OfflineSolver::<&str, NumberVersion>::new();
-//! solver.add_dependencies(
+//! ```
+//! # use pubgrub::solver::{OfflineDependencyProvider, resolve};
+//! # use pubgrub::version::NumberVersion;
+//! # use pubgrub::range::Range;
+//! #
+//! let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//!
+//! dependency_provider.add_dependencies(
 //!     "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
 //! );
-//! solver.add_dependencies("menu", 1, vec![("dropdown", Range::any())]);
-//! solver.add_dependencies("dropdown", 1, vec![("icons", Range::any())]);
-//! solver.add_dependencies("icons", 1, vec![]);
+//! dependency_provider.add_dependencies("menu", 1, vec![("dropdown", Range::any())]);
+//! dependency_provider.add_dependencies("dropdown", 1, vec![("icons", Range::any())]);
+//! dependency_provider.add_dependencies("icons", 1, vec![]);
 //!
-//! // Run the solver.
-//! let _solution = solver.run("root", 1).unwrap();
+//! // Run the algorithm.
+//! let solution = resolve(&dependency_provider, "root", 1).unwrap();
 //! ```
 //!
-//! # Solver trait
+//! # DependencyProvider trait
 //!
-//! In our previous example we used the `OfflineSolver`,
-//! which is a basic implementation of the `Solver` trait.
+//! In our previous example we used the `OfflineDependencyProvider`,
+//! which is a basic implementation of the [DependencyProvider](solver::DependencyProvider) trait.
 //!
-//! But we might want to implement the `Solver` trait for our own type.
-//! Let's say that we will use `String` for packages,
-//! and `SemanticVersion` for versions.
+//! But we might want to implement the [DependencyProvider](solver::DependencyProvider) trait for our own type.
+//! Let's say that we will use [String] for packages,
+//! and [SemanticVersion](version::SemanticVersion) for versions.
 //! This may be done quite easily by implementing the two following functions.
-//! ```ignore
-//! impl Solver<String, SemanticVersion> for MySolver {
+//! ```
+//! # use pubgrub::solver::DependencyProvider;
+//! # use pubgrub::version::SemanticVersion;
+//! # use std::collections::HashMap;
+//! # use std::error::Error;
+//! # use pubgrub::range::Range;
+//! #
+//! # struct MyDependencyProvider;
+//! #
+//! impl DependencyProvider<String, SemanticVersion> for MyDependencyProvider {
 //!     fn list_available_versions(
-//!         &mut self,
+//!         &self,
 //!         package: &String
 //!     ) -> Result<Vec<SemanticVersion>, Box<dyn Error>> {
-//!         ...
+//!         unimplemented!()
 //!     }
 //!
 //!     fn get_dependencies(
-//!         &mut self,
+//!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Option<Map<String, Range<SemanticVersion>>>, Box<dyn Error>> {
-//!         ...
+//!     ) -> Result<Option<HashMap<String, Range<SemanticVersion>>>, Box<dyn Error>> {
+//!         unimplemented!()
 //!     }
 //! }
 //! ```
@@ -91,19 +104,19 @@
 //! Return `None` if dependencies are unknown.
 //!
 //! On a real scenario, these two methods may involve reading the file system
-//! or doing network request, so you may want to hold a cache in your `MySolver` type.
-//! You could use the `OfflineSolver` type provided by the crate as guidance,
+//! or doing network request, so you may want to hold a cache in your [DependencyProvider](solver::DependencyProvider) impl.
+//! You could use the [OfflineDependencyProvider](solver::OfflineDependencyProvider) type provided by the crate as guidance,
 //! but you are free to use whatever approach
 //! makes sense in your situation.
 //!
 //! # Solution and error reporting
 //!
-//! When everything goes well, the solver finds and returns the complete
+//! When everything goes well, the algorithm finds and returns the complete
 //! set of direct and indirect dependencies satisfying all the constraints.
 //! The packages and versions selected are returned in a `HashMap<P, V>`.
 //! But sometimes there is no solution because dependencies are incompatible.
-//! In such cases, `solver.run(...)` returns a
-//! `PubGrubError::NoSolution(derivation_tree)`,
+//! In such cases, [resolve(...)](solver::resolve) returns a
+//! [PubGrubError::NoSolution(derivation_tree)](error::PubGrubError::NoSolution),
 //! where the provided derivation tree is a custom binary tree
 //! containing the full chain of reasons why there is no solution.
 //!
@@ -112,26 +125,43 @@
 //! Leaves of the tree are external incompatibilities,
 //! and nodes are derived.
 //! External incompatibilities have reasons that are independent
-//! of the way this solver is implemented such as
+//! of the way this algorithm is implemented such as
 //!  - dependencies: "package_a" at version 1 depends on "package_b" at version 4
 //!  - missing dependencies: dependencies of "package_a" are unknown
 //!  - absence of version: there is no version of "package_a" in the range [3.1.0  4.0.0[
 //!
-//! Derived incompatibilities are obtained by the solver by deduction,
+//! Derived incompatibilities are obtained during the algorithm execution by deduction,
 //! such as if "a" depends on "b" and "b" depends on "c", "a" depends on "c".
 //!
 //! This crate defines a `Reporter` trait, with an associated `Output` type
-//! and a single method
-//! ```ignore
-//! report(derivation_tree: &DerivationTree<P, V>) -> Output
+//! and a single method.
+//! ```
+//! # use pubgrub::package::Package;
+//! # use pubgrub::version::Version;
+//! # use pubgrub::report::DerivationTree;
+//! #
+//! pub trait Reporter<P: Package, V: Version> {
+//!     type Output;
+//!
+//!     fn report(derivation_tree: &DerivationTree<P, V>) -> Self::Output;
+//! }
 //! ```
 //! Implementing a `Reporter` may involve a lot of heuristics
 //! to make the output human-readable and natural.
 //! For convenience, we provide a default implementation
 //! `DefaultStringReporter`, that output the report as a String.
 //! You may use it as follows:
-//! ```ignore
-//! match solver.run(root_package, root_version) {
+//! ```
+//! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
+//! # use pubgrub::report::{DefaultStringReporter, Reporter};
+//! # use pubgrub::error::PubGrubError;
+//! use pubgrub::version::NumberVersion;
+//! #
+//! # let dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//! # let root_package = "root";
+//! # let root_version = 1;
+//! #
+//! match resolve(&dependency_provider, root_package, root_version) {
 //!     Ok(solution) => println!("{:?}", solution),
 //!     Err(PubGrubError::NoSolution(mut derivation_tree)) => {
 //!         derivation_tree.collapse_noversion();
