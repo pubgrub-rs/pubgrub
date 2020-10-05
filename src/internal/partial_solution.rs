@@ -155,7 +155,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     /// Check if the terms in the partial solution satisfy the incompatibility.
     pub fn relation(&self, incompat: &Incompatibility<P, V>) -> Relation<P, V> {
-        incompat.relation(&mut self.memory.all_terms())
+        incompat.relation(|package| self.memory.terms_for_package(package))
     }
 
     /// Find satisfier and previous satisfier decision level.
