@@ -17,6 +17,6 @@ fn main() {
     dependency_provider.add_dependencies("icons", 1, vec![]);
 
     // Run the algorithm.
-    let solution = resolve(&dependency_provider, "root", 1).unwrap();
+    let solution = resolve(&dependency_provider, "root", 1);
     println!("Solution: {:?}", solution);
 }
