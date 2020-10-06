@@ -27,7 +27,7 @@
 //! and `bump(&self) -> Self` which returns the next smallest version
 //! strictly higher than the current one.
 //! For convenience, this library already provides two implementations of `Version`.
-//! The first one is `NumberVersion`, basically a newtype for `usize`.
+//! The first one is `NumberVersion`, basically a newtype for `u32`.
 //! The second one is `SemanticVersion` that implements semantic versioning rules.
 //!
 //! # Basic example
@@ -103,11 +103,11 @@
 //! of a given package at a given version.
 //! Return `None` if dependencies are unknown.
 //!
-//! On a real scenario, these two methods may involve reading the file system
-//! or doing network request, so you may want to hold a cache in your [DependencyProvider](solver::DependencyProvider) impl.
-//! You could use the [OfflineDependencyProvider](solver::OfflineDependencyProvider) type provided by the crate as guidance,
-//! but you are free to use whatever approach
-//! makes sense in your situation.
+//! In a real scenario, these two methods may involve reading the file system
+//! or doing network request, so you may want to hold a cache in your [DependencyProvider](solver::DependencyProvider) implementation.
+//! How exactly this could be achieved is shown in `CachingDependencyProvider` (see `examples/caching_dependency_provider.rs`).
+//! You could also use the [OfflineDependencyProvider](solver::OfflineDependencyProvider) type provided by the crate as guidance,
+//! but you are free to use whatever approach makes sense in your situation.
 //!
 //! # Solution and error reporting
 //!
