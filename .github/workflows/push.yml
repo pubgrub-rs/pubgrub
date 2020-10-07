@@ -30,6 +30,9 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
 
+    - name: Run tests serde
+      run: cargo test --features=serde --verbose
+
     - name: Build documentation
       run: cargo doc --no-deps
 

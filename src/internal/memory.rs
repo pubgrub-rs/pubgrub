@@ -37,15 +37,12 @@ impl<P: Package, V: Version> Memory<P, V> {
         }
     }
 
-    /// Retrieve all terms in memory.
-    pub fn all_terms(&self) -> Map<P, impl Iterator<Item = &Term<V>>> {
-        self.assignments
-            .iter()
-            .map(|(package, a)| {
-                let decision_iter = a.decision.iter().map(|(_, term)| term);
-                (package.clone(), decision_iter.chain(a.derivations.iter()))
-            })
-            .collect()
+    /// Retrieve terms in memory related to package.
+    pub fn terms_for_package(&self, package: &P) -> impl Iterator<Item = &Term<V>> {
+        self.assignments.get(package).into_iter().flat_map(|a| {
+            let decision_iter = a.decision.iter().map(|(_, term)| term);
+            decision_iter.chain(a.derivations.iter())
+        })
     }
 
     /// Building step of a Memory from a given assignment.

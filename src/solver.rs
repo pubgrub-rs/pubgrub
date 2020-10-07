@@ -164,17 +164,17 @@ pub trait Solver<P: Package, V: Version> {
 }
 
 /// A basic implementation of Solver.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OfflineSolver<P: Package, V: Version + Hash> {
-    package_versions: Map<P, Set<V>>,
-    dependencies: Map<(P, V), Map<P, Range<V>>>,
+    dependencies: Map<P, Map<V, Map<P, Range<V>>>>,
 }
 
 impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
     /// Creates an empty OfflineSolver with no dependencies.
     pub fn new() -> Self {
         Self {
-            package_versions: Map::new(),
-            dependencies: Map::new(),
+            dependencies: Default::default(),
         }
     }
 
@@ -194,28 +194,29 @@ impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
     ) {
         let package_deps = dependencies.into_iter().collect();
         let v = version.into();
-        self.add_package_version(package.clone(), v.clone());
-        self.dependencies.insert((package, v), package_deps);
-    }
-
-    // TODO: use Into<P> and Into<V>
-    fn add_package_version(&mut self, package: P, version: impl Into<V>) {
-        let v_set = self.package_versions.entry(package).or_insert(Set::new());
-        v_set.insert(version.into());
+        *self
+            .dependencies
+            .entry(package)
+            .or_default()
+            .entry(v)
+            .or_default() = package_deps;
     }
 
     /// Lists versions of saved packages.
     /// Returns `None` if no information is available regarding that package.
     fn versions(&self, package: &P) -> Option<Set<V>> {
-        self.package_versions.get(package).cloned()
+        self.dependencies
+            .get(package)
+            .map(|k| k.keys().cloned().collect())
     }
 
     /// Lists dependencies of a given package and version.
     /// Returns `None` if no information is available regarding that package and version pair.
     fn dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>> {
         self.dependencies
-            .get(&(package.clone(), version.clone()))
-            .cloned()
+            .get(package)?
+            .get(version)
+            .map(|m| m.iter().map(|x| (x.0.clone(), x.1.clone())).collect())
     }
 }
 

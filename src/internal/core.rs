@@ -5,7 +5,7 @@
 //! Core model and functions
 //! to write a functional PubGrub algorithm.
 
-use std::collections::HashSet as Set;
+use std::{collections::HashSet as Set, rc::Rc};
 
 use crate::error::PubGrubError;
 use crate::internal::assignment::Assignment::{Decision, Derivation};
@@ -22,7 +22,7 @@ pub struct State<P: Package, V: Version> {
     root_version: V,
 
     /// TODO: remove pub.
-    pub incompatibilities: Vec<Incompatibility<P, V>>,
+    pub incompatibilities: Rc<Vec<Incompatibility<P, V>>>,
 
     /// Partial solution.
     /// TODO: remove pub.
@@ -44,7 +44,7 @@ impl<P: Package, V: Version> State<P, V> {
         Self {
             root_package,
             root_version,
-            incompatibilities: vec![not_root_incompat.clone()],
+            incompatibilities: Rc::new(vec![not_root_incompat.clone()]),
             partial_solution: PartialSolution::empty(),
             incompatibility_store: vec![not_root_incompat],
         }
@@ -54,7 +54,7 @@ impl<P: Package, V: Version> State<P, V> {
     pub fn add_incompatibility<F: Fn(usize) -> Incompatibility<P, V>>(&mut self, gen_incompat: F) {
         let incompat = gen_incompat(self.incompatibility_store.len());
         self.incompatibility_store.push(incompat.clone());
-        incompat.merge_into(&mut self.incompatibilities);
+        incompat.merge_into(Rc::make_mut(&mut self.incompatibilities));
     }
 
     /// Check if an incompatibility is terminal.
@@ -70,8 +70,7 @@ impl<P: Package, V: Version> State<P, V> {
         loop {
             // Iterate over incompatibilities in reverse order
             // to evaluate first the newest incompatibilities.
-            let mut loop_incompatibilities = self.incompatibilities.clone();
-            while let Some(incompat) = loop_incompatibilities.pop() {
+            for incompat in Rc::clone(&self.incompatibilities).iter().rev() {
                 // We only care about that incompatibility if it contains the current package.
                 if incompat.get(&current_package) == None {
                     continue;
@@ -98,7 +97,7 @@ impl<P: Package, V: Version> State<P, V> {
                         self.partial_solution.add_derivation(
                             package_almost,
                             term.negate(),
-                            incompat,
+                            incompat.clone(),
                         );
                     }
                     _ => {}
@@ -173,7 +172,7 @@ impl<P: Package, V: Version> State<P, V> {
     ) {
         self.partial_solution.backtrack(decision_level);
         if incompat_changed {
-            incompat.merge_into(&mut self.incompatibilities);
+            incompat.merge_into(Rc::make_mut(&mut self.incompatibilities));
         }
     }
 

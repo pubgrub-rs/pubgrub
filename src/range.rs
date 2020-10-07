@@ -21,6 +21,8 @@ use std::fmt;
 
 /// A Range is a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Range<V: Version> {
     segments: Vec<Interval<V>>,
 }
