@@ -14,8 +14,8 @@ use crate::range::Range;
 use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
 use crate::term::{self, Term};
 use crate::version::Version;
+use fxhash::FxHasher64;
 use std::hash::BuildHasherDefault;
-use twox_hash::XxHash64;
 
 /// An incompatibility is a set of terms for different packages
 /// that should never be satisfied all together.
@@ -36,7 +36,7 @@ use twox_hash::XxHash64;
 pub struct Incompatibility<P: Package, V: Version> {
     /// TODO: remove pub.
     pub id: usize,
-    package_terms: Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
+    package_terms: Map<P, Term<V>, BuildHasherDefault<FxHasher64>>,
     kind: Kind<P, V>,
 }
 
@@ -116,7 +116,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         start_id: usize,
         package: P,
         version: V,
-        deps: &Map<P, Range<V>, BuildHasherDefault<XxHash64>>,
+        deps: &Map<P, Range<V>, BuildHasherDefault<FxHasher64>>,
     ) -> Vec<Self> {
         deps.iter()
             .enumerate()
@@ -144,8 +144,8 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Terms that are always satisfied are removed from the union.
     fn union(
         id: usize,
-        i1: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
-        i2: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
+        i1: &Map<P, Term<V>, BuildHasherDefault<FxHasher64>>,
+        i2: &Map<P, Term<V>, BuildHasherDefault<FxHasher64>>,
         kind: Kind<P, V>,
     ) -> Self {
         let package_terms = Self::merge(i1, i2, |t1, t2| {
@@ -170,10 +170,10 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// If the result is None, remove that key from the merged map,
     /// otherwise add the content of the Some(_).
     fn merge<T: Clone, F: Fn(&T, &T) -> Option<T>>(
-        hashmap_1: &Map<P, T, BuildHasherDefault<XxHash64>>,
-        hashmap_2: &Map<P, T, BuildHasherDefault<XxHash64>>,
+        hashmap_1: &Map<P, T, BuildHasherDefault<FxHasher64>>,
+        hashmap_2: &Map<P, T, BuildHasherDefault<FxHasher64>>,
         f: F,
-    ) -> Map<P, T, BuildHasherDefault<XxHash64>> {
+    ) -> Map<P, T, BuildHasherDefault<FxHasher64>> {
         let mut merged_map = hashmap_1.clone();
         merged_map.reserve(hashmap_2.len());
         let mut to_delete = Vec::new();

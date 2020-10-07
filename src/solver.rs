@@ -66,7 +66,7 @@ use crate::internal::partial_solution::PartialSolution;
 use crate::package::Package;
 use crate::range::Range;
 use crate::version::Version;
-use twox_hash::XxHash64;
+use fxhash::FxHasher64;
 
 /// Solver trait.
 /// Given functions to retrieve the list of available versions of a package,
@@ -85,14 +85,14 @@ pub trait Solver<P: Package, V: Version> {
         &mut self,
         package: &P,
         version: &V,
-    ) -> Result<Option<Map<P, Range<V>, BuildHasherDefault<XxHash64>>>, Box<dyn Error>>;
+    ) -> Result<Option<Map<P, Range<V>, BuildHasherDefault<FxHasher64>>>, Box<dyn Error>>;
 
     /// Solve dependencies of a given package.
     fn run(
         &mut self,
         package: P,
         version: impl Into<V>,
-    ) -> Result<Map<P, V, BuildHasherDefault<XxHash64>>, PubGrubError<P, V>> {
+    ) -> Result<Map<P, V, BuildHasherDefault<FxHasher64>>, PubGrubError<P, V>> {
         let mut state = State::init(package.clone(), version.into());
         let mut next = package;
         loop {
@@ -174,8 +174,8 @@ pub trait Solver<P: Package, V: Version> {
 pub struct OfflineSolver<P: Package, V: Version + Hash> {
     dependencies: Map<
         P,
-        Map<V, Map<P, Range<V>, BuildHasherDefault<XxHash64>>, BuildHasherDefault<XxHash64>>,
-        BuildHasherDefault<XxHash64>,
+        Map<V, Map<P, Range<V>, BuildHasherDefault<FxHasher64>>, BuildHasherDefault<FxHasher64>>,
+        BuildHasherDefault<FxHasher64>,
     >,
 }
 
@@ -225,7 +225,7 @@ impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
         &self,
         package: &P,
         version: &V,
-    ) -> Option<Map<P, Range<V>, BuildHasherDefault<XxHash64>>> {
+    ) -> Option<Map<P, Range<V>, BuildHasherDefault<FxHasher64>>> {
         self.dependencies
             .get(package)?
             .get(version)
@@ -247,7 +247,7 @@ impl<P: Package, V: Version + Hash> Solver<P, V> for OfflineSolver<P, V> {
         &mut self,
         package: &P,
         version: &V,
-    ) -> Result<Option<Map<P, Range<V>, BuildHasherDefault<XxHash64>>>, Box<dyn Error>> {
+    ) -> Result<Option<Map<P, Range<V>, BuildHasherDefault<FxHasher64>>>, Box<dyn Error>> {
         Ok(self.dependencies(package, version))
     }
 }
