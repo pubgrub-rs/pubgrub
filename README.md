@@ -53,6 +53,10 @@ to satisfy the dependencies of that package and version pair.
 If there is no solution, the reason will be provided as clear as possible.
 
 
+## Contributing
+
+Discussion and development happens here on github and on our [Zulip stream](https://rust-lang.zulipchat.com/#narrow/stream/260232-t-cargo.2FPubGrub). Please join in!
+
 ## PubGrub
 
 PubGrub is a version solving algorithm,
