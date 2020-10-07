@@ -331,6 +331,11 @@ pub mod tests {
             assert_eq!(range.negate().negate(), range);
         }
 
+        #[test]
+        fn negate_contains_opposite(range in strategy(), version in version_strat()) {
+            assert_ne!(range.contains(&version), range.negate().contains(&version));
+        }
+
         // Testing intersection ----------------------------
 
         #[test]
@@ -363,11 +368,21 @@ pub mod tests {
             assert_eq!(range.negate().intersection(&range), Range::none());
         }
 
+        #[test]
+        fn intesection_contains_both(r1 in strategy(), r2 in strategy(), version in version_strat()) {
+            assert_eq!(r1.intersection(&r2).contains(&version), r1.contains(&version) && r2.contains(&version));
+        }
+
         // Testing union -----------------------------------
 
         #[test]
         fn union_of_complements_is_any(range in strategy()) {
             assert_eq!(range.negate().union(&range), Range::any());
+        }
+
+        #[test]
+        fn union_contains_either(r1 in strategy(), r2 in strategy(), version in version_strat()) {
+            assert_eq!(r1.union(&r2).contains(&version), r1.contains(&version) || r2.contains(&version));
         }
 
         // Testing contains --------------------------------
