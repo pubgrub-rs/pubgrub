@@ -5,13 +5,15 @@
 //! Build a report as clear as possible as to why
 //! dependency solving failed.
 
-use indexmap::map::IndexMap as Map;
+use std::collections::HashMap as Map;
 use std::fmt;
 
 use crate::package::Package;
 use crate::range::Range;
 use crate::term::Term;
 use crate::version::Version;
+use std::hash::BuildHasherDefault;
+use twox_hash::XxHash64;
 
 /// Reporter trait.
 pub trait Reporter<P: Package, V: Version> {
@@ -52,7 +54,7 @@ pub enum External<P: Package, V: Version> {
 #[derive(Debug, Clone)]
 pub struct Derived<P: Package, V: Version> {
     /// Terms of the incompatibility.
-    pub terms: Map<P, Term<V>>,
+    pub terms: Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     /// Indicate if that incompatibility is present multiple times
     /// in the derivation tree.
     /// If that is the case, it has a unique id, provided in that option.
@@ -184,7 +186,7 @@ pub struct DefaultStringReporter {
     ref_count: usize,
     /// Shared nodes that have already been marked with a line reference.
     /// The incompatibility ids are the keys, and the line references are the values.
-    shared_with_ref: Map<usize, usize>,
+    shared_with_ref: Map<usize, usize, BuildHasherDefault<XxHash64>>,
     /// Accumulated lines of the report already generated.
     lines: Vec<String>,
 }
@@ -194,7 +196,7 @@ impl DefaultStringReporter {
     fn new() -> Self {
         Self {
             ref_count: 0,
-            shared_with_ref: Map::new(),
+            shared_with_ref: Default::default(),
             lines: Vec::new(),
         }
     }
@@ -291,7 +293,7 @@ impl DefaultStringReporter {
         &mut self,
         derived: &Derived<P, V>,
         external: &External<P, V>,
-        current_terms: &Map<P, Term<V>>,
+        current_terms: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     ) {
         match self.line_ref_of(derived.shared_id) {
             Some(ref_id) => self.lines.push(Self::explain_ref_and_external(
@@ -309,7 +311,7 @@ impl DefaultStringReporter {
         &mut self,
         derived: &Derived<P, V>,
         external: &External<P, V>,
-        current_terms: &Map<P, Term<V>>,
+        current_terms: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     ) {
         match (&*derived.cause1, &*derived.cause2) {
             // If the derived cause has itself one external prior cause,
@@ -346,7 +348,7 @@ impl DefaultStringReporter {
     fn explain_both_external<P: Package, V: Version>(
         external1: &External<P, V>,
         external2: &External<P, V>,
-        current_terms: &Map<P, Term<V>>,
+        current_terms: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     ) -> String {
         // TODO: order should be chosen to make it more logical.
         format!(
@@ -363,7 +365,7 @@ impl DefaultStringReporter {
         derived1: &Derived<P, V>,
         ref_id2: usize,
         derived2: &Derived<P, V>,
-        current_terms: &Map<P, Term<V>>,
+        current_terms: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     ) -> String {
         // TODO: order should be chosen to make it more logical.
         format!(
@@ -383,7 +385,7 @@ impl DefaultStringReporter {
         ref_id: usize,
         derived: &Derived<P, V>,
         external: &External<P, V>,
-        current_terms: &Map<P, Term<V>>,
+        current_terms: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     ) -> String {
         // TODO: order should be chosen to make it more logical.
         format!(
@@ -398,7 +400,7 @@ impl DefaultStringReporter {
     /// Add an external cause to the chain of explanations.
     fn and_explain_external<P: Package, V: Version>(
         external: &External<P, V>,
-        current_terms: &Map<P, Term<V>>,
+        current_terms: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     ) -> String {
         format!(
             "And because {}, {}.",
@@ -411,7 +413,7 @@ impl DefaultStringReporter {
     fn and_explain_ref<P: Package, V: Version>(
         ref_id: usize,
         derived: &Derived<P, V>,
-        current_terms: &Map<P, Term<V>>,
+        current_terms: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     ) -> String {
         format!(
             "And because {} ({}), {}.",
@@ -425,7 +427,7 @@ impl DefaultStringReporter {
     fn and_explain_prior_and_external<P: Package, V: Version>(
         prior_external: &External<P, V>,
         external: &External<P, V>,
-        current_terms: &Map<P, Term<V>>,
+        current_terms: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     ) -> String {
         format!(
             "And because {} and {}, {}.",
@@ -436,7 +438,9 @@ impl DefaultStringReporter {
     }
 
     /// Try to print terms of an incompatibility in a human-readable way.
-    pub fn string_terms<P: Package, V: Version>(terms: &Map<P, Term<V>>) -> String {
+    pub fn string_terms<P: Package, V: Version>(
+        terms: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
+    ) -> String {
         let terms_vec: Vec<_> = terms.iter().collect();
         match terms_vec.as_slice() {
             [] => "version solving failed".into(),

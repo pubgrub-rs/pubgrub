@@ -5,7 +5,7 @@
 //! The partial solution is the current state
 //! of the solution being built by the algorithm.
 
-use indexmap::map::IndexMap as Map;
+use std::collections::HashMap as Map;
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
@@ -13,6 +13,8 @@ use crate::internal::memory::Memory;
 use crate::package::Package;
 use crate::term::Term;
 use crate::version::Version;
+use std::hash::BuildHasherDefault;
+use twox_hash::XxHash64;
 
 /// The partial solution is the current state
 /// of the solution being built by the algorithm.
@@ -64,7 +66,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// If a partial solution has, for every positive derivation,
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
-    pub fn extract_solution(&self) -> Option<Map<P, V>> {
+    pub fn extract_solution(&self) -> Option<Map<P, V, BuildHasherDefault<XxHash64>>> {
         self.memory.extract_solution()
     }
 
@@ -203,7 +205,9 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             .map_or(1, |((level, _), _)| level.max(1))
     }
 
-    fn new_accum_satisfied_from(incompat: &Incompatibility<P, V>) -> Map<P, (bool, Term<V>)> {
+    fn new_accum_satisfied_from(
+        incompat: &Incompatibility<P, V>,
+    ) -> Map<P, (bool, Term<V>), BuildHasherDefault<XxHash64>> {
         incompat
             .iter()
             .map(|(p, _)| (p.clone(), (false, Term::any())))
@@ -215,7 +219,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// satisfies the given incompatibility.
     pub fn find_satisfier_helper<'a>(
         incompat: &Incompatibility<P, V>,
-        accum_satisfied: Map<P, (bool, Term<V>)>,
+        accum_satisfied: Map<P, (bool, Term<V>), BuildHasherDefault<XxHash64>>,
         all_assignments: &'a [(usize, Assignment<P, V>)],
     ) -> Option<(
         (usize, &'a Assignment<P, V>),

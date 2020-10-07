@@ -5,7 +5,7 @@
 //! An incompatibility is a set of terms for different packages
 //! that should never be satisfied all together.
 
-use indexmap::map::IndexMap as Map;
+use std::collections::HashMap as Map;
 use std::collections::HashSet as Set;
 use std::fmt;
 
@@ -14,6 +14,8 @@ use crate::range::Range;
 use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
 use crate::term::{self, Term};
 use crate::version::Version;
+use std::hash::BuildHasherDefault;
+use twox_hash::XxHash64;
 
 /// An incompatibility is a set of terms for different packages
 /// that should never be satisfied all together.
@@ -34,7 +36,7 @@ use crate::version::Version;
 pub struct Incompatibility<P: Package, V: Version> {
     /// TODO: remove pub.
     pub id: usize,
-    package_terms: Map<P, Term<V>>,
+    package_terms: Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
     kind: Kind<P, V>,
 }
 
@@ -67,7 +69,7 @@ pub enum Relation<P: Package, V: Version> {
 impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Create the initial "not Root" incompatibility.
     pub fn not_root(id: usize, package: P, version: V) -> Self {
-        let mut package_terms = Map::with_capacity(1);
+        let mut package_terms = Map::with_capacity_and_hasher(1, Default::default());
         package_terms.insert(
             package.clone(),
             Term::Negative(Range::exact(version.clone())),
@@ -86,7 +88,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
         };
-        let mut package_terms = Map::with_capacity(1);
+        let mut package_terms = Map::with_capacity_and_hasher(1, Default::default());
         package_terms.insert(package.clone(), term);
         Self {
             id,
@@ -100,7 +102,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// because its list of dependencies is unavailable.
     pub fn unavailable_dependencies(id: usize, package: P, version: V) -> Self {
         let range = Range::exact(version);
-        let mut package_terms = Map::with_capacity(1);
+        let mut package_terms = Map::with_capacity_and_hasher(1, Default::default());
         package_terms.insert(package.clone(), Term::Positive(range.clone()));
         Self {
             id,
@@ -114,7 +116,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         start_id: usize,
         package: P,
         version: V,
-        deps: &Map<P, Range<V>>,
+        deps: &Map<P, Range<V>, BuildHasherDefault<XxHash64>>,
     ) -> Vec<Self> {
         deps.iter()
             .enumerate()
@@ -126,7 +128,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Build an incompatibility from a given dependency.
     fn from_dependency(id: usize, package: P, version: V, dep: (&P, &Range<V>)) -> Self {
-        let mut package_terms = Map::with_capacity(2);
+        let mut package_terms = Map::with_capacity_and_hasher(2, Default::default());
         let range1 = Range::exact(version);
         package_terms.insert(package.clone(), Term::Positive(range1.clone()));
         let (p2, range2) = dep;
@@ -140,7 +142,12 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Perform the union of two incompatibilities.
     /// Terms that are always satisfied are removed from the union.
-    fn union(id: usize, i1: &Map<P, Term<V>>, i2: &Map<P, Term<V>>, kind: Kind<P, V>) -> Self {
+    fn union(
+        id: usize,
+        i1: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
+        i2: &Map<P, Term<V>, BuildHasherDefault<XxHash64>>,
+        kind: Kind<P, V>,
+    ) -> Self {
         let package_terms = Self::merge(i1, i2, |t1, t2| {
             let term_union = t1.union(t2);
             if term_union == Term::any() {
@@ -163,10 +170,10 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// If the result is None, remove that key from the merged map,
     /// otherwise add the content of the Some(_).
     fn merge<T: Clone, F: Fn(&T, &T) -> Option<T>>(
-        hashmap_1: &Map<P, T>,
-        hashmap_2: &Map<P, T>,
+        hashmap_1: &Map<P, T, BuildHasherDefault<XxHash64>>,
+        hashmap_2: &Map<P, T, BuildHasherDefault<XxHash64>>,
         f: F,
-    ) -> Map<P, T> {
+    ) -> Map<P, T, BuildHasherDefault<XxHash64>> {
         let mut merged_map = hashmap_1.clone();
         merged_map.reserve(hashmap_2.len());
         let mut to_delete = Vec::new();
@@ -181,7 +188,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                 },
             }
         }
-        for key in to_delete.into_iter() {
+        for key in to_delete.iter() {
             merged_map.remove(key);
         }
         merged_map
@@ -266,7 +273,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// Iterate over packages.
-    pub fn iter(&self) -> indexmap::map::Iter<P, Term<V>> {
+    pub fn iter(&self) -> std::collections::hash_map::Iter<P, Term<V>> {
         self.package_terms.iter()
     }
 
@@ -331,7 +338,7 @@ impl<P: Package, V: Version> fmt::Display for Incompatibility<P, V> {
 
 impl<P: Package, V: Version> IntoIterator for Incompatibility<P, V> {
     type Item = (P, Term<V>);
-    type IntoIter = indexmap::map::IntoIter<P, Term<V>>;
+    type IntoIter = std::collections::hash_map::IntoIter<P, Term<V>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.package_terms.into_iter()
@@ -357,15 +364,15 @@ pub mod tests {
         ///    { p1: t1, p3: t3 }
         #[test]
         fn rule_of_resolution(t1 in term_strat(), t2 in term_strat(), t3 in term_strat()) {
-            let mut i1 = Map::new();
+            let mut i1 = Map::default();
             i1.insert("p1", t1.clone());
             i1.insert("p2", t2.negate());
 
-            let mut i2 = Map::new();
+            let mut i2 = Map::default();
             i2.insert("p2", t2.clone());
             i2.insert("p3", t3.clone());
 
-            let mut i3 = Map::new();
+            let mut i3 = Map::default();
             i3.insert("p1", t1);
             i3.insert("p3", t3);
 

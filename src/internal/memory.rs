@@ -5,12 +5,14 @@
 //! A Memory acts like a structured partial solution
 //! where terms are regrouped by package in a hashmap.
 
-use indexmap::map::IndexMap as Map;
+use std::collections::HashMap as Map;
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::package::Package;
 use crate::term::Term;
 use crate::version::Version;
+use std::hash::BuildHasherDefault;
+use twox_hash::XxHash64;
 
 /// A memory is the set of all assignments in the partial solution,
 /// organized by package instead of historically ordered.
@@ -18,7 +20,7 @@ use crate::version::Version;
 /// Contrary to PartialSolution, Memory does not store derivations causes, only the terms.
 #[derive(Clone)]
 pub struct Memory<P: Package, V: Version> {
-    assignments: Map<P, PackageAssignments<V>>,
+    assignments: Map<P, PackageAssignments<V>, BuildHasherDefault<XxHash64>>,
 }
 
 /// A package memory contains the potential decision and derivations
@@ -33,7 +35,7 @@ impl<P: Package, V: Version> Memory<P, V> {
     /// Initialize an empty memory.
     pub fn empty() -> Self {
         Self {
-            assignments: Map::new(),
+            assignments: Default::default(),
         }
     }
 
@@ -109,7 +111,7 @@ impl<P: Package, V: Version> Memory<P, V> {
     /// If a partial solution has, for every positive derivation,
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
-    pub fn extract_solution(&self) -> Option<Map<P, V>> {
+    pub fn extract_solution(&self) -> Option<Map<P, V, BuildHasherDefault<XxHash64>>> {
         if self.assignments.values().all(|pa| pa.is_valid()) {
             Some(
                 self.assignments

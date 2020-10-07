@@ -1,4 +1,4 @@
-use indexmap::map::IndexMap;
+use std::collections::HashMap;
 
 use pubgrub::range::Range;
 use pubgrub::solver::{OfflineSolver, Solver};
@@ -25,7 +25,7 @@ fn no_conflict() {
     let solver_solution = solver.run("root", (1, 0, 0)).unwrap();
 
     // Solution.
-    let mut solution = IndexMap::<&str, SemanticVersion>::new();
+    let mut solution = HashMap::default();
     solution.insert("root", (1, 0, 0).into());
     solution.insert("foo", (1, 0, 0).into());
     solution.insert("bar", (1, 0, 0).into());
@@ -60,7 +60,7 @@ fn avoiding_conflict_during_decision_making() {
     let solver_solution = solver.run("root", (1, 0, 0)).unwrap();
 
     // Solution.
-    let mut solution = IndexMap::<&str, SemanticVersion>::new();
+    let mut solution = HashMap::default();
     solution.insert("root", (1, 0, 0).into());
     solution.insert("foo", (1, 0, 0).into());
     solution.insert("bar", (1, 1, 0).into());
@@ -94,7 +94,7 @@ fn conflict_resolution() {
     let solver_solution = solver.run("root", (1, 0, 0)).unwrap();
 
     // Solution.
-    let mut solution = IndexMap::<&str, SemanticVersion>::new();
+    let mut solution = HashMap::default();
     solution.insert("root", (1, 0, 0).into());
     solution.insert("foo", (1, 0, 0).into());
 
@@ -151,7 +151,7 @@ fn conflict_with_partial_satisfier() {
     let solver_solution = solver.run("root", (1, 0, 0)).unwrap();
 
     // Solution.
-    let mut solution = IndexMap::<&str, SemanticVersion>::new();
+    let mut solution = HashMap::default();
     solution.insert("root", (1, 0, 0).into());
     solution.insert("foo", (1, 0, 0).into());
     solution.insert("target", (2, 0, 0).into());
