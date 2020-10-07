@@ -25,6 +25,27 @@ pub struct SemanticVersion {
     patch: u32,
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for SemanticVersion {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&format!("{}", self))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for SemanticVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
 // Constructors
 impl SemanticVersion {
     /// Create a version with "major", "minor" and "patch" values.
@@ -207,6 +228,8 @@ impl Version for SemanticVersion {
 
 /// Simplest versions possible, just a positive number.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize,))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct NumberVersion(pub u32);
 
 // Convert an usize into a version.

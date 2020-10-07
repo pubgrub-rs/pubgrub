@@ -67,6 +67,7 @@
 //! to satisfy the dependencies of that package and version pair.
 //! If there is no solution, the reason will be provided as clear as possible.
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet as Set;
 use std::collections::HashMap as Map;
 use std::error::Error;
@@ -180,17 +181,18 @@ pub trait DependencyProvider<P: Package, V: Version> {
 }
 
 /// A basic implementation of [DependencyProvider].
-pub struct OfflineDependencyProvider<P: Package, V: Version + Hash> {
-    package_versions: Map<P, Set<V>>,
-    dependencies: Map<(P, V), Map<P, Range<V>>>,
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+pub struct OfflineDependencyProvider<P: Package + Ord, V: Version + Hash> {
+    dependencies: BTreeMap<P, BTreeMap<V, BTreeMap<P, Range<V>>>>,
 }
 
-impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
+impl<P: Package + Ord, V: Version + Hash> OfflineDependencyProvider<P, V> {
     /// Creates an empty OfflineDependencyProvider with no dependencies.
     pub fn new() -> Self {
         Self {
-            package_versions: Map::new(),
-            dependencies: Map::new(),
+            dependencies: BTreeMap::new(),
         }
     }
 
@@ -210,35 +212,36 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
     ) {
         let package_deps = dependencies.into_iter().collect();
         let v = version.into();
-        self.add_package_version(package.clone(), v.clone());
-        self.dependencies.insert((package, v), package_deps);
-    }
-
-    // TODO: use Into<P> and Into<V>
-    fn add_package_version(&mut self, package: P, version: impl Into<V>) {
-        let v_set = self.package_versions.entry(package).or_insert(Set::new());
-        v_set.insert(version.into());
+        *self
+            .dependencies
+            .entry(package)
+            .or_default()
+            .entry(v)
+            .or_default() = package_deps;
     }
 
     /// Lists versions of saved packages.
     /// Returns `None` if no information is available regarding that package.
     fn versions(&self, package: &P) -> Option<Set<V>> {
-        self.package_versions.get(package).cloned()
+        self.dependencies
+            .get(package)
+            .map(|k| k.keys().cloned().collect())
     }
 
     /// Lists dependencies of a given package and version.
     /// Returns `None` if no information is available regarding that package and version pair.
     fn dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>> {
         self.dependencies
-            .get(&(package.clone(), version.clone()))
-            .cloned()
+            .get(package)?
+            .get(version)
+            .map(|m| m.iter().map(|x| (x.0.clone(), x.1.clone())).collect())
     }
 }
 
 /// An implementation of [DependencyProvider] that
 /// contains all dependency information available in memory.
 /// Versions are listed with the newest versions first.
-impl<P: Package, V: Version + Hash> DependencyProvider<P, V> for OfflineDependencyProvider<P, V> {
+impl<P: Package + Ord, V: Version + Hash> DependencyProvider<P, V> for OfflineDependencyProvider<P, V> {
     fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
         Ok(self
             .versions(package)

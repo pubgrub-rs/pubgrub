@@ -10,13 +10,16 @@ use std::hash::Hash;
 
 // An example implementing caching dependency provider that will
 // store queried dependencies in memory and check them before querying more from remote.
-struct CachingDependencyProvider<P: Package, V: Version + Hash> {
-    remote_dependencies: Box<dyn DependencyProvider<P, V>>,
+struct CachingDependencyProvider<P: Package + Ord, V: Version + Hash, DP: DependencyProvider<P, V>>
+{
+    remote_dependencies: DP,
     cached_dependencies: RefCell<OfflineDependencyProvider<P, V>>,
 }
 
-impl<P: Package, V: Version + Hash> CachingDependencyProvider<P, V> {
-    pub fn new(remote_dependencies_provider: Box<dyn DependencyProvider<P, V>>) -> Self {
+impl<P: Package + Ord, V: Version + Hash, DP: DependencyProvider<P, V>>
+    CachingDependencyProvider<P, V, DP>
+{
+    pub fn new(remote_dependencies_provider: DP) -> Self {
         CachingDependencyProvider {
             remote_dependencies: remote_dependencies_provider,
             cached_dependencies: RefCell::new(OfflineDependencyProvider::new()),
@@ -24,7 +27,9 @@ impl<P: Package, V: Version + Hash> CachingDependencyProvider<P, V> {
     }
 }
 
-impl<P: Package, V: Version + Hash> DependencyProvider<P, V> for CachingDependencyProvider<P, V> {
+impl<P: Package + Ord, V: Version + Hash, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
+    for CachingDependencyProvider<P, V, DP>
+{
     // Lists only from remote for simplicity
     fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
         self.remote_dependencies.list_available_versions(package)
@@ -66,7 +71,7 @@ fn main() {
     remote_dependencies_provider.add_dependencies("root", 1, Vec::new());
 
     let caching_dependencies_provider =
-        CachingDependencyProvider::new(Box::new(remote_dependencies_provider));
+        CachingDependencyProvider::new(remote_dependencies_provider);
 
     let solution = resolve(&caching_dependencies_provider, "root", 1);
     println!("Solution: {:?}", solution);
