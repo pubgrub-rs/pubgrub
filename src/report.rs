@@ -5,12 +5,12 @@
 //! Build a report as clear as possible as to why
 //! dependency solving failed.
 
-use std::collections::HashMap as Map;
 use std::fmt;
 
 use crate::package::Package;
 use crate::range::Range;
 use crate::term::Term;
+use crate::type_aliases::Map;
 use crate::version::Version;
 
 /// Reporter trait.
@@ -194,7 +194,7 @@ impl DefaultStringReporter {
     fn new() -> Self {
         Self {
             ref_count: 0,
-            shared_with_ref: Map::new(),
+            shared_with_ref: Map::default(),
             lines: Vec::new(),
         }
     }

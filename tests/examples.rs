@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
+use pubgrub::type_aliases::Map;
 use pubgrub::version::SemanticVersion;
 
 #[test]
@@ -25,7 +24,7 @@ fn no_conflict() {
     let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
 
     // Solution.
-    let mut expected_solution = HashMap::new();
+    let mut expected_solution = Map::default();
     expected_solution.insert("root", (1, 0, 0).into());
     expected_solution.insert("foo", (1, 0, 0).into());
     expected_solution.insert("bar", (1, 0, 0).into());
@@ -60,7 +59,7 @@ fn avoiding_conflict_during_decision_making() {
     let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
 
     // Solution.
-    let mut expected_solution = HashMap::new();
+    let mut expected_solution = Map::default();
     expected_solution.insert("root", (1, 0, 0).into());
     expected_solution.insert("foo", (1, 0, 0).into());
     expected_solution.insert("bar", (1, 1, 0).into());
@@ -94,7 +93,7 @@ fn conflict_resolution() {
     let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
 
     // Solution.
-    let mut expected_solution = HashMap::new();
+    let mut expected_solution = Map::default();
     expected_solution.insert("root", (1, 0, 0).into());
     expected_solution.insert("foo", (1, 0, 0).into());
 
@@ -151,7 +150,7 @@ fn conflict_with_partial_satisfier() {
     let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
 
     // Solution.
-    let mut expected_solution = HashMap::new();
+    let mut expected_solution = Map::default();
     expected_solution.insert("root", (1, 0, 0).into());
     expected_solution.insert("foo", (1, 0, 0).into());
     expected_solution.insert("target", (2, 0, 0).into());

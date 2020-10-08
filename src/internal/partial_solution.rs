@@ -5,13 +5,12 @@
 //! The partial solution is the current state
 //! of the solution being built by the algorithm.
 
-use std::collections::HashMap as Map;
-
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::memory::Memory;
 use crate::package::Package;
 use crate::term::Term;
+use crate::type_aliases::Map;
 use crate::version::Version;
 
 /// The partial solution is the current state

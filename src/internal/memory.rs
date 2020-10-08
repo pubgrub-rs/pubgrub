@@ -3,13 +3,12 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! A Memory acts like a structured partial solution
-//! where terms are regrouped by package in a hashmap.
-
-use std::collections::HashMap as Map;
+//! where terms are regrouped by package in a [Map](crate::Map).
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::package::Package;
 use crate::term::Term;
+use crate::type_aliases::Map;
 use crate::version::Version;
 
 /// A memory is the set of all assignments in the partial solution,
@@ -33,7 +32,7 @@ impl<P: Package, V: Version> Memory<P, V> {
     /// Initialize an empty memory.
     pub fn empty() -> Self {
         Self {
-            assignments: Map::new(),
+            assignments: Map::default(),
         }
     }
 
