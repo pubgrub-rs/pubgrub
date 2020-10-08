@@ -138,7 +138,11 @@ impl<P: Package, V: Version> State<P, V> {
                         );
                         return Ok(current_incompat);
                     }
-                    Derivation { cause, .. } => {
+                    Derivation {
+                        cause,
+                        term,
+                        package,
+                    } => {
                         if previous_satisfier_level != satisfier_level {
                             self.backtrack(
                                 current_incompat.clone(),
@@ -148,8 +152,13 @@ impl<P: Package, V: Version> State<P, V> {
                             return Ok(current_incompat);
                         } else {
                             let id = self.incompatibility_store.len();
-                            let prior_cause =
-                                Incompatibility::prior_cause(id, &current_incompat, &cause);
+                            let prior_cause = Incompatibility::prior_cause(
+                                id,
+                                &current_incompat,
+                                &cause,
+                                package,
+                                term,
+                            );
                             // eprintln!("\ncause 1: {}", &current_incompat);
                             // eprintln!("cause 2: {}", &cause);
                             // eprintln!("prior cause: {}\n", &prior_cause);

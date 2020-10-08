@@ -1,7 +1,7 @@
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::type_aliases::Map;
-use pubgrub::version::SemanticVersion;
+use pubgrub::version::{NumberVersion, SemanticVersion};
 
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#no-conflicts
@@ -156,5 +156,35 @@ fn conflict_with_partial_satisfier() {
     expected_solution.insert("target", (2, 0, 0).into());
 
     // Comparing the true solution with the one computed by the algorithm.
+    assert_eq!(expected_solution, computed_solution);
+}
+
+#[test]
+/// a0 dep on b and c
+/// b0 dep on d0
+/// b1 dep on d1 (not existing)
+/// c0 has no dep
+/// c1 dep on d2 (not existing)
+/// d0 has no dep
+///
+/// Solution: a0, b0, c0, d0
+fn double_choices() {
+    let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+    dependency_provider.add_dependencies("a", 0, vec![("b", Range::any()), ("c", Range::any())]);
+    dependency_provider.add_dependencies("b", 0, vec![("d", Range::exact(0))]);
+    dependency_provider.add_dependencies("b", 1, vec![("d", Range::exact(1))]);
+    dependency_provider.add_dependencies("c", 0, vec![]);
+    dependency_provider.add_dependencies("c", 1, vec![("d", Range::exact(2))]);
+    dependency_provider.add_dependencies("d", 0, vec![]);
+
+    // Solution.
+    let mut expected_solution = Map::default();
+    expected_solution.insert("a", 0.into());
+    expected_solution.insert("b", 0.into());
+    expected_solution.insert("c", 0.into());
+    expected_solution.insert("d", 0.into());
+
+    // Run the algorithm.
+    let computed_solution = resolve(&dependency_provider, "a", 0).unwrap();
     assert_eq!(expected_solution, computed_solution);
 }
