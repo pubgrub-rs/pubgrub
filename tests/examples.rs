@@ -1,7 +1,7 @@
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
+use pubgrub::type_aliases::Map;
 use pubgrub::version::SemanticVersion;
-use pubgrub::Map;
 
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#no-conflicts

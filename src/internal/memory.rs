@@ -8,8 +8,8 @@
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::package::Package;
 use crate::term::Term;
+use crate::type_aliases::Map;
 use crate::version::Version;
-use crate::Map;
 
 /// A memory is the set of all assignments in the partial solution,
 /// organized by package instead of historically ordered.

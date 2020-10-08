@@ -77,8 +77,8 @@ use crate::internal::incompatibility::Incompatibility;
 use crate::internal::partial_solution::PartialSolution;
 use crate::package::Package;
 use crate::range::Range;
+use crate::type_aliases::Map;
 use crate::version::Version;
-use crate::Map;
 
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.

@@ -10,8 +10,8 @@ use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::memory::Memory;
 use crate::package::Package;
 use crate::term::Term;
+use crate::type_aliases::Map;
 use crate::version::Version;
-use crate::Map;
 
 /// The partial solution is the current state
 /// of the solution being built by the algorithm.

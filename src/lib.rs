@@ -76,7 +76,7 @@
 //! # use pubgrub::version::SemanticVersion;
 //! # use std::error::Error;
 //! # use pubgrub::range::Range;
-//! # use pubgrub::Map;
+//! # use pubgrub::type_aliases::Map;
 //! #
 //! # struct MyDependencyProvider;
 //! #
@@ -189,14 +189,13 @@
 
 #![warn(missing_docs)]
 
-pub use internal::types::Map;
-
 pub mod error;
 pub mod package;
 pub mod range;
 pub mod report;
 pub mod solver;
 pub mod term;
+pub mod type_aliases;
 pub mod version;
 
 mod internal;

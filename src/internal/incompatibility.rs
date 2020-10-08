@@ -12,8 +12,8 @@ use crate::package::Package;
 use crate::range::Range;
 use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
 use crate::term::{self, Term};
+use crate::type_aliases::Map;
 use crate::version::Version;
-use crate::Map;
 
 /// An incompatibility is a set of terms for different packages
 /// that should never be satisfied all together.

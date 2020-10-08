@@ -10,8 +10,8 @@ use std::fmt;
 use crate::package::Package;
 use crate::range::Range;
 use crate::term::Term;
+use crate::type_aliases::Map;
 use crate::version::Version;
-use crate::Map;
 
 /// Reporter trait.
 pub trait Reporter<P: Package, V: Version> {

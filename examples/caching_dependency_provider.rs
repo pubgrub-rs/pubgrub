@@ -1,8 +1,8 @@
 use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, DependencyProvider, OfflineDependencyProvider};
+use pubgrub::type_aliases::Map;
 use pubgrub::version::{NumberVersion, Version};
-use pubgrub::Map;
 use std::cell::RefCell;
 use std::error::Error;
 use std::hash::Hash;
