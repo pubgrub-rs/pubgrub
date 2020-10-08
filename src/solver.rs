@@ -55,9 +55,8 @@
 //! If there is no solution, the reason will be provided as clear as possible.
 
 use std::collections::BTreeSet as Set;
-use std::collections::HashMap as Map;
 use std::error::Error;
-use std::hash::{BuildHasherDefault, Hash};
+use std::hash::Hash;
 
 use crate::error::PubGrubError;
 use crate::internal::core::State;
@@ -66,7 +65,7 @@ use crate::internal::partial_solution::PartialSolution;
 use crate::package::Package;
 use crate::range::Range;
 use crate::version::Version;
-use fxhash::FxHasher64;
+use crate::Map;
 
 /// Solver trait.
 /// Given functions to retrieve the list of available versions of a package,
@@ -85,14 +84,10 @@ pub trait Solver<P: Package, V: Version> {
         &mut self,
         package: &P,
         version: &V,
-    ) -> Result<Option<Map<P, Range<V>, BuildHasherDefault<FxHasher64>>>, Box<dyn Error>>;
+    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>>;
 
     /// Solve dependencies of a given package.
-    fn run(
-        &mut self,
-        package: P,
-        version: impl Into<V>,
-    ) -> Result<Map<P, V, BuildHasherDefault<FxHasher64>>, PubGrubError<P, V>> {
+    fn run(&mut self, package: P, version: impl Into<V>) -> Result<Map<P, V>, PubGrubError<P, V>> {
         let mut state = State::init(package.clone(), version.into());
         let mut next = package;
         loop {
@@ -172,11 +167,7 @@ pub trait Solver<P: Package, V: Version> {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OfflineSolver<P: Package, V: Version + Hash> {
-    dependencies: Map<
-        P,
-        Map<V, Map<P, Range<V>, BuildHasherDefault<FxHasher64>>, BuildHasherDefault<FxHasher64>>,
-        BuildHasherDefault<FxHasher64>,
-    >,
+    dependencies: Map<P, Map<V, Map<P, Range<V>>>>,
 }
 
 impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
@@ -221,11 +212,7 @@ impl<P: Package, V: Version + Hash> OfflineSolver<P, V> {
 
     /// Lists dependencies of a given package and version.
     /// Returns `None` if no information is available regarding that package and version pair.
-    fn dependencies(
-        &self,
-        package: &P,
-        version: &V,
-    ) -> Option<Map<P, Range<V>, BuildHasherDefault<FxHasher64>>> {
+    fn dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>> {
         self.dependencies
             .get(package)?
             .get(version)
@@ -247,7 +234,7 @@ impl<P: Package, V: Version + Hash> Solver<P, V> for OfflineSolver<P, V> {
         &mut self,
         package: &P,
         version: &V,
-    ) -> Result<Option<Map<P, Range<V>, BuildHasherDefault<FxHasher64>>>, Box<dyn Error>> {
+    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
         Ok(self.dependencies(package, version))
     }
 }

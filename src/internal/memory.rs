@@ -5,14 +5,11 @@
 //! A Memory acts like a structured partial solution
 //! where terms are regrouped by package in a hashmap.
 
-use std::collections::HashMap as Map;
-
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::package::Package;
 use crate::term::Term;
 use crate::version::Version;
-use fxhash::FxHasher64;
-use std::hash::BuildHasherDefault;
+use crate::Map;
 
 /// A memory is the set of all assignments in the partial solution,
 /// organized by package instead of historically ordered.
@@ -20,7 +17,7 @@ use std::hash::BuildHasherDefault;
 /// Contrary to PartialSolution, Memory does not store derivations causes, only the terms.
 #[derive(Clone)]
 pub struct Memory<P: Package, V: Version> {
-    assignments: Map<P, PackageAssignments<V>, BuildHasherDefault<FxHasher64>>,
+    assignments: Map<P, PackageAssignments<V>>,
 }
 
 /// A package memory contains the potential decision and derivations
@@ -111,7 +108,7 @@ impl<P: Package, V: Version> Memory<P, V> {
     /// If a partial solution has, for every positive derivation,
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
-    pub fn extract_solution(&self) -> Option<Map<P, V, BuildHasherDefault<FxHasher64>>> {
+    pub fn extract_solution(&self) -> Option<Map<P, V>> {
         if self.assignments.values().all(|pa| pa.is_valid()) {
             Some(
                 self.assignments
