@@ -266,7 +266,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// Iterate over packages.
-    pub fn iter(&self) -> std::collections::hash_map::Iter<P, Term<V>> {
+    pub fn iter(&self) -> impl Iterator<Item = (&P, &Term<V>)> {
         self.package_terms.iter()
     }
 
