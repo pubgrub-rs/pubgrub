@@ -159,12 +159,8 @@
 
 #![warn(missing_docs)]
 
-use fxhash::FxHasher64;
-use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
-
 /// Map implementation used by the library
-pub type Map<K, V> = HashMap<K, V, BuildHasherDefault<FxHasher64>>;
+pub type Map<K, V> = rustc_hash::FxHashMap<K, V>;
 
 pub mod error;
 pub mod package;
