@@ -189,8 +189,7 @@
 
 #![warn(missing_docs)]
 
-/// Map implementation used by the library
-pub type Map<K, V> = rustc_hash::FxHashMap<K, V>;
+pub use internal::types::Map;
 
 pub mod error;
 pub mod package;

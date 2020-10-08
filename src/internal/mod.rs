@@ -4,8 +4,9 @@
 
 //! Non exposed modules.
 
-pub mod assignment;
-pub mod core;
-pub mod incompatibility;
-pub mod memory;
-pub mod partial_solution;
+mod assignment;
+pub(crate) mod core;
+pub(crate) mod incompatibility;
+mod memory;
+pub(crate) mod partial_solution;
+pub(crate) mod types;
