@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use pubgrub::{package::Package, version::NumberVersion};
+use pubgrub::{
+    error::PubGrubError, package::Package, report::DefaultStringReporter, report::Reporter,
+    version::NumberVersion,
+};
 use pubgrub::{range::Range, solver::resolve, solver::OfflineDependencyProvider};
 
 use proptest::collection::{btree_map, vec};
@@ -33,10 +36,10 @@ pub fn registry_strategy<N: Package + Ord>(
         Vec<(N, NumberVersion)>,
     ),
 > {
-    let max_crates = 50;
-    let max_versions = 20;
-    let shrinkage = 60;
-    let complicated_len = 10;
+    let max_crates = 40;
+    let max_versions = 15;
+    let shrinkage = 50;
+    let complicated_len = 10usize;
 
     // If this is false than the crate will depend on the nonexistent "bad"
     // instead of the complex set we generated for it.
@@ -73,9 +76,10 @@ pub fn registry_strategy<N: Package + Ord>(
         list_of_crates_with_versions,
         list_of_raw_dependency,
         reverse_alphabetical,
+        1..(complicated_len + 1),
     )
         .prop_map(
-            move |(crate_vers_by_name, raw_dependencies, reverse_alphabetical)| {
+            move |(crate_vers_by_name, raw_dependencies, reverse_alphabetical, complicated_len)| {
                 let mut list_of_pkgid: Vec<(
                     (N, NumberVersion),
                     Option<Vec<(N, Range<NumberVersion>)>>,
@@ -168,6 +172,27 @@ proptest! {
     )  {
         for (name, ver) in cases {
             let _ = resolve(&dependency_provider, name, ver);
+        }
+    }
+
+    #[test]
+    /// This tests wheter the allgorithm is still deterministic 
+    fn prop_same_on_repeated_runs(
+        (dependency_provider, cases) in registry_strategy(0u16..665, 666)
+    )  {
+        for (name, ver) in cases {
+            let one = resolve(&dependency_provider, name, ver);
+            for _ in 0..3 {
+                match (&one, &resolve(&dependency_provider, name, ver)) {
+                    (Ok(l), Ok(r)) => assert_eq!(l, r),
+                    (Err(PubGrubError::NoSolution(derivation_l)), Err(PubGrubError::NoSolution(derivation_r))) => {
+                        assert_eq!(
+                            format!("{}", DefaultStringReporter::report(&derivation_l)),
+                            format!("{}", DefaultStringReporter::report(&derivation_r)),
+                        )},
+                    _ => panic!("not the same result")
+                }
+            }
         }
     }
 }
