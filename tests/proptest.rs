@@ -66,7 +66,7 @@ pub fn registry_strategy<N: Package + Ord>(
 > {
     let max_crates = 40;
     let max_versions = 15;
-    let shrinkage = 50;
+    let shrinkage = 40;
     let complicated_len = 10usize;
 
     // If this is false than the crate will depend on the nonexistent "bad"
@@ -175,6 +175,45 @@ pub fn registry_strategy<N: Package + Ord>(
                 (solver, complicated)
             },
         )
+}
+
+/// This test is to test the generator to ensure
+/// that it makes registries with large dependency trees
+#[test]
+fn meta_test_deep_trees_from_strategy() {
+    use proptest::strategy::ValueTree;
+    use proptest::test_runner::TestRunner;
+
+    let mut dis = [0; 21];
+
+    let strategy = registry_strategy(0u16..665, 666);
+    let mut test_runner = TestRunner::deterministic();
+    for _ in 0..128 {
+        let (dependency_provider, cases) = strategy
+            .new_tree(&mut TestRunner::new_with_rng(
+                Default::default(),
+                test_runner.new_rng(),
+            ))
+            .unwrap()
+            .current();
+
+        for (name, ver) in cases {
+            let res = resolve(&dependency_provider, name, ver);
+            dis[res
+                .as_ref()
+                .map(|x| std::cmp::min(x.len(), dis.len()) - 1)
+                .unwrap_or(0)] += 1;
+            if dis.iter().all(|&x| x > 0) {
+                return;
+            }
+        }
+    }
+
+    panic!(
+        "In {} tries we did not see a wide enough distribution of dependency trees! dis: {:?}",
+        dis.iter().sum::<i32>(),
+        dis
+    );
 }
 
 proptest! {
