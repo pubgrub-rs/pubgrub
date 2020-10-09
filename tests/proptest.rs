@@ -2,9 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use pubgrub::range::Range;
-use pubgrub::solver::OfflineDependencyProvider;
 use pubgrub::version::NumberVersion;
+use pubgrub::{range::Range, solver::resolve, solver::OfflineDependencyProvider};
 
 use proptest::collection::{btree_map, vec};
 use proptest::prelude::*;
@@ -14,11 +13,17 @@ use proptest::string::string_regex;
 /// This generates a random registry index.
 /// Unlike vec((Name, Ver, vec((Name, VerRq), ..), ..)
 /// This strategy has a high probability of having valid dependencies
-pub fn registry_strategy(
-    max_crates: usize,
-    max_versions: usize,
-    shrinkage: usize,
-) -> impl Strategy<Value = OfflineDependencyProvider<String, NumberVersion>> {
+pub fn registry_strategy() -> impl Strategy<
+    Value = (
+        OfflineDependencyProvider<String, NumberVersion>,
+        Vec<(String, NumberVersion)>,
+    ),
+> {
+    let max_crates = 50;
+    let max_versions = 20;
+    let shrinkage = 60;
+    let complicated_len = 10;
+
     let name = string_regex("[A-Za-z][A-Za-z0-9_-]{0,5}")
         .unwrap()
         .prop_filter("reseved names", |n| {
@@ -110,17 +115,44 @@ pub fn registry_strategy(
                     }
                 }
 
-                let mut out = OfflineDependencyProvider::<String, NumberVersion>::new();
+                let mut solver = OfflineDependencyProvider::<String, NumberVersion>::new();
+
+                let complicated_len = std::cmp::min(complicated_len, list_of_pkgid.len());
+                let complicated: Vec<_> = if reverse_alphabetical {
+                    &list_of_pkgid[..complicated_len]
+                } else {
+                    &list_of_pkgid[(list_of_pkgid.len() - complicated_len)..]
+                }
+                .iter()
+                .map(|(x, _)| (x.0.clone(), x.1))
+                .collect();
 
                 for ((name, ver), deps) in list_of_pkgid {
-                    out.add_dependencies(
+                    solver.add_dependencies(
                         name,
                         ver,
                         deps.unwrap_or_else(|| vec![("bad".to_owned(), Range::any())]),
                     );
                 }
 
-                out
+                (solver, complicated)
             },
         )
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig {
+        result_cache: prop::test_runner::basic_result_cache,
+        .. ProptestConfig::default()
+    })]
+
+    #[test]
+    /// This test is mostly for profiling
+    fn prop_passes(
+        (dependency_provider, cases) in registry_strategy()
+    )  {
+        for (name, ver) in cases {
+            let _ = resolve(&dependency_provider, name, ver);
+        }
+    }
 }
