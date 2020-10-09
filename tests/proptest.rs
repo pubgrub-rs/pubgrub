@@ -222,6 +222,7 @@ proptest! {
         }
     }
 
+    #[test]
     /// MinimalDependencyProvider change what order the candidates
     /// are tried but not the existence of a solution
     fn prop_minimum_version_errors_the_same(
@@ -235,6 +236,39 @@ proptest! {
                 (Ok(_), Ok(_)) => (),
                 (Err(_), Err(_)) => (),
                 _ => panic!("not the same result")
+            }
+        }
+    }
+
+    #[test]
+    fn prop_removing_a_dep_cant_break(
+        (dependency_provider, cases) in registry_strategy(0u16..665, 666),
+        indexes_to_remove in prop::collection::vec((any::<prop::sample::Index>(), any::<prop::sample::Index>(), any::<prop::sample::Index>()), ..10)
+    )  {
+        let packages: Vec<_> = dependency_provider.packages().collect();
+        let mut removed_provider = dependency_provider.clone();
+        for (package_idx, version_idx, dep_idx) in indexes_to_remove {
+            let package = package_idx.get(&packages);
+            let versions = dependency_provider.list_available_versions(package).unwrap();
+            let version = version_idx.get(&versions);
+            let dependencys: Vec<_> = dependency_provider.get_dependencies(package, version).unwrap().unwrap().into_iter().collect();
+            if !dependencys.is_empty() {
+                let dependency = dep_idx.get(&dependencys).0.clone();
+                removed_provider.add_dependencies(
+                    **package,
+                    *version,
+                    dependencys.into_iter().filter(|x| x.0 != dependency)
+                )
+            }
+        }
+        for (name, ver) in cases {
+            if resolve(&dependency_provider, name, ver).is_ok() {
+                prop_assert!(
+                    resolve(&removed_provider, name, ver).is_ok(),
+                    "full index worked for `{} = \"={}\"` but removing some deps broke it!",
+                    name,
+                    ver,
+                )
             }
         }
     }

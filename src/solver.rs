@@ -226,6 +226,11 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
             .or_default() = package_deps;
     }
 
+    /// Lists packages that have bean saved.
+    pub fn packages(&self) -> impl Iterator<Item=&P> {
+        self.dependencies.keys()
+    }
+
     /// Lists versions of saved packages.
     /// Returns [None] if no information is available regarding that package.
     fn versions(&self, package: &P) -> Option<Set<V>> {
