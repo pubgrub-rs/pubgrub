@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, Reporter};

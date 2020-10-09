@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 #![feature(test)]
 extern crate test;
 use test::Bencher;
@@ -12,7 +14,8 @@ use pubgrub::version::NumberVersion;
 /// It has not bean minimized. There are meny `add_dependencies` that have no impact on the runtime or output.
 fn large_case(b: &mut Bencher) {
     let s = std::fs::read_to_string("test-examples/large_case_u16_NumberVersion.ron").unwrap();
-    let dependency_provider: OfflineDependencyProvider<u16, NumberVersion> = ron::de::from_str(&s).unwrap();
+    let dependency_provider: OfflineDependencyProvider<u16, NumberVersion> =
+        ron::de::from_str(&s).unwrap();
 
     // bench
     b.iter(|| {
