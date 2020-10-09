@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use pubgrub::range::Range;
+use pubgrub::solver::OfflineDependencyProvider;
 use pubgrub::version::NumberVersion;
 
 use proptest::collection::{btree_map, vec};
@@ -17,13 +18,7 @@ pub fn registry_strategy(
     max_crates: usize,
     max_versions: usize,
     shrinkage: usize,
-) -> impl Strategy<
-    Value = Vec<(
-        String,
-        NumberVersion,
-        Vec<(String, pubgrub::range::Range<NumberVersion>)>,
-    )>,
-> {
+) -> impl Strategy<Value = OfflineDependencyProvider<String, NumberVersion>> {
     let name = string_regex("[A-Za-z][A-Za-z0-9_-]{0,5}")
         .unwrap()
         .prop_filter("reseved names", |n| {
@@ -115,20 +110,14 @@ pub fn registry_strategy(
                     }
                 }
 
-                let mut out: Vec<_> = list_of_pkgid
-                    .into_iter()
-                    .map(|((name, ver), deps)| {
-                        (
-                            name,
-                            ver,
-                            deps.unwrap_or_else(|| vec![("bad".to_owned(), Range::any())]),
-                        )
-                    })
-                    .collect();
+                let mut out = OfflineDependencyProvider::<String, NumberVersion>::new();
 
-                if reverse_alphabetical {
-                    // make sure the complicated cases are at the end
-                    out.reverse();
+                for ((name, ver), deps) in list_of_pkgid {
+                    out.add_dependencies(
+                        name,
+                        ver,
+                        deps.unwrap_or_else(|| vec![("bad".to_owned(), Range::any())]),
+                    );
                 }
 
                 out
