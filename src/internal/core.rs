@@ -30,8 +30,8 @@ pub struct State<P: Package, V: Version> {
 
     /// The store is the reference storage for all incompatibilities.
     /// The id field in one incompatibility refers
-    /// to the position in the `incompatibility_store` vec,
-    /// NOT the position in the `incompatibilities` vec.
+    /// to the position in the [incompatibility_store](State::incompatibility_store) vec,
+    /// NOT the position in the [incompatibilities](State::incompatibilities) vec.
     /// TODO: remove pub.
     pub incompatibility_store: Vec<Incompatibility<P, V>>,
 }

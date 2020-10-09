@@ -189,7 +189,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// (provided that no other version of foo exists between 1.0.0 and 2.0.0).
     /// We could collapse them into { foo (1.0.0 ∪ 1.1.0), not bar ^1.0.0 }
     /// without having to check the existence of other versions though.
-    /// And it would even keep the same `Kind`: `FromDependencyOf foo`.
+    /// And it would even keep the same [Kind]: [FromDependencyOf](Kind::FromDependencyOf) foo.
     ///
     /// Here we do the simple stupid thing of just growing the Vec.
     /// TODO: improve this.

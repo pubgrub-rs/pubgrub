@@ -66,11 +66,12 @@ pub struct Derived<P: Package, V: Version> {
 }
 
 impl<P: Package, V: Version> DerivationTree<P, V> {
-    /// Merge the `NoVersion` external incompatibilities
+    /// Merge the [NoVersion](External::NoVersion) external incompatibilities
     /// with the other one they are matched with
     /// in a derived incompatibility.
     /// This cleans up quite nicely the generated report.
-    /// You might want to do this if you know that the [DependencyProvider](crate::solver::DependencyProvider)
+    /// You might want to do this if you know that the
+    /// [DependencyProvider](crate::solver::DependencyProvider)
     /// was not run in some kind of offline mode that may not
     /// have access to all versions existing.
     pub fn collapse_noversion(&mut self) {
@@ -178,7 +179,7 @@ impl<P: Package, V: Version> fmt::Display for External<P, V> {
     }
 }
 
-/// Default reporter able to generate an explanation as a `String`.
+/// Default reporter able to generate an explanation as a [String].
 pub struct DefaultStringReporter {
     /// Number of explanations already with a line reference.
     ref_count: usize,
