@@ -138,22 +138,9 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         }
     }
 
-    /// Perform the union of two incompatibilities.
-    /// Terms that are always satisfied are removed from the union.
-    fn union(id: usize, i1: &Map<P, Term<V>>, i2: &Map<P, Term<V>>, kind: Kind<P, V>) -> Self {
-        let package_terms = Self::merge(i1, i2, |t1, t2| {
-            let term_union = t1.union(t2);
-            if term_union == Term::any() {
-                None
-            } else {
-                Some(term_union)
-            }
-        });
-        Self {
-            id,
-            package_terms,
-            kind,
-        }
+    /// Perform the intersection of terms in two incompatibilities.
+    fn intersection(i1: &Map<P, Term<V>>, i2: &Map<P, Term<V>>) -> Map<P, Term<V>> {
+        Self::merge(i1, i2, |t1, t2| Some(t1.intersection(t2)))
     }
 
     /// Merge two hash maps.
@@ -213,11 +200,30 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         incompatibilities.push(self);
     }
 
-    /// A prior cause is computed as the union of the terms in two incompatibilities.
-    /// Terms that are always satisfied are removed from the union.
-    pub fn prior_cause(id: usize, i1: &Self, i2: &Self) -> Self {
-        let kind = Kind::DerivedFrom(i1.id, i2.id);
-        Self::union(id, &i1.package_terms, &i2.package_terms, kind)
+    /// Prior cause of two incompatibilities using the rule of resolution.
+    pub fn prior_cause(
+        id: usize,
+        incompat: &Self,
+        satisfier_cause: &Self,
+        package: &P,
+        satisfier: &Term<V>,
+    ) -> Self {
+        let kind = Kind::DerivedFrom(incompat.id, satisfier_cause.id);
+        let mut t1 = incompat.package_terms.clone();
+        let mut t2 = satisfier_cause.package_terms.clone();
+        t1.remove(package);
+        t2.remove(package);
+        let mut prior_cause_terms = Self::intersection(&t1, &t2);
+        let term = incompat.package_terms.get(package).unwrap();
+        let p_term = term.union(&satisfier.negate());
+        if p_term != Term::any() {
+            prior_cause_terms.insert(package.clone(), p_term);
+        }
+        Self {
+            id,
+            package_terms: prior_cause_terms,
+            kind,
+        }
     }
 
     /// CF definition of Relation enum.
@@ -360,16 +366,18 @@ pub mod tests {
             let mut i1 = Map::new();
             i1.insert("p1", t1.clone());
             i1.insert("p2", t2.negate());
+            let i1 = Incompatibility { id: 0, package_terms: i1, kind: Kind::DerivedFrom(0,0) };
 
             let mut i2 = Map::new();
             i2.insert("p2", t2.clone());
             i2.insert("p3", t3.clone());
+            let i2 = Incompatibility { id: 0, package_terms: i2, kind: Kind::DerivedFrom(0,0) };
 
             let mut i3 = Map::new();
             i3.insert("p1", t1);
             i3.insert("p3", t3);
 
-            let i_resolution = Incompatibility::union(0, &i1, &i2, Kind::DerivedFrom(0, 0));
+            let i_resolution = Incompatibility::prior_cause(0, &i1, &i2, &"p2", &t2.negate());
             assert_eq!(i_resolution.package_terms, i3);
         }
 
