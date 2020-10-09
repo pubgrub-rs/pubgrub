@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::collections::BTreeSet as Set;
+
 use pubgrub::type_aliases::Map;
 use pubgrub::{
     error::PubGrubError, package::Package, report::DefaultStringReporter, report::Reporter,
@@ -212,9 +214,9 @@ proptest! {
                 match (&one, &resolve(&dependency_provider, name, ver)) {
                     (Ok(l), Ok(r)) => assert_eq!(l, r),
                     (Err(PubGrubError::NoSolution(derivation_l)), Err(PubGrubError::NoSolution(derivation_r))) => {
-                        assert_eq!(
+                        prop_assert_eq!(
                             format!("{}", DefaultStringReporter::report(&derivation_l)),
-                            format!("{}", DefaultStringReporter::report(&derivation_r)),
+                            format!("{}", DefaultStringReporter::report(&derivation_r))
                         )},
                     _ => panic!("not the same result")
                 }
@@ -243,7 +245,7 @@ proptest! {
     #[test]
     fn prop_removing_a_dep_cant_break(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666),
-        indexes_to_remove in prop::collection::vec((any::<prop::sample::Index>(), any::<prop::sample::Index>(), any::<prop::sample::Index>()), ..10)
+        indexes_to_remove in prop::collection::vec((any::<prop::sample::Index>(), any::<prop::sample::Index>(), any::<prop::sample::Index>()), 1..10)
     )  {
         let packages: Vec<_> = dependency_provider.packages().collect();
         let mut removed_provider = dependency_provider.clone();
@@ -269,6 +271,65 @@ proptest! {
                     name,
                     ver,
                 )
+            }
+        }
+    }
+
+    #[test]
+    fn prop_limited_independence_of_irrelevant_alternatives(
+        (dependency_provider, cases) in registry_strategy(0u16..665, 666),
+        indexes_to_remove in prop::collection::vec(any::<prop::sample::Index>(), 1..10)
+    )  {
+        let all_versions: Vec<(u16, NumberVersion)> = dependency_provider
+        .packages()
+        .flat_map(|&p| {
+            dependency_provider
+                .list_available_versions(&p)
+                .unwrap()
+                .into_iter()
+                .map(move |v| (p, v))
+        })
+        .collect();
+        let to_remove: Set<(_, _)> = indexes_to_remove.iter().map(|x| x.get(&all_versions)).cloned().collect();
+        for (name, ver) in cases {
+            match resolve(&dependency_provider, name, ver) {
+                Ok(used) => {
+                    // If resolution was successful, then unpublishing a version of a crate
+                    // that was not selected should not change that.
+                    let mut solver = OfflineDependencyProvider::<_, NumberVersion>::new();
+                    for &(n, v) in &all_versions {
+                        if used.get(&n) == Some(&v) // it was ues
+                           || to_remove.get(&(n, v)).is_none() // or it is not one to be removed
+                        {
+                            solver.add_dependencies(n, v, dependency_provider.get_dependencies(&n, &v).unwrap().unwrap())
+                        }
+                    }
+                    prop_assert!(
+                        resolve(&solver, name, ver).is_ok(),
+                        "unpublishing {:?} stopped `{} = \"={}\"` from working",
+                        to_remove,
+                        name,
+                        ver
+                    )
+                }
+                Err(_) => {
+                    // If resolution was unsuccessful, then it should stay unsuccessful
+                    // even if any version of a crate is unpublished.
+                    let mut solver = OfflineDependencyProvider::<_, NumberVersion>::new();
+                    for &(n, v) in &all_versions {
+                        if to_remove.get(&(n, v)).is_none() // it is not one to be removed
+                        {
+                            solver.add_dependencies(n, v, dependency_provider.get_dependencies(&n, &v).unwrap().unwrap())
+                        }
+                    }
+                    prop_assert!(
+                        resolve(&solver, name, ver).is_err(),
+                        "full index did not work for `{} = \"={}\"` but unpublishing {:?} fixed it!",
+                        name,
+                        ver,
+                        to_remove,
+                    )
+                }
             }
         }
     }
