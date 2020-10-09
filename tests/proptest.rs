@@ -2,9 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use pubgrub::type_aliases::Map;
 use pubgrub::{
     error::PubGrubError, package::Package, report::DefaultStringReporter, report::Reporter,
-    version::NumberVersion,
+    solver::DependencyProvider, version::NumberVersion, version::Version,
 };
 use pubgrub::{range::Range, solver::resolve, solver::OfflineDependencyProvider};
 
@@ -12,6 +13,31 @@ use proptest::collection::{btree_map, vec};
 use proptest::prelude::*;
 use proptest::sample::Index;
 use proptest::string::string_regex;
+
+/// The same as DP but it prefers the opposite versions.
+/// If DP returns versions from newest to oldest, this returns them from oldest to newest.
+struct MinimalDependencyProvider<DP>(DP);
+
+impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
+    for MinimalDependencyProvider<DP>
+{
+    // Lists only from remote for simplicity
+    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn std::error::Error>> {
+        self.0.list_available_versions(package).map(|mut v| {
+            v.reverse();
+            v
+        })
+    }
+
+    // Caches dependencies if they were already queried
+    fn get_dependencies(
+        &self,
+        package: &P,
+        version: &V,
+    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn std::error::Error>> {
+        self.0.get_dependencies(package, version)
+    }
+}
 
 fn string_names() -> impl Strategy<Value = String> {
     string_regex("[A-Za-z][A-Za-z0-9_-]{0,5}")
@@ -176,7 +202,7 @@ proptest! {
     }
 
     #[test]
-    /// This tests wheter the allgorithm is still deterministic 
+    /// This tests wheter the allgorithm is still deterministic
     fn prop_same_on_repeated_runs(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
@@ -192,6 +218,23 @@ proptest! {
                         )},
                     _ => panic!("not the same result")
                 }
+            }
+        }
+    }
+
+    /// MinimalDependencyProvider change what order the candidates
+    /// are tried but not the existence of a solution
+    fn prop_minimum_version_errors_the_same(
+        (dependency_provider, cases) in registry_strategy(0u16..665, 666)
+    )  {
+        let minimal_provider = MinimalDependencyProvider(dependency_provider.clone());
+        for (name, ver) in cases {
+            let l = resolve(&dependency_provider, name, ver);
+            let r = resolve(&minimal_provider, name, ver);
+            match (&l, &r) {
+                (Ok(_), Ok(_)) => (),
+                (Err(_), Err(_)) => (),
+                _ => panic!("not the same result")
             }
         }
     }
