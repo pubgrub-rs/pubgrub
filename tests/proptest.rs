@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use pubgrub::version::NumberVersion;
+use pubgrub::{package::Package, version::NumberVersion};
 use pubgrub::{range::Range, solver::resolve, solver::OfflineDependencyProvider};
 
 use proptest::collection::{btree_map, vec};
@@ -10,28 +10,33 @@ use proptest::prelude::*;
 use proptest::sample::Index;
 use proptest::string::string_regex;
 
-/// This generates a random registry index.
-/// Unlike vec((Name, Ver, vec((Name, VerRq), ..), ..)
-/// This strategy has a high probability of having valid dependencies
-pub fn registry_strategy() -> impl Strategy<
-    Value = (
-        OfflineDependencyProvider<String, NumberVersion>,
-        Vec<(String, NumberVersion)>,
-    ),
-> {
-    let max_crates = 50;
-    let max_versions = 20;
-    let shrinkage = 60;
-    let complicated_len = 10;
-
-    let name = string_regex("[A-Za-z][A-Za-z0-9_-]{0,5}")
+fn string_names() -> impl Strategy<Value = String> {
+    string_regex("[A-Za-z][A-Za-z0-9_-]{0,5}")
         .unwrap()
         .prop_filter("reseved names", |n| {
             // root is the name of the thing being compiled
             // so it would be confusing to have it in the index
             // bad is a name reserved for a dep that won't work
             n != "root" && n != "bad"
-        });
+        })
+}
+
+/// This generates a random registry index.
+/// Unlike vec((Name, Ver, vec((Name, VerRq), ..), ..)
+/// This strategy has a high probability of having valid dependencies
+pub fn registry_strategy<N: Package + Ord>(
+    name: impl Strategy<Value = N>,
+    bad_name: N,
+) -> impl Strategy<
+    Value = (
+        OfflineDependencyProvider<N, NumberVersion>,
+        Vec<(N, NumberVersion)>,
+    ),
+> {
+    let max_crates = 50;
+    let max_versions = 20;
+    let shrinkage = 60;
+    let complicated_len = 10;
 
     // If this is false than the crate will depend on the nonexistent "bad"
     // instead of the complex set we generated for it.
@@ -72,8 +77,8 @@ pub fn registry_strategy() -> impl Strategy<
         .prop_map(
             move |(crate_vers_by_name, raw_dependencies, reverse_alphabetical)| {
                 let mut list_of_pkgid: Vec<(
-                    (String, NumberVersion),
-                    Option<Vec<(String, Range<NumberVersion>)>>,
+                    (N, NumberVersion),
+                    Option<Vec<(N, Range<NumberVersion>)>>,
                 )> = crate_vers_by_name
                     .iter()
                     .flat_map(|(name, vers)| {
@@ -115,7 +120,7 @@ pub fn registry_strategy() -> impl Strategy<
                     }
                 }
 
-                let mut solver = OfflineDependencyProvider::<String, NumberVersion>::new();
+                let mut solver = OfflineDependencyProvider::<N, NumberVersion>::new();
 
                 let complicated_len = std::cmp::min(complicated_len, list_of_pkgid.len());
                 let complicated: Vec<_> = if reverse_alphabetical {
@@ -131,7 +136,7 @@ pub fn registry_strategy() -> impl Strategy<
                     solver.add_dependencies(
                         name,
                         ver,
-                        deps.unwrap_or_else(|| vec![("bad".to_owned(), Range::any())]),
+                        deps.unwrap_or_else(|| vec![(bad_name.clone(), Range::any())]),
                     );
                 }
 
@@ -148,8 +153,18 @@ proptest! {
 
     #[test]
     /// This test is mostly for profiling
-    fn prop_passes(
-        (dependency_provider, cases) in registry_strategy()
+    fn prop_passes_string(
+        (dependency_provider, cases) in registry_strategy(string_names(), "bad".to_owned())
+    )  {
+        for (name, ver) in cases {
+            let _ = resolve(&dependency_provider, name, ver);
+        }
+    }
+
+    #[test]
+    /// This test is mostly for profiling
+    fn prop_passes_int(
+        (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
         for (name, ver) in cases {
             let _ = resolve(&dependency_provider, name, ver);
