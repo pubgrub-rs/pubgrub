@@ -11,8 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Install nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+
       - name: Build documentation
-        run: cargo doc --no-deps
+        run: cargo +nightly doc --no-deps
 
       - name: Deploy documentation
         uses: peaceiris/actions-gh-pages@v3
