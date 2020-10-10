@@ -12,23 +12,26 @@
 //!
 //! # Package and Version traits
 //!
-//! All the code in this crate is manipulating packages and versions,
-//! and for this to work, we defined a `Package` and `Version` traits,
+//! All the code in this crate is manipulating packages and versions, and for this to work
+//! we defined a [Package](package::Package) and [Version](version::Version) traits
 //! that are used as bounds on most of the exposed types and functions.
 //!
-//! Package identifiers needs to implement our `Package` trait,
+//! Package identifiers needs to implement our [Package](package::Package) trait,
 //! which is automatic if the type already implements
-//! `Clone + Eq + Hash + Debug + Display`.
-//! So things like `String` will work out of the box.
+//! [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
+//! So things like [String] will work out of the box.
 //!
-//! Our `Version` trait requires `Clone + Ord + Debug + Display`
+//! Our [Version](version::Version) trait requires
+//! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display)
 //! and also the definition of two methods,
-//! `lowest() -> Self` which returns the lowest version existing,
-//! and `bump(&self) -> Self` which returns the next smallest version
+//! [lowest() -> Self](version::Version::lowest) which returns the lowest version existing,
+//! and [bump(&self) -> Self](version::Version::bump) which returns the next smallest version
 //! strictly higher than the current one.
-//! For convenience, this library already provides two implementations of `Version`.
-//! The first one is `NumberVersion`, basically a newtype for `u32`.
-//! The second one is `SemanticVersion` that implements semantic versioning rules.
+//! For convenience, this library already provides
+//! two implementations of [Version](version::Version).
+//! The first one is [NumberVersion](version::NumberVersion), basically a newtype for [u32].
+//! The second one is [SemanticVersion](version::NumberVersion)
+//! that implements semantic versioning rules.
 //!
 //! # Basic example
 //!
@@ -64,10 +67,12 @@
 //!
 //! # DependencyProvider trait
 //!
-//! In our previous example we used the `OfflineDependencyProvider`,
+//! In our previous example we used the
+//! [OfflineDependencyProvider](solver::OfflineDependencyProvider),
 //! which is a basic implementation of the [DependencyProvider](solver::DependencyProvider) trait.
 //!
-//! But we might want to implement the [DependencyProvider](solver::DependencyProvider) trait for our own type.
+//! But we might want to implement the [DependencyProvider](solver::DependencyProvider)
+//! trait for our own type.
 //! Let's say that we will use [String] for packages,
 //! and [SemanticVersion](version::SemanticVersion) for versions.
 //! This may be done quite easily by implementing the two following functions.
@@ -97,23 +102,28 @@
 //!     }
 //! }
 //! ```
-//! The first method `list_available_versions` should return all available
-//! versions of a package.
-//! The second method `get_dependencies` aims at retrieving the dependencies
-//! of a given package at a given version.
-//! Return `None` if dependencies are unknown.
+//! The first method
+//! [list_available_versions](crate::solver::DependencyProvider::list_available_versions)
+//! should return all available versions of a package.
+//! The second method
+//! [get_dependencies](crate::solver::DependencyProvider::get_dependencies)
+//! aims at retrieving the dependencies of a given package at a given version.
+//! Returns [None] if dependencies are unknown.
 //!
 //! In a real scenario, these two methods may involve reading the file system
-//! or doing network request, so you may want to hold a cache in your [DependencyProvider](solver::DependencyProvider) implementation.
-//! How exactly this could be achieved is shown in `CachingDependencyProvider` (see `examples/caching_dependency_provider.rs`).
-//! You could also use the [OfflineDependencyProvider](solver::OfflineDependencyProvider) type provided by the crate as guidance,
+//! or doing network request, so you may want to hold a cache in your
+//! [DependencyProvider](solver::DependencyProvider) implementation.
+//! How exactly this could be achieved is shown in `CachingDependencyProvider`
+//! (see `examples/caching_dependency_provider.rs`).
+//! You could also use the [OfflineDependencyProvider](solver::OfflineDependencyProvider)
+//! type defined by the crate as guidance,
 //! but you are free to use whatever approach makes sense in your situation.
 //!
 //! # Solution and error reporting
 //!
 //! When everything goes well, the algorithm finds and returns the complete
 //! set of direct and indirect dependencies satisfying all the constraints.
-//! The packages and versions selected are returned in a [Map<P, V>](Map).
+//! The packages and versions selected are returned in a [Map<P, V>](type_aliases::Map).
 //! But sometimes there is no solution because dependencies are incompatible.
 //! In such cases, [resolve(...)](solver::resolve) returns a
 //! [PubGrubError::NoSolution(derivation_tree)](error::PubGrubError::NoSolution),
@@ -133,8 +143,8 @@
 //! Derived incompatibilities are obtained during the algorithm execution by deduction,
 //! such as if "a" depends on "b" and "b" depends on "c", "a" depends on "c".
 //!
-//! This crate defines a `Reporter` trait, with an associated `Output` type
-//! and a single method.
+//! This crate defines a [Reporter](crate::report::Reporter) trait, with an associated
+//! [Output](crate::report::Reporter::Output) type and a single method.
 //! ```
 //! # use pubgrub::package::Package;
 //! # use pubgrub::version::Version;
@@ -146,10 +156,11 @@
 //!     fn report(derivation_tree: &DerivationTree<P, V>) -> Self::Output;
 //! }
 //! ```
-//! Implementing a `Reporter` may involve a lot of heuristics
+//! Implementing a [Reporter](crate::report::Reporter) may involve a lot of heuristics
 //! to make the output human-readable and natural.
 //! For convenience, we provide a default implementation
-//! `DefaultStringReporter`, that output the report as a String.
+//! [DefaultStringReporter](crate::report::DefaultStringReporter)
+//! that outputs the report as a [String].
 //! You may use it as follows:
 //! ```
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
@@ -170,9 +181,11 @@
 //!     Err(err) => panic!("{:?}", err),
 //! };
 //! ```
-//! Notice that we also used `collapse_noversion()` above.
-//! This method simplifies the derivation tree to get rid
-//! of the `NoVersion` external incompatibilities in the derivation tree.
+//! Notice that we also used
+//! [collapse_noversion()](crate::report::DerivationTree::collapse_noversion) above.
+//! This method simplifies the derivation tree to get rid of the
+//! [NoVersion](crate::report::External::NoVersion)
+//! external incompatibilities in the derivation tree.
 //! So instead of seeing things like this in the report:
 //! ```txt
 //! Because there is no version of foo in 1.0.1 <= v < 2.0.0

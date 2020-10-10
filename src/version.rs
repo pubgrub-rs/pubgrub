@@ -107,23 +107,23 @@ impl SemanticVersion {
     }
 }
 
-/// Error creating SemanticVersion from string
+/// Error creating [SemanticVersion] from [String].
 #[derive(Error, Debug, PartialEq)]
 pub enum VersionParseError {
-    /// SemanticVersion must contain major, minor, patch versions
+    /// [SemanticVersion] must contain major, minor, patch versions.
     #[error("version {full_version} must contain 3 numbers separated by dot")]
     NotThreeParts {
-        /// SemanticVersion that was being parsed
+        /// [SemanticVersion] that was being parsed.
         full_version: String,
     },
-    /// Wrapper around core::num::error::ParseIntError
+    /// Wrapper around [ParseIntError](core::num::ParseIntError).
     #[error("cannot parse '{version_part}' in '{full_version}' as u32: {parse_error}")]
     ParseIntError {
-        /// SemanticVersion that was being parsed
+        /// [SemanticVersion] that was being parsed.
         full_version: String,
-        /// A version part where parsing failed
+        /// A version part where parsing failed.
         version_part: String,
-        /// A specific error resulted from parsing a part of the version as u32
+        /// A specific error resulted from parsing a part of the version as [u32].
         parse_error: String,
     },
 }

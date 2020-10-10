@@ -42,7 +42,7 @@ impl<P: Package, V: Version> Assignment<P, V> {
         }
     }
 
-    /// Retrieve the current assignment as a `Term`.
+    /// Retrieve the current assignment as a [Term].
     /// If this is decision, it returns a positive term with that exact version.
     /// Otherwise, if this is a derivation, just returns its term.
     pub fn as_term(&self) -> Term<V> {

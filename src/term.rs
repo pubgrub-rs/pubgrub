@@ -22,7 +22,7 @@ pub enum Term<V: Version> {
     Negative(Range<V>),
 }
 
-// Base methods.
+/// Base methods.
 impl<V: Version> Term<V> {
     /// A term that is always true.
     pub(crate) fn any() -> Self {
@@ -71,7 +71,7 @@ impl<V: Version> Term<V> {
     }
 }
 
-// Set operations with terms.
+/// Set operations with terms.
 impl<V: Version> Term<V> {
     /// Compute the intersection of two terms.
     /// If at least one term is positive, the intersection is also positive.
@@ -123,7 +123,7 @@ pub(crate) enum Relation {
     Inconclusive,
 }
 
-// Relation between terms.
+/// Relation between terms.
 impl<'a, V: 'a + Version> Term<V> {
     /// Check if a set of terms satisfies this term.
     ///

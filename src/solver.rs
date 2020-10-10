@@ -29,16 +29,16 @@
 //!
 //! The algorithm is generic and works for any type of dependency system
 //! as long as packages (P) and versions (V) implement
-//! the `Package` and `Version` traits.
-//! `Package` is strictly equivalent and automatically generated
-//! for any type that implement `Clone + Eq + Hash + Debug + Display`.
-//! `Version` simply states that versions are ordered,
+//! the [Package](crate::package::Package) and [Version](crate::version::Version) traits.
+//! [Package](crate::package::Package) is strictly equivalent and automatically generated
+//! for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
+//! [Version](crate::version::Version) simply states that versions are ordered,
 //! that there should be
-//! a minimal `lowest` version (like 0.0.0 in semantic versions),
+//! a minimal [lowest](crate::version::Version::lowest) version (like 0.0.0 in semantic versions),
 //! and that for any version, it is possible to compute
-//! what the next version closest to this one is (`bump`).
-//! For semantic versions, `bump` corresponds to an increment of the patch number.
-//!
+//! what the next version closest to this one is ([bump](crate::version::Version::bump)).
+//! For semantic versions, [bump](crate::version::Version::bump) corresponds to
+//! an increment of the patch number.
 //!
 //! ## API
 //!
@@ -196,12 +196,14 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
     }
 
     /// Registers the dependencies of a package and version pair.
-    /// Dependencies must be added with a single call to `add_dependencies`.
-    /// All subsequent calls to `add_dependencies` for a given
+    /// Dependencies must be added with a single call to
+    /// [add_dependencies](OfflineDependencyProvider::add_dependencies).
+    /// All subsequent calls to
+    /// [add_dependencies](OfflineDependencyProvider::add_dependencies) for a given
     /// package version pair will replace the dependencies by the new ones.
     ///
-    /// The API does not allow to add dependencies one at a time
-    /// to uphold an assumption that `OfflineDependencyProvider.get_dependencies(p, v)`
+    /// The API does not allow to add dependencies one at a time to uphold an assumption that
+    /// [OfflineDependencyProvider.get_dependencies(p, v)](OfflineDependencyProvider::get_dependencies)
     /// provides all dependencies of a given package (p) and version (v) pair.
     pub fn add_dependencies<I: IntoIterator<Item = (P, Range<V>)>>(
         &mut self,
@@ -220,7 +222,7 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
     }
 
     /// Lists versions of saved packages.
-    /// Returns `None` if no information is available regarding that package.
+    /// Returns [None] if no information is available regarding that package.
     fn versions(&self, package: &P) -> Option<Set<V>> {
         self.dependencies
             .get(package)
@@ -228,7 +230,7 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
     }
 
     /// Lists dependencies of a given package and version.
-    /// Returns `None` if no information is available regarding that package and version pair.
+    /// Returns [None] if no information is available regarding that package and version pair.
     fn dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>> {
         self.dependencies
             .get(package)?

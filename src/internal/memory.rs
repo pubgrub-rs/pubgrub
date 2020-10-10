@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! A Memory acts like a structured partial solution
-//! where terms are regrouped by package in a [Map](crate::Map).
+//! where terms are regrouped by package in a [Map](crate::type_aliases::Map).
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::package::Package;
