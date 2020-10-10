@@ -14,12 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Cache
+      - name: Download cache
         uses: actions/cache@v2
         with:
           path: |
-            ./target
-            ~/.cargo
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
           key: ${{ runner.os }}-${{ hashFiles('Cargo.toml') }}
           restore-keys: ${{ runner.os }}
 
