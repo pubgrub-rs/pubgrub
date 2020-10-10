@@ -8,37 +8,32 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  rust:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Cache
-      uses: actions/cache@v2
-      with:
-        path: |
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: |
             ./target
             ~/.cargo
-        key: ${{ runner.os }}-${{ hashFiles('Cargo.toml') }}
-        restore-keys: ${{ runner.os }}
+          key: ${{ runner.os }}-${{ hashFiles('Cargo.toml') }}
+          restore-keys: ${{ runner.os }}
 
-    - name: Build
-      run: cargo build --verbose
+      - name: Build
+        run: cargo build --verbose
 
-    - name: Run tests
-      run: cargo test --verbose
+      - name: Run tests
+        run: cargo test --features=serde --verbose
 
-    - name: Run tests serde
-      run: cargo test --features=serde --verbose
+      - name: Build documentation
+        run: cargo doc --no-deps
 
-    - name: Build documentation
-      run: cargo doc --no-deps
-
-    - name: Deploy Documentation
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./target/doc
-        force_orphan: true
+      - name: Deploy Documentation
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./target/doc
+          force_orphan: true
