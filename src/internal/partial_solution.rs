@@ -5,13 +5,19 @@
 //! The partial solution is the current state
 //! of the solution being built by the algorithm.
 
-use crate::internal::assignment::Assignment::{self, Decision, Derivation};
-use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::memory::Memory;
 use crate::package::Package;
 use crate::term::Term;
 use crate::type_aliases::Map;
 use crate::version::Version;
+use crate::{
+    error::PubGrubError,
+    internal::incompatibility::{Incompatibility, Relation},
+};
+use crate::{
+    internal::assignment::Assignment::{self, Decision, Derivation},
+    solver::DependencyProvider,
+};
 
 /// The partial solution is the current state
 /// of the solution being built by the algorithm.
@@ -94,19 +100,39 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// This should be a package with a positive derivation but no decision yet.
     /// If multiple choices are possible, use a heuristic.
     ///
-    /// Pub chooses the package with the fewest versions
+    /// We and Pub chooses the package with the fewest versions
     /// matching the outstanding constraint.
     /// This tends to find conflicts earlier if any exist,
     /// since these packages will run out of versions to try more quickly.
     /// But there's likely room for improvement in these heuristics.
     ///
-    /// Here we just pick the first one.
     /// TODO: improve? (do not introduce any side effect if trying to improve)
-    pub fn pick_package(&self) -> Option<(P, Term<V>)> {
-        self.memory
+    pub fn pick_package(
+        &self,
+        dependency_provider: &impl DependencyProvider<P, V>,
+    ) -> Result<Option<(P, Term<V>)>, PubGrubError<P, V>> {
+        let mut out: Option<(P, Term<V>)> = None;
+        let mut min_key = usize::MAX;
+        for (p, term) in self
+            .memory
             .potential_packages()
-            .next()
-            .map(|(p, all_terms)| (p.clone(), Term::intersect_all(all_terms.iter())))
+            .map(|(p, all_terms)| (p, Term::intersect_all(all_terms.iter())))
+        {
+            let key = dependency_provider
+                .list_available_versions(p)
+                .map_err(|err| PubGrubError::ErrorRetrievingVersions {
+                    package: p.clone(),
+                    source: err,
+                })?
+                .iter()
+                .filter(|&v| term.contains(v))
+                .count();
+            if key < min_key {
+                min_key = key;
+                out = Some((p.clone(), term));
+            }
+        }
+        Ok(out)
     }
 
     /// Pub chooses the latest matching version of the package
@@ -118,7 +144,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn pick_version(available_versions: &[V], partial_solution_term: &Term<V>) -> Option<V> {
         available_versions
             .iter()
-            .find(|v| partial_solution_term.accept_version(v))
+            .find(|v| partial_solution_term.contains(v))
             .cloned()
     }
 
