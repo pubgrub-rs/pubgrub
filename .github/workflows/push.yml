@@ -1,5 +1,4 @@
-name: Build code, run tests and deploy doc
-
+name: Build and deploy documentation
 on:
   push:
     branches: [ dev ]
@@ -8,30 +7,14 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  rust:
+  documentation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-
-      - name: Cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ./target
-            ~/.cargo
-          key: ${{ runner.os }}-${{ hashFiles('Cargo.toml') }}
-          restore-keys: ${{ runner.os }}
-
-      - name: Build
-        run: cargo build --verbose
-
-      - name: Run tests
-        run: cargo test --features=serde --verbose
-
       - name: Build documentation
         run: cargo doc --no-deps
 
-      - name: Deploy Documentation
+      - name: Deploy documentation
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
