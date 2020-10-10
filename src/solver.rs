@@ -88,6 +88,7 @@ pub fn resolve<P: Package, V: Version>(
     version: impl Into<V>,
 ) -> Result<Map<P, V>, PubGrubError<P, V>> {
     let mut state = State::init(package.clone(), version.into());
+    let mut added_dependencies: Map<P, Set<V>> = Map::default();
     let mut next = package;
     loop {
         state.unit_propagation(next)?;
@@ -145,8 +146,14 @@ pub fn resolve<P: Package, V: Version>(
         let start_id = state.incompatibility_store.len();
         let dep_incompats =
             Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
-        for incompat in dep_incompats.iter() {
-            state.add_incompatibility(|_| incompat.clone());
+        if added_dependencies
+            .entry(p.clone())
+            .or_default()
+            .insert(v.clone())
+        {
+            for incompat in dep_incompats.iter() {
+                state.add_incompatibility(|_| incompat.clone());
+            }
         }
         if dep_incompats
             .iter()
