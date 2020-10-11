@@ -89,6 +89,9 @@ pub fn resolve<P: Package, V: Version>(
     let mut added_dependencies: Map<P, Set<V>> = Map::default();
     let mut next = package;
     loop {
+        dependency_provider
+            .callback()
+            .map_err(|err| PubGrubError::ErrorCallback(err))?;
         state.unit_propagation(next)?;
 
         // Pick the next package.
@@ -182,6 +185,15 @@ pub trait DependencyProvider<P: Package, V: Version> {
         package: &P,
         version: &V,
     ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>>;
+
+    /// This is called fairly regularly during the resolution,
+    /// if it returns an Err then resolution will be terminated.
+    /// This is helpful if you want to add some form of early termination like a timeout,
+    /// or you want to add some form of user feedback if things are taking a while.
+    /// If not provided the resolver will run as long as needed.
+    fn callback(&self) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
 }
 
 /// A basic implementation of [DependencyProvider].
@@ -227,7 +239,7 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
     }
 
     /// Lists packages that have bean saved.
-    pub fn packages(&self) -> impl Iterator<Item=&P> {
+    pub fn packages(&self) -> impl Iterator<Item = &P> {
         self.dependencies.keys()
     }
 

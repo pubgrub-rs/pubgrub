@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::BTreeSet as Set;
+use std::{collections::BTreeSet as Set, error::Error};
 
 use pubgrub::type_aliases::Map;
 use pubgrub::{
@@ -18,27 +18,80 @@ use proptest::string::string_regex;
 
 /// The same as DP but it prefers the opposite versions.
 /// If DP returns versions from newest to oldest, this returns them from oldest to newest.
+#[derive(Clone)]
 struct MinimalDependencyProvider<DP>(DP);
 
 impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
     for MinimalDependencyProvider<DP>
 {
     // Lists only from remote for simplicity
-    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn std::error::Error>> {
-        self.0.list_available_versions(package).map(|mut v| {
+    fn list_available_versions(&self, p: &P) -> Result<Vec<V>, Box<dyn Error>> {
+        self.0.list_available_versions(p).map(|mut v| {
             v.reverse();
             v
         })
     }
 
     // Caches dependencies if they were already queried
-    fn get_dependencies(
-        &self,
-        package: &P,
-        version: &V,
-    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn std::error::Error>> {
-        self.0.get_dependencies(package, version)
+    fn get_dependencies(&self, p: &P, v: &V) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
+        self.0.get_dependencies(p, v)
     }
+}
+
+/// The same as DP but it has a time out.
+#[derive(Clone)]
+struct TimeoutDependencyProvider<DP> {
+    dp: DP,
+    start_time: std::time::Instant,
+    call_count: std::cell::Cell<u64>,
+    max_calls: u64,
+}
+
+impl<DP> TimeoutDependencyProvider<DP> {
+    fn new(dp: DP, max_calls: u64) -> Self {
+        Self {
+            dp,
+            start_time: std::time::Instant::now(),
+            call_count: std::cell::Cell::new(0),
+            max_calls,
+        }
+    }
+}
+
+impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
+    for TimeoutDependencyProvider<DP>
+{
+    // Lists only from remote for simplicity
+    fn list_available_versions(&self, p: &P) -> Result<Vec<V>, Box<dyn Error>> {
+        self.dp.list_available_versions(p)
+    }
+
+    // Caches dependencies if they were already queried
+    fn get_dependencies(&self, p: &P, v: &V) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
+        self.dp.get_dependencies(p, v)
+    }
+
+    fn callback(&self) -> Result<(), Box<dyn Error>> {
+        assert!(self.start_time.elapsed().as_secs() < 60);
+        let calls = self.call_count.get();
+        assert!(calls < self.max_calls);
+        self.call_count.set(calls + 1);
+        Ok(())
+    }
+}
+
+#[test]
+#[should_panic]
+fn callback_can_panic() {
+    let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
+    dependency_provider.add_dependencies(0, 0, vec![(666, Range::any())]);
+
+    // Run the algorithm.
+    let _ = resolve(
+        &TimeoutDependencyProvider::new(dependency_provider, 1),
+        0,
+        0,
+    );
 }
 
 fn string_names() -> impl Strategy<Value = String> {
@@ -236,7 +289,7 @@ proptest! {
         (dependency_provider, cases) in registry_strategy(string_names(), "bad".to_owned())
     )  {
         for (name, ver) in cases {
-            let _ = resolve(&dependency_provider, name, ver);
+            let _ = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
         }
     }
 
@@ -246,7 +299,7 @@ proptest! {
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
         for (name, ver) in cases {
-            let _ = resolve(&dependency_provider, name, ver);
+            let _ = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
         }
     }
 
@@ -256,9 +309,9 @@ proptest! {
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
         for (name, ver) in cases {
-            let one = resolve(&dependency_provider, name, ver);
+            let one = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
             for _ in 0..3 {
-                match (&one, &resolve(&dependency_provider, name, ver)) {
+                match (&one, &resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver)) {
                     (Ok(l), Ok(r)) => assert_eq!(l, r),
                     (Err(PubGrubError::NoSolution(derivation_l)), Err(PubGrubError::NoSolution(derivation_r))) => {
                         prop_assert_eq!(
@@ -279,8 +332,8 @@ proptest! {
     )  {
         let minimal_provider = MinimalDependencyProvider(dependency_provider.clone());
         for (name, ver) in cases {
-            let l = resolve(&dependency_provider, name, ver);
-            let r = resolve(&minimal_provider, name, ver);
+            let l = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
+            let r = resolve(&TimeoutDependencyProvider::new(minimal_provider.clone(), 50_000), name, ver);
             match (&l, &r) {
                 (Ok(_), Ok(_)) => (),
                 (Err(_), Err(_)) => (),
@@ -313,7 +366,7 @@ proptest! {
         for (name, ver) in cases {
             if resolve(&dependency_provider, name, ver).is_ok() {
                 prop_assert!(
-                    resolve(&removed_provider, name, ver).is_ok(),
+                    resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver).is_ok(),
                     "full index worked for `{} = \"={}\"` but removing some deps broke it!",
                     name,
                     ver,
@@ -339,7 +392,7 @@ proptest! {
         .collect();
         let to_remove: Set<(_, _)> = indexes_to_remove.iter().map(|x| x.get(&all_versions)).cloned().collect();
         for (name, ver) in cases {
-            match resolve(&dependency_provider, name, ver) {
+            match resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver) {
                 Ok(used) => {
                     // If resolution was successful, then unpublishing a version of a crate
                     // that was not selected should not change that.
@@ -352,7 +405,7 @@ proptest! {
                         }
                     }
                     prop_assert!(
-                        resolve(&solver, name, ver).is_ok(),
+                        resolve(&TimeoutDependencyProvider::new(solver.clone(), 50_000), name, ver).is_ok(),
                         "unpublishing {:?} stopped `{} = \"={}\"` from working",
                         to_remove,
                         name,
@@ -370,7 +423,7 @@ proptest! {
                         }
                     }
                     prop_assert!(
-                        resolve(&solver, name, ver).is_err(),
+                        resolve(&TimeoutDependencyProvider::new(solver.clone(), 50_000), name, ver).is_err(),
                         "full index did not work for `{} = \"={}\"` but unpublishing {:?} fixed it!",
                         name,
                         ver,
