@@ -218,6 +218,14 @@ fn meta_test_deep_trees_from_strategy() {
 
 proptest! {
     #![proptest_config(ProptestConfig {
+    max_shrink_iters:
+        if std::env::var("CI").is_ok() {
+            // This attempts to make sure that CI will fail fast,
+            0
+        } else {
+            // but that local builds will give a small clear test case.
+            2048 // u32::MAX
+        },
         result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
