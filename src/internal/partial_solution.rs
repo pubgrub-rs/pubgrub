@@ -100,13 +100,10 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// This should be a package with a positive derivation but no decision yet.
     /// If multiple choices are possible, use a heuristic.
     ///
-    /// We and Pub chooses the package with the fewest versions
-    /// matching the outstanding constraint.
+    /// Current heuristic employed by this and Pub's implementations is to choose
+    /// the package with the fewest versions matching the outstanding constraint.
     /// This tends to find conflicts earlier if any exist,
     /// since these packages will run out of versions to try more quickly.
-    /// But there's likely room for improvement in these heuristics.
-    ///
-    /// TODO: improve? (do not introduce any side effect if trying to improve)
     pub fn pick_package(
         &self,
         dependency_provider: &impl DependencyProvider<P, V>,
