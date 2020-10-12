@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 #![feature(test)]
 extern crate test;
 use test::Bencher;

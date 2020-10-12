@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, DependencyProvider, OfflineDependencyProvider};
