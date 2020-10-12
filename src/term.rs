@@ -61,7 +61,7 @@ impl<V: Version> Term<V> {
     }
 
     /// Evaluate a term regarding a given choice of version.
-    pub(crate) fn accept_version(&self, v: &V) -> bool {
+    pub(crate) fn contains(&self, v: &V) -> bool {
         match self {
             Self::Positive(range) => range.contains(v),
             Self::Negative(range) => !(range.contains(v)),

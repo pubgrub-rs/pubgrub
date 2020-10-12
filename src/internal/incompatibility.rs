@@ -260,7 +260,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             false
         } else {
             let (package, term) = self.package_terms.iter().next().unwrap();
-            (package == root_package) && term.accept_version(&root_version)
+            (package == root_package) && term.contains(&root_version)
         }
     }
 

@@ -91,7 +91,7 @@ pub fn resolve<P: Package, V: Version>(
         state.unit_propagation(next)?;
 
         // Pick the next package.
-        let (p, term) = match state.partial_solution.pick_package() {
+        let (p, term) = match state.partial_solution.pick_package(dependency_provider)? {
             None => {
                 return state
                     .partial_solution
