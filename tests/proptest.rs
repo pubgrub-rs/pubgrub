@@ -4,12 +4,13 @@
 
 use std::{collections::BTreeSet as Set, error::Error};
 
+use pubgrub::range::Range;
+use pubgrub::solver::{resolve, DependencyProvider, OfflineDependencyProvider};
 use pubgrub::type_aliases::Map;
 use pubgrub::{
     error::PubGrubError, package::Package, report::DefaultStringReporter, report::Reporter,
-    solver::DependencyProvider, version::NumberVersion, version::Version,
+    version::NumberVersion, version::Version,
 };
-use pubgrub::{range::Range, solver::resolve, solver::OfflineDependencyProvider};
 
 use proptest::collection::{btree_map, vec};
 use proptest::prelude::*;
@@ -19,10 +20,10 @@ use proptest::string::string_regex;
 /// The same as DP but it prefers the opposite versions.
 /// If DP returns versions from newest to oldest, this returns them from oldest to newest.
 #[derive(Clone)]
-struct MinimalDependencyProvider<DP>(DP);
+struct ReversedDependencyProvider<DP>(DP);
 
 impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
-    for MinimalDependencyProvider<DP>
+    for ReversedDependencyProvider<DP>
 {
     // Lists only from remote for simplicity
     fn list_available_versions(&self, p: &P) -> Result<Vec<V>, Box<dyn Error>> {
@@ -97,7 +98,7 @@ fn callback_can_panic() {
 fn string_names() -> impl Strategy<Value = String> {
     string_regex("[A-Za-z][A-Za-z0-9_-]{0,5}")
         .unwrap()
-        .prop_filter("reseved names", |n| {
+        .prop_filter("reserved names", |n| {
             // root is the name of the thing being compiled
             // so it would be confusing to have it in the index
             // bad is a name reserved for a dep that won't work
@@ -205,7 +206,7 @@ pub fn registry_strategy<N: Package + Ord>(
                     }
                 }
 
-                let mut solver = OfflineDependencyProvider::<N, NumberVersion>::new();
+                let mut dependency_provider = OfflineDependencyProvider::<N, NumberVersion>::new();
 
                 let complicated_len = std::cmp::min(complicated_len, list_of_pkgid.len());
                 let complicated: Vec<_> = if reverse_alphabetical {
@@ -218,14 +219,14 @@ pub fn registry_strategy<N: Package + Ord>(
                 .collect();
 
                 for ((name, ver), deps) in list_of_pkgid {
-                    solver.add_dependencies(
+                    dependency_provider.add_dependencies(
                         name,
                         ver,
                         deps.unwrap_or_else(|| vec![(bad_name.clone(), Range::any())]),
                     );
                 }
 
-                (solver, complicated)
+                (dependency_provider, complicated)
             },
         )
 }
@@ -304,7 +305,7 @@ proptest! {
     }
 
     #[test]
-    /// This tests wheter the allgorithm is still deterministic
+    /// This tests whether the algorithm is still deterministic
     fn prop_same_on_repeated_runs(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
@@ -325,12 +326,12 @@ proptest! {
     }
 
     #[test]
-    /// MinimalDependencyProvider change what order the candidates
+    /// [ReversedDependencyProvider] change what order the candidates
     /// are tried but not the existence of a solution
-    fn prop_minimum_version_errors_the_same(
+    fn prop_reversed_version_errors_the_same(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
-        let minimal_provider = MinimalDependencyProvider(dependency_provider.clone());
+        let minimal_provider = ReversedDependencyProvider(dependency_provider.clone());
         for (name, ver) in cases {
             let l = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
             let r = resolve(&TimeoutDependencyProvider::new(minimal_provider.clone(), 50_000), name, ver);
@@ -364,9 +365,9 @@ proptest! {
             }
         }
         for (name, ver) in cases {
-            if resolve(&dependency_provider, name, ver).is_ok() {
+            if resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver).is_ok() {
                 prop_assert!(
-                    resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver).is_ok(),
+                    resolve(&TimeoutDependencyProvider::new(removed_provider.clone(), 50_000), name, ver).is_ok(),
                     "full index worked for `{} = \"={}\"` but removing some deps broke it!",
                     name,
                     ver,
@@ -381,31 +382,33 @@ proptest! {
         indexes_to_remove in prop::collection::vec(any::<prop::sample::Index>(), 1..10)
     )  {
         let all_versions: Vec<(u16, NumberVersion)> = dependency_provider
-        .packages()
-        .flat_map(|&p| {
-            dependency_provider
-                .list_available_versions(&p)
-                .unwrap()
-                .into_iter()
-                .map(move |v| (p, v))
-        })
-        .collect();
+            .packages()
+            .flat_map(|&p| {
+                dependency_provider
+                    .list_available_versions(&p)
+                    .unwrap()
+                    .into_iter()
+                    .map(move |v| (p, v))
+            })
+            .collect();
         let to_remove: Set<(_, _)> = indexes_to_remove.iter().map(|x| x.get(&all_versions)).cloned().collect();
         for (name, ver) in cases {
             match resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver) {
                 Ok(used) => {
                     // If resolution was successful, then unpublishing a version of a crate
                     // that was not selected should not change that.
-                    let mut solver = OfflineDependencyProvider::<_, NumberVersion>::new();
+                    let mut smaller_dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
                     for &(n, v) in &all_versions {
                         if used.get(&n) == Some(&v) // it was ues
                            || to_remove.get(&(n, v)).is_none() // or it is not one to be removed
                         {
-                            solver.add_dependencies(n, v, dependency_provider.get_dependencies(&n, &v).unwrap().unwrap())
+                            smaller_dependency_provider.add_dependencies(n, v,
+                                dependency_provider.get_dependencies(&n, &v).unwrap().unwrap()
+                            )
                         }
                     }
                     prop_assert!(
-                        resolve(&TimeoutDependencyProvider::new(solver.clone(), 50_000), name, ver).is_ok(),
+                        resolve(&TimeoutDependencyProvider::new(smaller_dependency_provider.clone(), 50_000), name, ver).is_ok(),
                         "unpublishing {:?} stopped `{} = \"={}\"` from working",
                         to_remove,
                         name,
@@ -415,15 +418,17 @@ proptest! {
                 Err(_) => {
                     // If resolution was unsuccessful, then it should stay unsuccessful
                     // even if any version of a crate is unpublished.
-                    let mut solver = OfflineDependencyProvider::<_, NumberVersion>::new();
+                    let mut smaller_dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
                     for &(n, v) in &all_versions {
                         if to_remove.get(&(n, v)).is_none() // it is not one to be removed
                         {
-                            solver.add_dependencies(n, v, dependency_provider.get_dependencies(&n, &v).unwrap().unwrap())
+                            smaller_dependency_provider.add_dependencies(n, v,
+                                dependency_provider.get_dependencies(&n, &v).unwrap().unwrap()
+                            )
                         }
                     }
                     prop_assert!(
-                        resolve(&TimeoutDependencyProvider::new(solver.clone(), 50_000), name, ver).is_err(),
+                        resolve(&TimeoutDependencyProvider::new(smaller_dependency_provider.clone(), 50_000), name, ver).is_err(),
                         "full index did not work for `{} = \"={}\"` but unpublishing {:?} fixed it!",
                         name,
                         ver,
