@@ -14,6 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Get Cargo version
+        id: cargo_version
+        run: echo "::set-output name=version::$(cargo -V | tr -d ' ')"
+        shell: bash
+
       - name: Download cache
         uses: actions/cache@v2
         with:
@@ -23,8 +28,8 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-${{ hashFiles('Cargo.toml') }}
-          restore-keys: ${{ runner.os }}
+          key: ${{ runner.os }}-${{ steps.cargo_version.outputs.version }}-${{ hashFiles('Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-${{ steps.cargo_version.outputs.version }}
 
       - name: Build
         run: cargo build --verbose
