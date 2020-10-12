@@ -80,8 +80,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             .rposition(|(l, _)| *l == decision_level)
             .unwrap_or(self.history.len() - 1);
         *self = Self::from_assignments(
-            self.history
-                .to_owned()
+            std::mem::take(&mut self.history)
                 .into_iter()
                 .take(pos + 1)
                 .map(|(_, a)| a),
@@ -103,16 +102,12 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// This tends to find conflicts earlier if any exist,
     /// since these packages will run out of versions to try more quickly.
     pub fn pick_package(
-        &self,
+        &mut self,
         dependency_provider: &impl DependencyProvider<P, V>,
     ) -> Result<Option<(P, Term<V>)>, PubGrubError<P, V>> {
         let mut out: Option<(P, Term<V>)> = None;
         let mut min_key = usize::MAX;
-        for (p, term) in self
-            .memory
-            .potential_packages()
-            .map(|(p, all_terms)| (p, Term::intersect_all(all_terms.iter())))
-        {
+        for (p, term) in self.memory.potential_packages() {
             let key = dependency_provider
                 .list_available_versions(p)
                 .map_err(|err| PubGrubError::ErrorRetrievingVersions {
@@ -124,7 +119,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                 .count();
             if key < min_key {
                 min_key = key;
-                out = Some((p.clone(), term));
+                out = Some((p.clone(), term.clone()));
             }
         }
         Ok(out)
@@ -167,15 +162,15 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         self.memory.remove_decision(last_assignment.package());
     }
 
-    fn satisfies_any_of(&self, incompatibilities: &[Incompatibility<P, V>]) -> bool {
+    fn satisfies_any_of(&mut self, incompatibilities: &[Incompatibility<P, V>]) -> bool {
         incompatibilities
             .iter()
             .any(|incompat| self.relation(incompat) == Relation::Satisfied)
     }
 
     /// Check if the terms in the partial solution satisfy the incompatibility.
-    pub fn relation(&self, incompat: &Incompatibility<P, V>) -> Relation<P, V> {
-        incompat.relation(|package| self.memory.terms_for_package(package))
+    pub fn relation(&mut self, incompat: &Incompatibility<P, V>) -> Relation<P, V> {
+        incompat.relation(|package| self.memory.terms_intersection_for_package(package))
     }
 
     /// Find satisfier and previous satisfier decision level.
