@@ -11,6 +11,7 @@ env:
 jobs:
   test:
     name: Build and test
+    runs-on: ubuntu-latest
     container: rust:alpine
     steps:
       - uses: actions/checkout@v2
