@@ -11,7 +11,7 @@ env:
 jobs:
   test:
     name: Build and test
-    runs-on: ubuntu-latest
+    runs-on: "rust:alpine"
     steps:
       - uses: actions/checkout@v2
 
