@@ -17,6 +17,17 @@ jobs:
           toolchain: nightly
           profile: minimal
 
+      - name: Download cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: documentation
+
       - name: Build documentation
         run: cargo +nightly doc --no-deps
 
