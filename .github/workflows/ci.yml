@@ -19,7 +19,7 @@ jobs:
       - name: Get Cargo version
         id: cargo_version
         run: echo "::set-output name=version::$(cargo -V | tr -d ' ')"
-        shell: bash
+        shell: ash
 
       - name: Download cache
         uses: actions/cache@v2
