@@ -56,3 +56,19 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+  check_documentation:
+    name: Check documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install nightly Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo +nightly doc --no-deps --document-private-items
