@@ -15,15 +15,14 @@ use proptest::prelude::*;
 use proptest::sample::Index;
 use proptest::string::string_regex;
 
-/// The same as DP but it prefers the opposite versions.
-/// If DP returns versions from newest to oldest, this returns them from oldest to newest.
+/// The same as DP but takes versions from the opposite end:
+/// if DP returns versions from newest to oldest, this returns them from oldest to newest.
 #[derive(Clone)]
 struct ReversedDependencyProvider<DP>(DP);
 
 impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
     for ReversedDependencyProvider<DP>
 {
-    // Lists only from remote for simplicity
     fn list_available_versions(&self, p: &P) -> Result<Vec<V>, Box<dyn Error>> {
         self.0.list_available_versions(p).map(|mut v| {
             v.reverse();
@@ -31,13 +30,12 @@ impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P,
         })
     }
 
-    // Caches dependencies if they were already queried
     fn get_dependencies(&self, p: &P, v: &V) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
         self.0.get_dependencies(p, v)
     }
 }
 
-/// The same as DP but it has a time out.
+/// The same as DP but it has a timeout.
 #[derive(Clone)]
 struct TimeoutDependencyProvider<DP> {
     dp: DP,
@@ -60,12 +58,10 @@ impl<DP> TimeoutDependencyProvider<DP> {
 impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
     for TimeoutDependencyProvider<DP>
 {
-    // Lists only from remote for simplicity
     fn list_available_versions(&self, p: &P) -> Result<Vec<V>, Box<dyn Error>> {
         self.dp.list_available_versions(p)
     }
 
-    // Caches dependencies if they were already queried
     fn get_dependencies(&self, p: &P, v: &V) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
         self.dp.get_dependencies(p, v)
     }
@@ -229,8 +225,7 @@ pub fn registry_strategy<N: Package + Ord>(
         )
 }
 
-/// This test is to test the generator to ensure
-/// that it makes registries with large dependency trees
+/// Ensures that generator makes registries with large dependency trees.
 #[test]
 fn meta_test_deep_trees_from_strategy() {
     use proptest::strategy::ValueTree;
@@ -276,14 +271,14 @@ proptest! {
             0
         } else {
             // but that local builds will give a small clear test case.
-            2048 // u32::MAX
+            2048
         },
         result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
 
     #[test]
-    /// This test is mostly for profiling
+    /// This test is mostly for profiling.
     fn prop_passes_string(
         (dependency_provider, cases) in registry_strategy(string_names(), "bad".to_owned())
     )  {
@@ -293,7 +288,7 @@ proptest! {
     }
 
     #[test]
-    /// This test is mostly for profiling
+    /// This test is mostly for profiling.
     fn prop_passes_int(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
@@ -303,7 +298,7 @@ proptest! {
     }
 
     #[test]
-    /// This tests whether the algorithm is still deterministic
+    /// This tests whether the algorithm is still deterministic.
     fn prop_same_on_repeated_runs(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
@@ -324,15 +319,15 @@ proptest! {
     }
 
     #[test]
-    /// [ReversedDependencyProvider] change what order the candidates
-    /// are tried but not the existence of a solution
+    /// [ReverseDependencyProvider] changes what order the candidates
+    /// are tried but not the existence of a solution.
     fn prop_reversed_version_errors_the_same(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
-        let minimal_provider = ReversedDependencyProvider(dependency_provider.clone());
+        let reversed_provider = ReversedDependencyProvider(dependency_provider.clone());
         for (name, ver) in cases {
             let l = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
-            let r = resolve(&TimeoutDependencyProvider::new(minimal_provider.clone(), 50_000), name, ver);
+            let r = resolve(&TimeoutDependencyProvider::new(reversed_provider.clone(), 50_000), name, ver);
             match (&l, &r) {
                 (Ok(_), Ok(_)) => (),
                 (Err(_), Err(_)) => (),
@@ -397,7 +392,7 @@ proptest! {
                     // that was not selected should not change that.
                     let mut smaller_dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
                     for &(n, v) in &all_versions {
-                        if used.get(&n) == Some(&v) // it was ues
+                        if used.get(&n) == Some(&v) // it was used
                            || to_remove.get(&(n, v)).is_none() // or it is not one to be removed
                         {
                             smaller_dependency_provider.add_dependencies(n, v,
