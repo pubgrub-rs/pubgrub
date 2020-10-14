@@ -82,14 +82,14 @@ impl<P: Package, V: Version> DerivationTree<P, V> {
                         *self = cause2
                             .clone()
                             .merge_noversion(p.to_owned(), r.to_owned())
-                            .unwrap_or(self.to_owned());
+                            .unwrap_or_else(|| self.to_owned());
                     }
                     (ref mut cause1, DerivationTree::External(External::NoVersion(p, r))) => {
                         cause1.collapse_noversion();
                         *self = cause1
                             .clone()
                             .merge_noversion(p.to_owned(), r.to_owned())
-                            .unwrap_or(self.to_owned());
+                            .unwrap_or_else(|| self.to_owned());
                     }
                     _ => {
                         derived.cause1.collapse_noversion();
@@ -200,12 +200,12 @@ impl DefaultStringReporter {
 
     fn build_recursive<P: Package, V: Version>(&mut self, derived: &Derived<P, V>) {
         self.build_recursive_helper(derived);
-        derived.shared_id.map(|id| {
+        if let Some(id) = derived.shared_id {
             if self.shared_with_ref.get(&id) == None {
                 self.add_line_ref();
                 self.shared_with_ref.insert(id, self.ref_count);
             }
-        });
+        };
     }
 
     fn build_recursive_helper<P: Package, V: Version>(&mut self, current: &Derived<P, V>) {
@@ -460,9 +460,9 @@ impl DefaultStringReporter {
     fn add_line_ref(&mut self) {
         let new_count = self.ref_count + 1;
         self.ref_count = new_count;
-        self.lines
-            .last_mut()
-            .map(|line| *line = format!("{} ({})", line, new_count));
+        if let Some(line) = self.lines.last_mut() {
+            *line = format!("{} ({})", line, new_count);
+        }
     }
 
     fn line_ref_of(&self, shared_id: Option<usize>) -> Option<usize> {

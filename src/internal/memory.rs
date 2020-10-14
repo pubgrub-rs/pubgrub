@@ -56,15 +56,15 @@ impl<P: Package, V: Version> Memory<P, V> {
         let pa = self
             .assignments
             .entry(package)
-            .or_insert(PackageAssignments::new());
+            .or_insert_with(PackageAssignments::new);
         pa.decision = Some((version.clone(), Term::exact(version)));
     }
 
     /// Remove a decision from a Memory.
     pub fn remove_decision(&mut self, package: &P) {
-        self.assignments
-            .get_mut(package)
-            .map(|pa| pa.decision = None);
+        if let Some(pa) = self.assignments.get_mut(package) {
+            pa.decision = None;
+        }
     }
 
     /// Add a derivation to a Memory.
@@ -72,7 +72,7 @@ impl<P: Package, V: Version> Memory<P, V> {
         let pa = self
             .assignments
             .entry(package)
-            .or_insert(PackageAssignments::new());
+            .or_insert_with(PackageAssignments::new);
         pa.derivations_not_intersected_yet.push(term);
     }
 

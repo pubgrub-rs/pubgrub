@@ -98,12 +98,11 @@ pub fn resolve<P: Package, V: Version>(
         // Pick the next package.
         let (p, term) = match state.partial_solution.pick_package(dependency_provider)? {
             None => {
-                return state
-                    .partial_solution
-                    .extract_solution()
-                    .ok_or(PubGrubError::Failure(
+                return state.partial_solution.extract_solution().ok_or_else(|| {
+                    PubGrubError::Failure(
                         "How did we end up with no package to choose but no solution?".into(),
-                    ))
+                    )
+                })
             }
             Some(x) => x,
         };
@@ -163,9 +162,9 @@ pub fn resolve<P: Package, V: Version>(
         {
             // For a dependency incompatibility to be terminal,
             // it can only mean that root depend on not root?
-            Err(PubGrubError::Failure(
+            return Err(PubGrubError::Failure(
                 "Root package depends on itself at a different version?".into(),
-            ))?;
+            ));
         }
         state.partial_solution.add_version(p, v, &dep_incompats);
     }
@@ -270,7 +269,7 @@ impl<P: Package, V: Version + Hash> DependencyProvider<P, V> for OfflineDependen
         Ok(self
             .versions(package)
             .map(|v| v.into_iter().rev().collect())
-            .unwrap_or(Vec::new()))
+            .unwrap_or_default())
     }
 
     fn get_dependencies(
