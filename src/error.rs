@@ -44,7 +44,7 @@ pub enum PubGrubError<P: Package, V: Version> {
     },
 
     /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
-    /// returned an error in the method `callback`.
+    /// returned an error in the method [callback](crate::solver::DependencyProvider::callback).
     #[error("callback failed)")]
     ErrorCallback(Box<dyn std::error::Error>),
 
