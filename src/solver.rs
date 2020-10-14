@@ -92,6 +92,7 @@ pub fn resolve<P: Package, V: Version>(
         dependency_provider
             .callback()
             .map_err(|err| PubGrubError::ErrorCallback(err))?;
+
         state.unit_propagation(next)?;
 
         // Pick the next package.

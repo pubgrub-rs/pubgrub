@@ -18,10 +18,10 @@ use proptest::string::string_regex;
 /// The same as DP but takes versions from the opposite end:
 /// if DP returns versions from newest to oldest, this returns them from oldest to newest.
 #[derive(Clone)]
-struct ReversedDependencyProvider<DP>(DP);
+struct ReverseDependencyProvider<DP>(DP);
 
 impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
-    for ReversedDependencyProvider<DP>
+    for ReverseDependencyProvider<DP>
 {
     fn list_available_versions(&self, p: &P) -> Result<Vec<V>, Box<dyn Error>> {
         self.0.list_available_versions(p).map(|mut v| {
@@ -324,10 +324,10 @@ proptest! {
     fn prop_reversed_version_errors_the_same(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
-        let reversed_provider = ReversedDependencyProvider(dependency_provider.clone());
+        let reverse_provider = ReverseDependencyProvider(dependency_provider.clone());
         for (name, ver) in cases {
             let l = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
-            let r = resolve(&TimeoutDependencyProvider::new(reversed_provider.clone(), 50_000), name, ver);
+            let r = resolve(&TimeoutDependencyProvider::new(reverse_provider.clone(), 50_000), name, ver);
             match (&l, &r) {
                 (Ok(_), Ok(_)) => (),
                 (Err(_), Err(_)) => (),
