@@ -15,6 +15,9 @@ use proptest::prelude::*;
 use proptest::sample::Index;
 use proptest::string::string_regex;
 
+mod sat_dependency_provider;
+use crate::sat_dependency_provider::SatResolve;
+
 /// The same as DP but takes versions from the opposite end:
 /// if DP returns versions from newest to oldest, this returns them from oldest to newest.
 #[derive(Clone)]
@@ -294,6 +297,20 @@ proptest! {
     )  {
         for (name, ver) in cases {
             let _ = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
+        }
+    }
+
+    #[test]
+    fn prop_sat_errors_the_same(
+        (dependency_provider, cases) in registry_strategy(0u16..665, 666)
+    )  {
+        let mut sat = SatResolve::new(&dependency_provider);
+        for (name, ver) in cases {
+            if let Ok(s) = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver) {
+                prop_assert!(sat.sat_is_valid_solution(&s));
+            } else {
+                prop_assert!(!sat.sat_resolve(&name, &ver));
+            }
         }
     }
 
