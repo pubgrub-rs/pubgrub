@@ -66,7 +66,7 @@ impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P,
         self.dp.get_dependencies(p, v)
     }
 
-    fn callback(&self) -> Result<(), Box<dyn Error>> {
+    fn should_cancel(&self) -> Result<(), Box<dyn Error>> {
         assert!(self.start_time.elapsed().as_secs() < 60);
         let calls = self.call_count.get();
         assert!(calls < self.max_calls);
@@ -77,7 +77,7 @@ impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P,
 
 #[test]
 #[should_panic]
-fn callback_can_panic() {
+fn should_cancel_can_panic() {
     let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
     dependency_provider.add_dependencies(0, 0, vec![(666, Range::any())]);
 

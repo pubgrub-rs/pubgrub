@@ -90,8 +90,8 @@ pub fn resolve<P: Package, V: Version>(
     let mut next = package;
     loop {
         dependency_provider
-            .callback()
-            .map_err(|err| PubGrubError::ErrorCallback(err))?;
+            .should_cancel()
+            .map_err(|err| PubGrubError::ErrorShouldCancel(err))?;
 
         state.unit_propagation(next)?;
 
@@ -192,7 +192,7 @@ pub trait DependencyProvider<P: Package, V: Version> {
     /// This is helpful if you want to add some form of early termination like a timeout,
     /// or you want to add some form of user feedback if things are taking a while.
     /// If not provided the resolver will run as long as needed.
-    fn callback(&self) -> Result<(), Box<dyn Error>> {
+    fn should_cancel(&self) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 }

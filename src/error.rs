@@ -19,7 +19,7 @@ pub enum PubGrubError<P: Package, V: Version> {
     /// [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method
     /// [list_available_versions](crate::solver::DependencyProvider::list_available_versions).
-    #[error("Retrieving available versions of package {package} failed)")]
+    #[error("Retrieving available versions of package {package} failed")]
     ErrorRetrievingVersions {
         /// Package for which we want the list of versions.
         package: P,
@@ -32,7 +32,7 @@ pub enum PubGrubError<P: Package, V: Version> {
     /// [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method
     /// [get_dependencies](crate::solver::DependencyProvider::get_dependencies).
-    #[error("Retrieving dependencies of {package} {version} failed)")]
+    #[error("Retrieving dependencies of {package} {version} failed")]
     ErrorRetrievingDependencies {
         /// Package whose dependencies we want.
         package: P,
@@ -44,9 +44,9 @@ pub enum PubGrubError<P: Package, V: Version> {
     },
 
     /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
-    /// returned an error in the method [callback](crate::solver::DependencyProvider::callback).
-    #[error("callback failed)")]
-    ErrorCallback(Box<dyn std::error::Error>),
+    /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
+    #[error("We should cancel")]
+    ErrorShouldCancel(Box<dyn std::error::Error>),
 
     /// Something unexpected happened.
     #[error("{0}")]
