@@ -1,5 +1,6 @@
 name: Build and deploy documentation
 on:
+  pull_request:
   push:
     branches: [ dev ]
 
