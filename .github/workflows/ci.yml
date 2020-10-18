@@ -82,3 +82,16 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo +nightly doc --no-deps --document-private-items
+
+  check_commit_conventions:
+    name: Check commit conventions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Check commit conventions
+        uses: wagoid/commitlint-github-action@v2
+        with:
+          configFile: .commitlintrc.yml
+          failOnWarnings: true
