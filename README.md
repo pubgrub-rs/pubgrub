@@ -1,7 +1,5 @@
 # PubGrub version solving algorithm.
 
-[package documentation](https://mpizenberg.github.io/pubgrub-rs/pubgrub/)
-
 It consists in efficiently finding a set of packages and versions
 that satisfy all the constraints of a given project dependencies.
 In addition, when that is not possible,
