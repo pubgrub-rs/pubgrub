@@ -154,8 +154,8 @@ impl<P: Package, V: Version> State<P, V> {
                                 id,
                                 &current_incompat,
                                 &cause,
-                                package,
-                                term,
+                                &package,
+                                &term,
                             );
                             // eprintln!("\ncause 1: {}", &current_incompat);
                             // eprintln!("cause 2: {}", &cause);
