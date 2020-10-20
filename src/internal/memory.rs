@@ -36,10 +36,10 @@ impl<P: Package, V: Version> Memory<P, V> {
     }
 
     /// Retrieve intersection of terms in memory related to package.
-    pub fn terms_intersection_for_package(&mut self, package: &P) -> Term<V> {
+    pub fn term_intersection_for_package(&mut self, package: &P) -> Term<V> {
         match self.assignments.get_mut(package) {
             None => Term::any(),
-            Some(pa) => pa.assignments_intersection(),
+            Some(pa) => pa.assignment_intersection(),
         }
     }
 
@@ -133,8 +133,8 @@ impl<V: Version> PackageAssignments<V> {
 
     /// Returns intersection of all assignments (decision included).
     /// Mutates itself to store the intersection result.
-    fn assignments_intersection(&mut self) -> Term<V> {
-        self.derivations_intersection();
+    fn assignment_intersection(&mut self) -> Term<V> {
+        self.derivation_intersection();
         match &self.decision {
             None => self.derivations_intersected.clone(),
             Some((_, decision_term)) => decision_term.intersection(&self.derivations_intersected),
@@ -143,7 +143,7 @@ impl<V: Version> PackageAssignments<V> {
 
     /// Returns intersection of all derivation terms.
     /// Mutates itself to store the intersection result.
-    fn derivations_intersection(&mut self) -> &Term<V> {
+    fn derivation_intersection(&mut self) -> &Term<V> {
         for derivation in self.derivations_not_intersected_yet.iter() {
             self.derivations_intersected = self.derivations_intersected.intersection(derivation);
         }
@@ -166,7 +166,7 @@ impl<V: Version> PackageAssignments<V> {
                     .iter()
                     .any(|t| t.is_positive()))
         {
-            Some((package, self.derivations_intersection()))
+            Some((package, self.derivation_intersection()))
         } else {
             None
         }
