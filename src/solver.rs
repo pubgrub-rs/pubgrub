@@ -197,7 +197,7 @@ pub trait DependencyProvider<P: Package, V: Version> {
 }
 
 /// A basic implementation of [DependencyProvider].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct OfflineDependencyProvider<P: Package, V: Version + Hash> {
