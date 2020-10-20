@@ -183,8 +183,8 @@ pub mod tests {
 
     pub fn strategy() -> impl Strategy<Value = Term<NumberVersion>> {
         prop_oneof![
-            crate::range::tests::strategy().prop_map(|range| Term::Positive(range)),
-            crate::range::tests::strategy().prop_map(|range| Term::Negative(range)),
+            crate::range::tests::strategy().prop_map(Term::Positive),
+            crate::range::tests::strategy().prop_map(Term::Negative),
         ]
     }
 

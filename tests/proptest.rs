@@ -326,8 +326,8 @@ proptest! {
                     (Ok(l), Ok(r)) => assert_eq!(l, r),
                     (Err(PubGrubError::NoSolution(derivation_l)), Err(PubGrubError::NoSolution(derivation_r))) => {
                         prop_assert_eq!(
-                            format!("{}", DefaultStringReporter::report(&derivation_l)),
-                            format!("{}", DefaultStringReporter::report(&derivation_r))
+                            DefaultStringReporter::report(&derivation_l).to_string(),
+                            DefaultStringReporter::report(&derivation_r).to_string()
                         )},
                     _ => panic!("not the same result")
                 }
@@ -366,7 +366,7 @@ proptest! {
             let version = version_idx.get(&versions);
             let dependencys: Vec<_> = dependency_provider.get_dependencies(package, version).unwrap().unwrap().into_iter().collect();
             if !dependencys.is_empty() {
-                let dependency = dep_idx.get(&dependencys).0.clone();
+                let dependency = dep_idx.get(&dependencys).0;
                 removed_provider.add_dependencies(
                     **package,
                     *version,

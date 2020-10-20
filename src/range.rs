@@ -297,7 +297,7 @@ pub mod tests {
 
     pub fn strategy() -> impl Strategy<Value = Range<NumberVersion>> {
         prop::collection::vec(any::<u32>(), 0..10).prop_map(|mut vec| {
-            vec.sort();
+            vec.sort_unstable();
             vec.dedup();
             let mut pair_iter = vec.chunks_exact(2);
             let mut segments = Vec::with_capacity(vec.len() / 2 + 1);
@@ -312,7 +312,7 @@ pub mod tests {
     }
 
     fn version_strat() -> impl Strategy<Value = NumberVersion> {
-        any::<u32>().prop_map(|x| NumberVersion(x))
+        any::<u32>().prop_map(NumberVersion)
     }
 
     proptest! {
