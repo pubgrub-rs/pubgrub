@@ -17,9 +17,26 @@ use crate::{
     solver::DependencyProvider,
 };
 
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct DecisionLevel(u32);
+
+impl std::ops::Add<DecisionLevel> for DecisionLevel {
+    type Output = DecisionLevel;
+
+    fn add(self, other: DecisionLevel) -> DecisionLevel {
+        DecisionLevel(self.0 + other.0)
+    }
+}
+
+impl std::ops::SubAssign<DecisionLevel> for DecisionLevel {
+    fn sub_assign(&mut self, other: DecisionLevel) {
+        self.0 -= other.0
+    }
+}
+
 #[derive(Clone)]
 pub struct AssignmentDepth<P: Package, V: Version> {
-    decision_level: usize,
+    decision_level: DecisionLevel,
     assignment: Assignment<P, V>,
 }
 
@@ -29,7 +46,7 @@ pub struct AssignmentDepth<P: Package, V: Version> {
 /// defined as either decisions or derivations.
 #[derive(Clone)]
 pub struct PartialSolution<P: Package, V: Version> {
-    decision_level: usize,
+    decision_level: DecisionLevel,
     /// Each assignment is stored with its decision level in the history.
     /// The order in which assignments where added in the vec is kept,
     /// so the oldest assignments are at the beginning of the vec.
@@ -41,7 +58,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// Initialize an empty partial solution.
     pub fn empty() -> Self {
         Self {
-            decision_level: 0,
+            decision_level: DecisionLevel(0),
             history: Vec::new(),
             memory: Memory::empty(),
         }
@@ -49,7 +66,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     fn add_assignment(&mut self, assignment: Assignment<P, V>) {
         self.decision_level = match assignment {
-            Decision { .. } => self.decision_level + 1,
+            Decision { .. } => self.decision_level + DecisionLevel(1),
             Derivation { .. } => self.decision_level,
         };
         self.memory.add_assignment(&assignment);
@@ -81,7 +98,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Backtrack the partial solution to a given decision level.
-    pub fn backtrack(&mut self, decision_level: usize) {
+    pub fn backtrack(&mut self, decision_level: DecisionLevel) {
         // TODO: improve with dichotomic search.
         let pos = self
             .history
@@ -166,7 +183,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     /// Can ONLY be called if the last assignment added was a decision.
     fn remove_last_decision(&mut self) {
-        self.decision_level -= 1;
+        self.decision_level -= DecisionLevel(1);
         let last_assignment = self.history.pop().unwrap().assignment;
         self.memory.remove_decision(last_assignment.package());
     }
@@ -186,7 +203,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn find_satisfier_and_previous_satisfier_level(
         &self,
         incompat: &Incompatibility<P, V>,
-    ) -> (Assignment<P, V>, usize, usize) {
+    ) -> (Assignment<P, V>, DecisionLevel, DecisionLevel) {
         let (
             AssignmentDepth {
                 decision_level: satisfier_level,
@@ -217,7 +234,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         incompat: &Incompatibility<P, V>,
         satisfier: &Assignment<P, V>,
         previous_assignments: &'a [AssignmentDepth<P, V>],
-    ) -> usize {
+    ) -> DecisionLevel {
         let package = satisfier.package().clone();
         let incompat_term = incompat.get(&package).expect("This should exist");
         let satisfier_term = satisfier.as_term();
@@ -226,8 +243,8 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         accum_satisfied.insert(package, (is_satisfied, satisfier_term));
         // Search previous satisfier.
         Self::find_satisfier_helper(incompat, accum_satisfied, previous_assignments)
-            .map_or(1, |assignment_history| {
-                assignment_history.0.decision_level.max(1)
+            .map_or(DecisionLevel(1), |assignment_history| {
+                assignment_history.0.decision_level.max(DecisionLevel(1))
             })
     }
 

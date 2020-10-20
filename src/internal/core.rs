@@ -8,7 +8,7 @@ use std::{collections::HashSet as Set, rc::Rc};
 use crate::error::PubGrubError;
 use crate::internal::assignment::Assignment::{Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
-use crate::internal::partial_solution::PartialSolution;
+use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::package::Package;
 use crate::report::DerivationTree;
 use crate::version::Version;
@@ -175,7 +175,7 @@ impl<P: Package, V: Version> State<P, V> {
         &mut self,
         incompat: Incompatibility<P, V>,
         incompat_changed: bool,
-        decision_level: usize,
+        decision_level: DecisionLevel,
     ) {
         self.partial_solution.backtrack(decision_level);
         if incompat_changed {
