@@ -1,0 +1,6 @@
+[book]
+authors = ["Matthieu Pizenberg"]
+language = "en"
+multilingual = false
+src = "src"
+title = "PubGrub Guide"
