@@ -40,6 +40,11 @@ pub struct AssignmentDepth<P: Package, V: Version> {
     assignment: Assignment<P, V>,
 }
 
+pub struct AssignmentHistory<'a, P: Package, V: Version> {
+    assignment: AssignmentDepth<P, V>,
+    history: &'a [AssignmentDepth<P, V>],
+}
+
 /// The partial solution is the current state
 /// of the solution being built by the algorithm.
 /// It is composed of a succession of assignments,
@@ -204,13 +209,14 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         &self,
         incompat: &Incompatibility<P, V>,
     ) -> (Assignment<P, V>, DecisionLevel, DecisionLevel) {
-        let (
-            AssignmentDepth {
-                decision_level: satisfier_level,
-                assignment: satisfier,
-            },
-            previous_assignments,
-        ) = Self::find_satisfier(incompat, self.history.as_slice())
+        let AssignmentHistory {
+            assignment:
+                AssignmentDepth {
+                    decision_level: satisfier_level,
+                    assignment: satisfier,
+                },
+            history: previous_assignments,
+        } = Self::find_satisfier(incompat, self.history.as_slice())
             .expect("We should always find a satisfier if called in the right context.");
         let previous_satisfier_level =
             Self::find_previous_satisfier(incompat, &satisfier, previous_assignments);
@@ -223,7 +229,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     fn find_satisfier<'a>(
         incompat: &Incompatibility<P, V>,
         history: &'a [AssignmentDepth<P, V>],
-    ) -> Option<(AssignmentDepth<P, V>, &'a [AssignmentDepth<P, V>])> {
+    ) -> Option<AssignmentHistory<'a, P, V>> {
         Self::find_satisfier_helper(incompat, Self::new_accum_satisfied_from(incompat), history)
     }
 
@@ -242,10 +248,15 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         let mut accum_satisfied = Self::new_accum_satisfied_from(incompat);
         accum_satisfied.insert(package, (is_satisfied, satisfier_term));
         // Search previous satisfier.
-        Self::find_satisfier_helper(incompat, accum_satisfied, previous_assignments)
-            .map_or(DecisionLevel(1), |assignment_history| {
-                assignment_history.0.decision_level.max(DecisionLevel(1))
-            })
+        Self::find_satisfier_helper(incompat, accum_satisfied, previous_assignments).map_or(
+            DecisionLevel(1),
+            |assignment_history| {
+                assignment_history
+                    .assignment
+                    .decision_level
+                    .max(DecisionLevel(1))
+            },
+        )
     }
 
     fn new_accum_satisfied_from(incompat: &Incompatibility<P, V>) -> Map<P, (bool, Term<V>)> {
@@ -262,7 +273,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         incompat: &Incompatibility<P, V>,
         accum_satisfied: Map<P, (bool, Term<V>)>,
         all_assignments: &'a [AssignmentDepth<P, V>],
-    ) -> Option<(AssignmentDepth<P, V>, &'a [AssignmentDepth<P, V>])> {
+    ) -> Option<AssignmentHistory<'a, P, V>> {
         let mut accum_satisfied = accum_satisfied;
         for (idx, assignment_depth) in all_assignments.iter().enumerate() {
             let package = assignment_depth.assignment.package();
@@ -282,13 +293,13 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             // Check if we have found the satisfier
             // (all booleans in accum_satisfied are true).
             if *is_satisfied && accum_satisfied.iter().all(|(_, (satisfied, _))| *satisfied) {
-                return Some((
-                    AssignmentDepth {
+                return Some(AssignmentHistory {
+                    assignment: AssignmentDepth {
                         decision_level: assignment_depth.decision_level,
                         assignment: assignment_depth.assignment.clone(),
                     },
-                    &all_assignments[0..idx],
-                ));
+                    history: &all_assignments[0..idx],
+                });
             }
         }
         None
