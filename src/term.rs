@@ -92,12 +92,6 @@ impl<V: Version> Term<V> {
         (self.negate().intersection(&other.negate())).negate()
     }
 
-    /// Compute the intersection of multiple terms.
-    /// Return None if the iterator is empty.
-    pub(crate) fn intersect_all<T: AsRef<Term<V>>>(all_terms: impl Iterator<Item = T>) -> Term<V> {
-        all_terms.fold(Self::any(), |acc, term| acc.intersection(term.as_ref()))
-    }
-
     /// Indicate if this term is a subset of another term.
     /// Just like for sets, we say that t1 is a subset of t2
     /// if and only if t1 ∩ t2 = t1.
@@ -131,8 +125,8 @@ impl<'a, V: 'a + Version> Term<V> {
     /// It turns out that this can also be expressed with set operations:
     ///    S satisfies t if and only if  ⋂ S ⊆ t
     #[cfg(test)]
-    fn satisfied_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
-        Self::intersect_all(terms).subset_of(self)
+    fn satisfied_by(&self, terms_intersection: &Term<V>) -> bool {
+        terms_intersection.subset_of(self)
     }
 
     /// Check if a set of terms contradicts this term.
@@ -144,19 +138,15 @@ impl<'a, V: 'a + Version> Term<V> {
     ///    S contradicts t if and only if ⋂ S is disjoint with t
     ///    S contradicts t if and only if  (⋂ S) ⋂ t = ∅
     #[cfg(test)]
-    fn contradicted_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
-        Self::intersect_all(terms).intersection(self) == Self::empty()
+    fn contradicted_by(&self, terms_intersection: &Term<V>) -> bool {
+        terms_intersection.intersection(self) == Self::empty()
     }
 
     /// Check if a set of terms satisfies or contradicts a given term.
     /// Otherwise the relation is inconclusive.
-    pub(crate) fn relation_with<T: AsRef<Term<V>>>(
-        &self,
-        other_terms: impl Iterator<Item = T>,
-    ) -> Relation {
-        let others_intersection = Self::intersect_all(other_terms);
-        let full_intersection = self.intersection(&others_intersection);
-        if full_intersection == others_intersection {
+    pub(crate) fn relation_with(&self, other_terms_intersection: &Term<V>) -> Relation {
+        let full_intersection = self.intersection(other_terms_intersection.as_ref());
+        if &full_intersection == other_terms_intersection.as_ref() {
             Relation::Satisfied
         } else if full_intersection == Self::empty() {
             Relation::Contradicted
@@ -203,13 +193,13 @@ pub mod tests {
         // Testing relation --------------------------------
 
         #[test]
-        fn relation_with(term in strategy(), set in prop::collection::vec(strategy(), 0..3)) {
-            match term.relation_with(set.iter()) {
-                Relation::Satisfied => assert!(term.satisfied_by(set.iter())),
-                Relation::Contradicted => assert!(term.contradicted_by(set.iter())),
+        fn relation_with(term1 in strategy(), term2 in strategy()) {
+            match term1.relation_with(&term2) {
+                Relation::Satisfied => assert!(term1.satisfied_by(&term2)),
+                Relation::Contradicted => assert!(term1.contradicted_by(&term2)),
                 Relation::Inconclusive => {
-                    assert!(!term.satisfied_by(set.iter()));
-                    assert!(!term.contradicted_by(set.iter()));
+                    assert!(!term1.satisfied_by(&term2));
+                    assert!(!term1.contradicted_by(&term2));
                 }
             }
         }

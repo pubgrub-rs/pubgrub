@@ -23,7 +23,8 @@ pub struct Memory<P: Package, V: Version> {
 #[derive(Clone)]
 struct PackageAssignments<V: Version> {
     decision: Option<(V, Term<V>)>,
-    derivations: Vec<Term<V>>,
+    derivations_intersected: Term<V>,
+    derivations_not_intersected_yet: Vec<Term<V>>,
 }
 
 impl<P: Package, V: Version> Memory<P, V> {
@@ -34,12 +35,12 @@ impl<P: Package, V: Version> Memory<P, V> {
         }
     }
 
-    /// Retrieve terms in memory related to package.
-    pub fn terms_for_package(&self, package: &P) -> impl Iterator<Item = &Term<V>> {
-        self.assignments.get(package).into_iter().flat_map(|a| {
-            let decision_iter = a.decision.iter().map(|(_, term)| term);
-            decision_iter.chain(a.derivations.iter())
-        })
+    /// Retrieve intersection of terms in memory related to package.
+    pub fn term_intersection_for_package(&mut self, package: &P) -> Term<V> {
+        match self.assignments.get_mut(package) {
+            None => Term::any(),
+            Some(pa) => pa.assignment_intersection(),
+        }
     }
 
     /// Building step of a Memory from a given assignment.
@@ -72,7 +73,7 @@ impl<P: Package, V: Version> Memory<P, V> {
             .assignments
             .entry(package)
             .or_insert(PackageAssignments::new());
-        pa.derivations.push(term);
+        pa.derivations_not_intersected_yet.push(term);
     }
 
     /// Extract all packages that may potentially be picked next
@@ -81,26 +82,10 @@ impl<P: Package, V: Version> Memory<P, V> {
     /// selected version (no "decision")
     /// and if it contains at least one positive derivation term
     /// in the partial solution.
-    pub fn potential_packages(&self) -> impl Iterator<Item = (&P, &[Term<V>])> {
+    pub fn potential_packages(&mut self) -> impl Iterator<Item = (&P, &Term<V>)> {
         self.assignments
-            .iter()
-            .filter_map(|(p, pa)| Self::potential_package_filter(p, pa))
-    }
-
-    fn potential_package_filter<'a, 'b>(
-        package: &'a P,
-        package_assignments: &'b PackageAssignments<V>,
-    ) -> Option<(&'a P, &'b [Term<V>])> {
-        if &package_assignments.decision == &None
-            && package_assignments
-                .derivations
-                .iter()
-                .any(|t| t.is_positive())
-        {
-            Some((package, package_assignments.derivations.as_slice()))
-        } else {
-            None
-        }
+            .iter_mut()
+            .filter_map(|(p, pa)| pa.potential_package_filter(p))
     }
 
     /// If a partial solution has, for every positive derivation,
@@ -125,7 +110,8 @@ impl<V: Version> PackageAssignments<V> {
     fn new() -> Self {
         Self {
             decision: None,
-            derivations: Vec::new(),
+            derivations_intersected: Term::any(),
+            derivations_not_intersected_yet: Vec::new(),
         }
     }
 
@@ -134,8 +120,55 @@ impl<V: Version> PackageAssignments<V> {
     /// it's a total solution and version solving has succeeded.
     fn is_valid(&self) -> bool {
         match self.decision {
-            None => self.derivations.iter().all(|t| t.is_negative()),
+            None => {
+                self.derivations_intersected.is_negative()
+                    && self
+                        .derivations_not_intersected_yet
+                        .iter()
+                        .all(|t| t.is_negative())
+            }
             Some(_) => true,
+        }
+    }
+
+    /// Returns intersection of all assignments (decision included).
+    /// Mutates itself to store the intersection result.
+    fn assignment_intersection(&mut self) -> Term<V> {
+        self.derivation_intersection();
+        match &self.decision {
+            None => self.derivations_intersected.clone(),
+            Some((_, decision_term)) => decision_term.intersection(&self.derivations_intersected),
+        }
+    }
+
+    /// Returns intersection of all derivation terms.
+    /// Mutates itself to store the intersection result.
+    fn derivation_intersection(&mut self) -> &Term<V> {
+        for derivation in self.derivations_not_intersected_yet.iter() {
+            self.derivations_intersected = self.derivations_intersected.intersection(derivation);
+        }
+        self.derivations_not_intersected_yet.clear();
+        &self.derivations_intersected
+    }
+
+    /// A package is a potential pick if there isn't an already
+    /// selected version (no "decision")
+    /// and if it contains at least one positive derivation term
+    /// in the partial solution.
+    fn potential_package_filter<'a, 'b, P: Package>(
+        &'a mut self,
+        package: &'b P,
+    ) -> Option<(&'b P, &'a Term<V>)> {
+        if self.decision == None
+            && (self.derivations_intersected.is_positive()
+                || self
+                    .derivations_not_intersected_yet
+                    .iter()
+                    .any(|t| t.is_positive()))
+        {
+            Some((package, self.derivation_intersection()))
+        } else {
+            None
         }
     }
 }
