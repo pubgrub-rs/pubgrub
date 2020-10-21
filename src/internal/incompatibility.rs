@@ -45,6 +45,9 @@ enum Kind<P: Package, V: Version> {
     DerivedFrom(usize, usize),
 }
 
+/// A type alias for a pair of [Package] and a corresponding [Term].
+pub type PackageTerm<P, V> = (P, Term<V>);
+
 /// A Relation describes how a set of terms can be compared to an incompatibility.
 /// Typically, the set of terms comes from the partial solution.
 #[derive(Eq, PartialEq)]
@@ -54,10 +57,10 @@ pub enum Relation<P: Package, V: Version> {
     Satisfied,
     /// We say that S contradicts I
     /// if S contradicts at least one term in I.
-    Contradicted(P, Term<V>),
+    Contradicted(PackageTerm<P, V>),
     /// If S satisfies all but one of I's terms and is inconclusive for the remaining term,
     /// we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
-    AlmostSatisfied(P, Term<V>),
+    AlmostSatisfied(PackageTerm<P, V>),
     /// Otherwise, we say that their relation is inconclusive.
     Inconclusive,
 }
@@ -231,13 +234,13 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             match incompat_term.relation_with(&terms(package)) {
                 term::Relation::Satisfied => {}
                 term::Relation::Contradicted => {
-                    relation = Relation::Contradicted(package.clone(), incompat_term.clone());
+                    relation = Relation::Contradicted((package.clone(), incompat_term.clone()));
                     break;
                 }
                 term::Relation::Inconclusive => {
                     if relation == Relation::Satisfied {
                         relation =
-                            Relation::AlmostSatisfied(package.clone(), incompat_term.clone());
+                            Relation::AlmostSatisfied((package.clone(), incompat_term.clone()));
                     } else {
                         relation = Relation::Inconclusive;
                     }

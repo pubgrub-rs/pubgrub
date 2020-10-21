@@ -3,6 +3,7 @@
 //! The partial solution is the current state
 //! of the solution being built by the algorithm.
 
+use crate::internal::incompatibility::PackageTerm;
 use crate::internal::memory::Memory;
 use crate::package::Package;
 use crate::term::Term;
@@ -135,8 +136,8 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn pick_package(
         &mut self,
         dependency_provider: &impl DependencyProvider<P, V>,
-    ) -> Result<Option<(P, Term<V>)>, PubGrubError<P, V>> {
-        let mut out: Option<(P, Term<V>)> = None;
+    ) -> Result<Option<PackageTerm<P, V>>, PubGrubError<P, V>> {
+        let mut out: Option<PackageTerm<P, V>> = None;
         let mut min_key = usize::MAX;
         for (p, term) in self.memory.potential_packages() {
             let key = dependency_provider
