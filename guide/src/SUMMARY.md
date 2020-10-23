@@ -6,7 +6,7 @@
   - [Writing your own dependency provider](./pubgrub_crate/custom_dep_provider.md)
   - [Caching dependencies in a DependencyProvider]()
   - [Strategical decision making in a DependencyProvider]()
-  - [Solution and error reporting]()
+  - [Solution and error reporting](./pubgrub_crate/solution.md)
   - [Writing your own error reporting logic]()
 - [Internals of the PubGrub algorithm](./internals/intro.md)
   - [Overview of the algorithm]()
