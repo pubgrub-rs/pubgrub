@@ -1,12 +1,17 @@
 # Version solving
 
-Version solving consists in efficiently finding a set of packages and versions
+Version solving consists in finding a set of packages and versions
 that satisfy all the constraints of a given project dependencies.
-In Rust, it is the package manager Cargo that takes the dependencies specified
-in the `Cargo.toml` file, and deduces the complete list of exact versions
+In Rust, it is the package manager _Cargo_ that takes the dependencies specified
+in the `Cargo.toml` file and deduces the complete list of exact versions
 of packages needed for your code to run.
 That includes direct dependencies but also indirect ones,
 which are dependencies of your dependencies.
+Packages and versions are not restricted to code libraries though.
+In fact they could refer to anything where "packages" act as a general
+name for things, and "versions" describe the evolution of those things.
+Such things could be office documents, laws, cooking recipes etc.
+Though if you version cooking recipes, well you are a very organized person.
 
 
 ## Semantic versioning
