@@ -2,7 +2,7 @@
 
 - [Version solving](./version_solving.md)
 - [Using the pubgrub crate](./pubgrub_crate/intro.md)
-  - [Basic example with OfflineDependencyProvider]()
+  - [Basic example with OfflineDependencyProvider](./pubgrub_crate/offline_dep_provider.md)
   - [Writing your own dependency provider]()
   - [Caching dependencies in a DependencyProvider]()
   - [Strategical decision making in a DependencyProvider]()
