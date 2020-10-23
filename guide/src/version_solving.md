@@ -57,26 +57,3 @@ I highly recommend ["Spec-ulation" by Rich Hickey][speculation],
 creator of the Clojure programming language.
 
 [speculation]: https://youtu.be/oyLBGkS5ICk
-
-
-## Version solving with PubGrub
-
-The algorithm provided by this crate, called PubGrub does not care
-if versions follow the semantic versioning scheme or not.
-We simply define a `Version` trait as follows, based on an ordered type.
-
-```rust
-pub trait Version: Clone + Ord + Debug + Display {
-    fn lowest() -> Self;
-    fn bump(&self) -> Self;
-}
-```
-
-The `lowest()` trait method should return the lowest version existing,
-and `bump(&self)` should return the smallest version stricly
-higher than the current one.
-
-For convenience, we already provide the `SemanticVersion` type,
-which implements `Version` for versions expressed as `Major.Minor.Patch`.
-We also provide the `NumberVersion` implementation of `Version`,
-which is basically just a newtype for non-negative integers, 0, 1, 2, etc.
