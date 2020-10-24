@@ -30,14 +30,14 @@ impl std::ops::SubAssign<DecisionLevel> for DecisionLevel {
 }
 
 #[derive(Clone)]
-pub struct DatedAssignment<P: Package, V: Version> {
+pub struct DatedAssignment<'arena, P: Package, V: Version> {
     decision_level: DecisionLevel,
-    assignment: Assignment<P, V>,
+    assignment: Assignment<'arena, P, V>,
 }
 
-pub struct SatisfierAndPreviousHistory<'a, P: Package, V: Version> {
-    satisfier: DatedAssignment<P, V>,
-    previous_history: &'a [DatedAssignment<P, V>],
+pub struct SatisfierAndPreviousHistory<'a, 'arena, P: Package, V: Version> {
+    satisfier: DatedAssignment<'arena, P, V>,
+    previous_history: &'a [DatedAssignment<'arena, P, V>],
 }
 
 /// The partial solution is the current state
@@ -45,16 +45,16 @@ pub struct SatisfierAndPreviousHistory<'a, P: Package, V: Version> {
 /// It is composed of a succession of assignments,
 /// defined as either decisions or derivations.
 #[derive(Clone)]
-pub struct PartialSolution<P: Package, V: Version> {
+pub struct PartialSolution<'arena, P: Package, V: Version> {
     decision_level: DecisionLevel,
     /// Each assignment is stored with its decision level in the history.
     /// The order in which assignments where added in the vec is kept,
     /// so the oldest assignments are at the beginning of the vec.
-    history: Vec<DatedAssignment<P, V>>,
+    history: Vec<DatedAssignment<'arena, P, V>>,
     memory: Memory<P, V>,
 }
 
-impl<P: Package, V: Version> PartialSolution<P, V> {
+impl<'arena, P: Package + 'arena, V: Version + 'arena> PartialSolution<'arena, P, V> {
     /// Initialize an empty partial solution.
     pub fn empty() -> Self {
         Self {
@@ -64,7 +64,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         }
     }
 
-    fn add_assignment(&mut self, assignment: Assignment<P, V>) {
+    fn add_assignment(&mut self, assignment: Assignment<'arena, P, V>) {
         self.decision_level = match assignment {
             Decision { .. } => self.decision_level + DecisionLevel(1),
             Derivation { .. } => self.decision_level,
@@ -82,7 +82,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Add a derivation to the partial solution.
-    pub fn add_derivation(&mut self, package: P, cause: Incompatibility<P, V>) {
+    pub fn add_derivation(&mut self, package: P, cause: &'arena Incompatibility<P, V>) {
         self.add_assignment(Derivation { package, cause });
     }
 
@@ -170,7 +170,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn find_satisfier_and_previous_satisfier_level(
         &self,
         incompat: &Incompatibility<P, V>,
-    ) -> (Assignment<P, V>, DecisionLevel, DecisionLevel) {
+    ) -> (Assignment<'arena, P, V>, DecisionLevel, DecisionLevel) {
         let SatisfierAndPreviousHistory {
             satisfier,
             previous_history,
@@ -190,8 +190,8 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// Also returns all assignments earlier than the satisfier.
     fn find_satisfier<'a>(
         incompat: &Incompatibility<P, V>,
-        history: &'a [DatedAssignment<P, V>],
-    ) -> Option<SatisfierAndPreviousHistory<'a, P, V>> {
+        history: &'a [DatedAssignment<'arena, P, V>],
+    ) -> Option<SatisfierAndPreviousHistory<'a, 'arena, P, V>> {
         Self::find_satisfier_helper(incompat, Self::new_accum_satisfied_from(incompat), history)
     }
 
@@ -201,7 +201,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     fn find_previous_satisfier<'a>(
         incompat: &Incompatibility<P, V>,
         satisfier: &Assignment<P, V>,
-        previous_assignments: &'a [DatedAssignment<P, V>],
+        previous_assignments: &'a [DatedAssignment<'arena, P, V>],
     ) -> DecisionLevel {
         let package = satisfier.package().clone();
         let incompat_term = incompat.get(&package).expect("This should exist");
@@ -234,8 +234,8 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn find_satisfier_helper<'a>(
         incompat: &Incompatibility<P, V>,
         accum_satisfied: Map<P, (bool, Term<V>)>,
-        all_assignments: &'a [DatedAssignment<P, V>],
-    ) -> Option<SatisfierAndPreviousHistory<'a, P, V>> {
+        all_assignments: &'a [DatedAssignment<'arena, P, V>],
+    ) -> Option<SatisfierAndPreviousHistory<'a, 'arena, P, V>> {
         let mut accum_satisfied = accum_satisfied;
         for (idx, dated_assignment) in all_assignments.iter().enumerate() {
             let package = dated_assignment.assignment.package();

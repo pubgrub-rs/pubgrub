@@ -5,6 +5,8 @@
 
 use std::{collections::HashSet as Set, rc::Rc};
 
+use typed_arena::Arena;
+
 use crate::error::PubGrubError;
 use crate::internal::assignment::Assignment::{Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
@@ -14,24 +16,18 @@ use crate::report::DerivationTree;
 use crate::version::Version;
 
 /// Current state of the PubGrub algorithm.
-#[derive(Clone)]
-pub struct State<P: Package, V: Version> {
+pub struct State<'arena, P: Package, V: Version> {
     root_package: P,
     root_version: V,
 
-    /// TODO: remove pub.
-    pub incompatibilities: Rc<Vec<Incompatibility<P, V>>>,
+    incompatibilities: Rc<Vec<&'arena Incompatibility<'arena, P, V>>>,
 
     /// Partial solution.
     /// TODO: remove pub.
-    pub partial_solution: PartialSolution<P, V>,
+    pub partial_solution: PartialSolution<'arena, P, V>,
 
     /// The store is the reference storage for all incompatibilities.
-    /// The id field in one incompatibility refers
-    /// to the position in the [incompatibility_store](State::incompatibility_store) vec,
-    /// NOT the position in the [incompatibilities](State::incompatibilities) vec.
-    /// TODO: remove pub.
-    pub incompatibility_store: Vec<Incompatibility<P, V>>,
+    incompatibility_store: &'arena Arena<Incompatibility<'arena, P, V>>,
 
     /// This is a stack of work to be done in `unit_propagation`.
     /// It can definitely be a local variable to that method, but
@@ -39,26 +35,32 @@ pub struct State<P: Package, V: Version> {
     unit_propagation_buffer: Vec<P>,
 }
 
-impl<P: Package, V: Version> State<P, V> {
+impl<'arena, P: Package, V: Version> State<'arena, P, V> {
     /// Initialization of PubGrub state.
-    pub fn init(root_package: P, root_version: V) -> Self {
-        let not_root_incompat =
-            Incompatibility::not_root(0, root_package.clone(), root_version.clone());
+    pub fn init(
+        root_package: P,
+        root_version: V,
+        incompatibility_store: &'arena Arena<Incompatibility<'arena, P, V>>,
+    ) -> Self {
+        let not_root_incompat = &*incompatibility_store.alloc(Incompatibility::not_root(
+            root_package.clone(),
+            root_version.clone(),
+        ));
         Self {
             root_package,
             root_version,
-            incompatibilities: Rc::new(vec![not_root_incompat.clone()]),
+            incompatibilities: Rc::new(vec![not_root_incompat]),
             partial_solution: PartialSolution::empty(),
-            incompatibility_store: vec![not_root_incompat],
+            incompatibility_store,
             unit_propagation_buffer: vec![],
         }
     }
 
     /// Add an incompatibility to the state.
-    pub fn add_incompatibility<F: Fn(usize) -> Incompatibility<P, V>>(&mut self, gen_incompat: F) {
-        let incompat = gen_incompat(self.incompatibility_store.len());
-        self.incompatibility_store.push(incompat.clone());
-        incompat.merge_into(Rc::make_mut(&mut self.incompatibilities));
+    pub fn add_incompatibility(&mut self, incompat: Incompatibility<'arena, P, V>) {
+        self.incompatibility_store
+            .alloc(incompat)
+            .merge_into(Rc::make_mut(&mut self.incompatibilities));
     }
 
     /// Check if an incompatibility is terminal.
@@ -74,12 +76,12 @@ impl<P: Package, V: Version> State<P, V> {
         while let Some(current_package) = self.unit_propagation_buffer.pop() {
             // Iterate over incompatibilities in reverse order
             // to evaluate first the newest incompatibilities.
-            for incompat in Rc::clone(&self.incompatibilities).iter().rev() {
+            for &incompat in Rc::clone(&self.incompatibilities).iter().rev() {
                 // We only care about that incompatibility if it contains the current package.
                 if incompat.get(&current_package) == None {
                     continue;
                 }
-                match self.partial_solution.relation(&incompat) {
+                match self.partial_solution.relation(incompat) {
                     // If the partial solution satisfies the incompatibility
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
@@ -94,7 +96,7 @@ impl<P: Package, V: Version> State<P, V> {
                         self.unit_propagation_buffer.push(package_almost.clone());
                         // Add (not term) to the partial solution with incompat as cause.
                         self.partial_solution
-                            .add_derivation(package_almost, incompat.clone());
+                            .add_derivation(package_almost, incompat);
                     }
                     _ => {}
                 }
@@ -108,14 +110,14 @@ impl<P: Package, V: Version> State<P, V> {
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     fn conflict_resolution(
         &mut self,
-        incompatibility: &Incompatibility<P, V>,
-    ) -> Result<(P, Incompatibility<P, V>), PubGrubError<P, V>> {
-        let mut current_incompat = incompatibility.clone();
+        incompatibility: &'arena Incompatibility<'arena, P, V>,
+    ) -> Result<(P, &'arena Incompatibility<'arena, P, V>), PubGrubError<P, V>> {
+        let mut current_incompat = incompatibility;
         let mut current_incompat_changed = false;
         loop {
             if current_incompat.is_terminal(&self.root_package, &self.root_version) {
                 return Err(PubGrubError::NoSolution(
-                    self.build_derivation_tree(&current_incompat),
+                    self.build_derivation_tree(current_incompat),
                 ));
             } else {
                 let (satisfier, satisfier_level, previous_satisfier_level) = self
@@ -124,7 +126,7 @@ impl<P: Package, V: Version> State<P, V> {
                 match satisfier {
                     Decision { package, .. } => {
                         self.backtrack(
-                            current_incompat.clone(),
+                            current_incompat,
                             current_incompat_changed,
                             previous_satisfier_level,
                         );
@@ -133,21 +135,15 @@ impl<P: Package, V: Version> State<P, V> {
                     Derivation { cause, package } => {
                         if previous_satisfier_level != satisfier_level {
                             self.backtrack(
-                                current_incompat.clone(),
+                                current_incompat,
                                 current_incompat_changed,
                                 previous_satisfier_level,
                             );
                             return Ok((package, current_incompat));
                         } else {
-                            let id = self.incompatibility_store.len();
-                            let prior_cause = Incompatibility::prior_cause(
-                                id,
-                                &current_incompat,
-                                &cause,
-                                &package,
-                            );
-                            self.incompatibility_store.push(prior_cause.clone());
-                            current_incompat = prior_cause;
+                            let prior_cause =
+                                Incompatibility::prior_cause(&current_incompat, &cause, &package);
+                            current_incompat = self.incompatibility_store.alloc(prior_cause);
                             current_incompat_changed = true;
                         }
                     }
@@ -159,7 +155,7 @@ impl<P: Package, V: Version> State<P, V> {
     /// Backtracking.
     fn backtrack(
         &mut self,
-        incompat: Incompatibility<P, V>,
+        incompat: &'arena Incompatibility<'arena, P, V>,
         incompat_changed: bool,
         decision_level: DecisionLevel,
     ) {
@@ -173,22 +169,21 @@ impl<P: Package, V: Version> State<P, V> {
 
     fn build_derivation_tree(&self, incompat: &Incompatibility<P, V>) -> DerivationTree<P, V> {
         let shared_ids = self.find_shared_ids(incompat);
-        incompat.build_derivation_tree(&shared_ids, self.incompatibility_store.as_slice())
+        incompat.build_derivation_tree(&shared_ids)
     }
 
     fn find_shared_ids(&self, incompat: &Incompatibility<P, V>) -> Set<usize> {
         let mut all_ids = Set::new();
         let mut shared_ids = Set::new();
-        let mut stack = Vec::new();
-        stack.push(incompat);
+        let mut stack = vec![incompat];
         while let Some(i) = stack.pop() {
             if let Some((id1, id2)) = i.causes() {
-                if all_ids.contains(&i.id) {
-                    shared_ids.insert(i.id);
+                if all_ids.contains(&(i as *const Incompatibility<_, _> as usize)) {
+                    shared_ids.insert(i as *const Incompatibility<_, _> as usize);
                 } else {
-                    all_ids.insert(i.id);
-                    stack.push(&self.incompatibility_store[id1]);
-                    stack.push(&self.incompatibility_store[id2]);
+                    all_ids.insert(i as *const Incompatibility<_, _> as usize);
+                    stack.push(id1);
+                    stack.push(id2);
                 }
             }
         }

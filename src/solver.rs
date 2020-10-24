@@ -69,6 +69,8 @@ use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet as Set};
 use std::error::Error;
 
+use typed_arena::Arena;
+
 use crate::error::PubGrubError;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
@@ -84,7 +86,8 @@ pub fn resolve<P: Package, V: Version>(
     package: P,
     version: impl Into<V>,
 ) -> Result<SelectedDependencies<P, V>, PubGrubError<P, V>> {
-    let mut state = State::init(package.clone(), version.into());
+    let incompatibility_store = Arena::with_capacity(2);
+    let mut state = State::init(package.clone(), version.into(), &incompatibility_store);
     let mut added_dependencies: Map<P, Set<V>> = Map::default();
     let mut next = package;
     loop {
@@ -119,9 +122,7 @@ pub fn resolve<P: Package, V: Version>(
                     .term_intersection_for_package(&next)
                     .expect("a package was chosen but we don't have a term.")
                     .clone();
-                state.add_incompatibility(|id| {
-                    Incompatibility::no_versions(id, next.clone(), term.clone())
-                });
+                state.add_incompatibility(Incompatibility::no_versions(next.clone(), term.clone()));
                 continue;
             }
             Some(x) => x,
@@ -153,9 +154,10 @@ pub fn resolve<P: Package, V: Version>(
                         source: err,
                     })? {
                     Dependencies::Unknown => {
-                        state.add_incompatibility(|id| {
-                            Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
-                        });
+                        state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                            p.clone(),
+                            v.clone(),
+                        ));
                         continue;
                     }
                     Dependencies::Known(x) => {
@@ -177,12 +179,11 @@ pub fn resolve<P: Package, V: Version>(
                 };
 
             // Add that package and version if the dependencies are not problematic.
-            let start_id = state.incompatibility_store.len();
             let dep_incompats =
-                Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
+                Incompatibility::from_dependencies(p.clone(), v.clone(), &dependencies);
 
             for incompat in dep_incompats.iter() {
-                state.add_incompatibility(|_| incompat.clone());
+                state.add_incompatibility(incompat.clone());
             }
             if dep_incompats
                 .iter()

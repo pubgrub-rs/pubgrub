@@ -12,7 +12,7 @@ use crate::version::Version;
 /// or a derivation : a term specifying compatible versions for a package.
 /// We also record the incompatibility at the origin of a derivation, called its cause.
 #[derive(Clone)]
-pub enum Assignment<P: Package, V: Version> {
+pub enum Assignment<'arena, P: Package, V: Version> {
     /// The decision.
     Decision {
         /// The package corresponding to the decision.
@@ -25,11 +25,11 @@ pub enum Assignment<P: Package, V: Version> {
         /// The package corresponding to the derivation.
         package: P,
         /// Incompatibility cause of the derivation.
-        cause: Incompatibility<P, V>,
+        cause: &'arena Incompatibility<'arena, P, V>,
     },
 }
 
-impl<P: Package, V: Version> Assignment<P, V> {
+impl<P: Package, V: Version> Assignment<'_, P, V> {
     /// Return the package for this assignment
     pub fn package(&self) -> &P {
         match self {

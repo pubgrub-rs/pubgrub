@@ -423,7 +423,7 @@ proptest! {
                 dependency_provider
                     .versions(&p)
                     .unwrap()
-                    .map(move |v| (p, v.clone()))
+                    .map(move |v| (p, *v))
             })
             .collect();
         let to_remove: Set<(_, _)> = indexes_to_remove.iter().map(|x| x.get(&all_versions)).cloned().collect();
