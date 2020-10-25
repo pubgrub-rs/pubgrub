@@ -2,21 +2,21 @@
 
 use std::{collections::BTreeSet as Set, error::Error};
 
-use pubgrub::range::Range;
-use pubgrub::solver::{resolve, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::Map;
-use pubgrub::{
-    error::PubGrubError, package::Package, report::DefaultStringReporter, report::Reporter,
-    version::NumberVersion, version::Version,
-};
-
 use proptest::collection::{btree_map, vec};
 use proptest::prelude::*;
 use proptest::sample::Index;
 use proptest::string::string_regex;
 
-mod sat_dependency_provider;
+use pubgrub::range::Range;
+use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
+use pubgrub::{
+    error::PubGrubError, package::Package, report::DefaultStringReporter, report::Reporter,
+    version::NumberVersion, version::Version,
+};
+
 use crate::sat_dependency_provider::SatResolve;
+
+mod sat_dependency_provider;
 
 /// The same as DP but takes versions from the opposite end:
 /// if DP returns versions from newest to oldest, this returns them from oldest to newest.
@@ -33,7 +33,7 @@ impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P,
         })
     }
 
-    fn get_dependencies(&self, p: &P, v: &V) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
+    fn get_dependencies(&self, p: &P, v: &V) -> Result<Dependencies<P, V>, Box<dyn Error>> {
         self.0.get_dependencies(p, v)
     }
 }
@@ -65,7 +65,7 @@ impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P,
         self.dp.list_available_versions(p)
     }
 
-    fn get_dependencies(&self, p: &P, v: &V) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
+    fn get_dependencies(&self, p: &P, v: &V) -> Result<Dependencies<P, V>, Box<dyn Error>> {
         self.dp.get_dependencies(p, v)
     }
 
@@ -357,27 +357,46 @@ proptest! {
     fn prop_removing_a_dep_cant_break(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666),
         indexes_to_remove in prop::collection::vec((any::<prop::sample::Index>(), any::<prop::sample::Index>(), any::<prop::sample::Index>()), 1..10)
-    )  {
+    ) {
         let packages: Vec<_> = dependency_provider.packages().collect();
         let mut removed_provider = dependency_provider.clone();
         for (package_idx, version_idx, dep_idx) in indexes_to_remove {
             let package = package_idx.get(&packages);
-            let versions = dependency_provider.list_available_versions(package).unwrap();
+            let versions = dependency_provider
+                .list_available_versions(package)
+                .unwrap();
             let version = version_idx.get(&versions);
-            let dependencys: Vec<_> = dependency_provider.get_dependencies(package, version).unwrap().unwrap().into_iter().collect();
-            if !dependencys.is_empty() {
-                let dependency = dep_idx.get(&dependencys).0;
+            let dependencies: Vec<(u16, Range<NumberVersion>)> = match dependency_provider
+                .get_dependencies(package, version)
+                .unwrap()
+            {
+                Dependencies::Unavailable => panic!(),
+                Dependencies::Known(d) => d.into_iter().collect(),
+            };
+            if !dependencies.is_empty() {
+                let dependency = dep_idx.get(&dependencies).0;
                 removed_provider.add_dependencies(
                     **package,
                     *version,
-                    dependencys.into_iter().filter(|x| x.0 != dependency)
+                    dependencies.into_iter().filter(|x| x.0 != dependency),
                 )
             }
         }
         for (name, ver) in cases {
-            if resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver).is_ok() {
+            if resolve(
+                &TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000),
+                name,
+                ver,
+            )
+            .is_ok()
+            {
                 prop_assert!(
-                    resolve(&TimeoutDependencyProvider::new(removed_provider.clone(), 50_000), name, ver).is_ok(),
+                    resolve(
+                        &TimeoutDependencyProvider::new(removed_provider.clone(), 50_000),
+                        name,
+                        ver
+                    )
+                    .is_ok(),
                     "full index worked for `{} = \"={}\"` but removing some deps broke it!",
                     name,
                     ver,
@@ -412,9 +431,11 @@ proptest! {
                         if used.get(&n) == Some(&v) // it was used
                            || to_remove.get(&(n, v)).is_none() // or it is not one to be removed
                         {
-                            smaller_dependency_provider.add_dependencies(n, v,
-                                dependency_provider.get_dependencies(&n, &v).unwrap().unwrap()
-                            )
+                            let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
+                                Dependencies::Unavailable => panic!(),
+                                Dependencies::Known(deps) => deps,
+                            };
+                            smaller_dependency_provider.add_dependencies(n, v, deps)
                         }
                     }
                     prop_assert!(
@@ -432,9 +453,11 @@ proptest! {
                     for &(n, v) in &all_versions {
                         if to_remove.get(&(n, v)).is_none() // it is not one to be removed
                         {
-                            smaller_dependency_provider.add_dependencies(n, v,
-                                dependency_provider.get_dependencies(&n, &v).unwrap().unwrap()
-                            )
+                            let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
+                                Dependencies::Unavailable => panic!(),
+                                Dependencies::Known(deps) => deps,
+                            };
+                            smaller_dependency_provider.add_dependencies(n, v, deps)
                         }
                     }
                     prop_assert!(

@@ -75,11 +75,9 @@
 //! and [SemanticVersion](version::SemanticVersion) for versions.
 //! This may be done quite easily by implementing the two following functions.
 //! ```
-//! # use pubgrub::solver::DependencyProvider;
+//! # use pubgrub::solver::{DependencyProvider, Dependencies};
 //! # use pubgrub::version::SemanticVersion;
 //! # use std::error::Error;
-//! # use pubgrub::range::Range;
-//! # use pubgrub::type_aliases::Map;
 //! #
 //! # struct MyDependencyProvider;
 //! #
@@ -95,7 +93,7 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Option<Map<String, Range<SemanticVersion>>>, Box<dyn Error>> {
+//!     ) -> Result<Dependencies<String, SemanticVersion>, Box<dyn Error>> {
 //!         unimplemented!()
 //!     }
 //! }

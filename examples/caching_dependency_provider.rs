@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::package::Package;
-use pubgrub::range::Range;
-use pubgrub::solver::{resolve, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::Map;
-use pubgrub::version::{NumberVersion, Version};
 use std::cell::RefCell;
 use std::error::Error;
 use std::hash::Hash;
+
+use pubgrub::package::Package;
+use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
+use pubgrub::version::{NumberVersion, Version};
 
 // An example implementing caching dependency provider that will
 // store queried dependencies in memory and check them before querying more from remote.
@@ -40,20 +39,21 @@ impl<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>> DependencyProv
         &self,
         package: &P,
         version: &V,
-    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
+    ) -> Result<Dependencies<P, V>, Box<dyn Error>> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
-            Ok(None) => {
+            Ok(Dependencies::Unavailable) => {
                 let dependencies = self.remote_dependencies.get_dependencies(package, version);
                 match dependencies {
-                    Ok(dependencies) => {
+                    Ok(Dependencies::Known(dependencies)) => {
                         cache.add_dependencies(
                             package.clone(),
                             version.clone(),
-                            dependencies.clone().unwrap_or_default(),
+                            dependencies.clone().into_iter(),
                         );
-                        Ok(dependencies)
+                        Ok(Dependencies::Known(dependencies))
                     }
+                    Ok(Dependencies::Unavailable) => Ok(Dependencies::Unavailable),
                     error @ Err(_) => error,
                 }
             }
