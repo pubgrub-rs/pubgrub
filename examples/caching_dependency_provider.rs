@@ -42,7 +42,7 @@ impl<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>> DependencyProv
     ) -> Result<Dependencies<P, V>, Box<dyn Error>> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
-            Ok(Dependencies::Unavailable) => {
+            Ok(Dependencies::Unknown) => {
                 let dependencies = self.remote_dependencies.get_dependencies(package, version);
                 match dependencies {
                     Ok(Dependencies::Known(dependencies)) => {
@@ -53,7 +53,7 @@ impl<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>> DependencyProv
                         );
                         Ok(Dependencies::Known(dependencies))
                     }
-                    Ok(Dependencies::Unavailable) => Ok(Dependencies::Unavailable),
+                    Ok(Dependencies::Unknown) => Ok(Dependencies::Unknown),
                     error @ Err(_) => error,
                 }
             }

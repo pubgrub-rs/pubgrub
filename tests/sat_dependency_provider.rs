@@ -77,7 +77,7 @@ impl<P: Package, V: Version + Hash> SatResolve<P, V> {
         // active packages need each of there `deps` to be satisfied
         for (p, v, var) in &all_versions {
             let deps = match dp.get_dependencies(p, v).unwrap() {
-                Dependencies::Unavailable => panic!(),
+                Dependencies::Unknown => panic!(),
                 Dependencies::Known(d) => d,
             };
             for (p1, range) in deps.iter() {

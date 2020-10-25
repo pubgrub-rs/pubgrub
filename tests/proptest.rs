@@ -370,7 +370,7 @@ proptest! {
                 .get_dependencies(package, version)
                 .unwrap()
             {
-                Dependencies::Unavailable => panic!(),
+                Dependencies::Unknown => panic!(),
                 Dependencies::Known(d) => d.into_iter().collect(),
             };
             if !dependencies.is_empty() {
@@ -432,7 +432,7 @@ proptest! {
                            || to_remove.get(&(n, v)).is_none() // or it is not one to be removed
                         {
                             let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
-                                Dependencies::Unavailable => panic!(),
+                                Dependencies::Unknown => panic!(),
                                 Dependencies::Known(deps) => deps,
                             };
                             smaller_dependency_provider.add_dependencies(n, v, deps)
@@ -454,7 +454,7 @@ proptest! {
                         if to_remove.get(&(n, v)).is_none() // it is not one to be removed
                         {
                             let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
-                                Dependencies::Unavailable => panic!(),
+                                Dependencies::Unknown => panic!(),
                                 Dependencies::Known(deps) => deps,
                             };
                             smaller_dependency_provider.add_dependencies(n, v, deps)

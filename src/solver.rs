@@ -135,7 +135,7 @@ pub fn resolve<P: Package, V: Version>(
                 version: v.clone(),
                 source: err,
             })? {
-            Dependencies::Unavailable => {
+            Dependencies::Unknown => {
                 state.add_incompatibility(|id| {
                     Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
                 });
@@ -176,15 +176,15 @@ pub fn resolve<P: Package, V: Version>(
 #[derive(Clone)]
 pub enum Dependencies<P: Package, V: Version> {
     /// Package dependencies are unavailable.
-    Unavailable,
+    Unknown,
     /// Container for all available package versions.
-    Known(AllowedVersions<P, V>),
+    Known(DependencyConstraints<P, V>),
 }
 
 /// Subtype of [Dependencies] which holds information about
 /// all possible versions a given package can accept.
 /// There is a difference in semantics between an empty [Map<P, Range<V>>](crate::type_aliases::Map)
-/// inside [AllowedVersions] and [Dependencies::Unavailable]:
+/// inside [DependencyConstraints] and [Dependencies::Unknown]:
 /// the former means the package has no dependencies and it is a known fact,
 /// while the latter means they could not be fetched by [DependencyProvider].
 #[derive(Debug, Clone)]
@@ -193,22 +193,22 @@ pub enum Dependencies<P: Package, V: Version> {
     derive(serde::Serialize, serde::Deserialize),
     serde(transparent)
 )]
-pub struct AllowedVersions<P: Package, V: Version>(Map<P, Range<V>>);
+pub struct DependencyConstraints<P: Package, V: Version>(Map<P, Range<V>>);
 
-impl<P: Package, V: Version> Default for AllowedVersions<P, V> {
+impl<P: Package, V: Version> Default for DependencyConstraints<P, V> {
     fn default() -> Self {
-        AllowedVersions(Map::default())
+        DependencyConstraints(Map::default())
     }
 }
 
-impl<P: Package, V: Version> AllowedVersions<P, V> {
+impl<P: Package, V: Version> DependencyConstraints<P, V> {
     /// An iterator over inner values of [Map<P, Range<V>>](crate::type_aliases::Map)
     pub fn iter(&self) -> impl Iterator<Item = (&P, &Range<V>)> {
         self.0.iter()
     }
 }
 
-impl<P: Package, V: Version> IntoIterator for AllowedVersions<P, V> {
+impl<P: Package, V: Version> IntoIterator for DependencyConstraints<P, V> {
     type Item = (P, Range<V>);
     type IntoIter = std::collections::hash_map::IntoIter<P, Range<V>>;
 
@@ -217,9 +217,9 @@ impl<P: Package, V: Version> IntoIterator for AllowedVersions<P, V> {
     }
 }
 
-impl<P: Package, V: Version> FromIterator<(P, Range<V>)> for AllowedVersions<P, V> {
+impl<P: Package, V: Version> FromIterator<(P, Range<V>)> for DependencyConstraints<P, V> {
     fn from_iter<T: IntoIterator<Item = (P, Range<V>)>>(iter: T) -> Self {
-        AllowedVersions(iter.into_iter().collect())
+        DependencyConstraints(iter.into_iter().collect())
     }
 }
 
@@ -232,7 +232,7 @@ pub trait DependencyProvider<P: Package, V: Version> {
     fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>>;
 
     /// Retrieves the package dependencies.
-    /// Return [Dependencies::Unavailable] if its dependencies are unknown.
+    /// Return [Dependencies::Unknown] if its dependencies are unknown.
     fn get_dependencies(
         &self,
         package: &P,
@@ -254,7 +254,7 @@ pub trait DependencyProvider<P: Package, V: Version> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct OfflineDependencyProvider<P: Package, V: Version + Hash> {
-    dependencies: Map<P, Map<V, AllowedVersions<P, V>>>,
+    dependencies: Map<P, Map<V, DependencyConstraints<P, V>>>,
 }
 
 impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
@@ -305,9 +305,9 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
     }
 
     /// Lists dependencies of a given package and version.
-    /// Returns [Dependencies::Unavailable] if no information is available
+    /// Returns [Dependencies::Unknown] if no information is available
     /// regarding that package and version pair.
-    fn dependencies(&self, package: &P, version: &V) -> Option<AllowedVersions<P, V>> {
+    fn dependencies(&self, package: &P, version: &V) -> Option<DependencyConstraints<P, V>> {
         self.dependencies
             .get(package)?
             .get(version)
@@ -332,7 +332,7 @@ impl<P: Package, V: Version + Hash> DependencyProvider<P, V> for OfflineDependen
         version: &V,
     ) -> Result<Dependencies<P, V>, Box<dyn Error>> {
         Ok(match self.dependencies(package, version) {
-            None => Dependencies::Unavailable,
+            None => Dependencies::Unknown,
             Some(dependencies) => Dependencies::Known(dependencies),
         })
     }
