@@ -119,7 +119,8 @@
 //!
 //! When everything goes well, the algorithm finds and returns the complete
 //! set of direct and indirect dependencies satisfying all the constraints.
-//! The packages and versions selected are returned in a [Map<P, V>](type_aliases::Map).
+//! The packages and versions selected are returned as
+//! [SelectedDepedencies<P, V>](type_aliases::SelectedDependencies).
 //! But sometimes there is no solution because dependencies are incompatible.
 //! In such cases, [resolve(...)](solver::resolve) returns a
 //! [PubGrubError::NoSolution(derivation_tree)](error::PubGrubError::NoSolution),

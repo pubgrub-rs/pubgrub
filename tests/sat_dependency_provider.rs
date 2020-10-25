@@ -2,7 +2,7 @@
 
 use pubgrub::package::Package;
 use pubgrub::solver::{Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::Map;
+use pubgrub::type_aliases::{Map, SelectedDependencies};
 use pubgrub::version::Version;
 use std::hash::Hash;
 use varisat::ExtendFormula;
@@ -127,7 +127,7 @@ impl<P: Package, V: Version + Hash> SatResolve<P, V> {
         }
     }
 
-    pub fn sat_is_valid_solution(&mut self, pids: &Map<P, V>) -> bool {
+    pub fn sat_is_valid_solution(&mut self, pids: &SelectedDependencies<P, V>) -> bool {
         let mut assumption = vec![];
 
         for (p, vs) in &self.all_versions_by_p {

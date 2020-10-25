@@ -6,7 +6,7 @@
 use crate::internal::memory::Memory;
 use crate::package::Package;
 use crate::term::Term;
-use crate::type_aliases::Map;
+use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
 use crate::{
     error::PubGrubError,
@@ -67,7 +67,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// If a partial solution has, for every positive derivation,
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
-    pub fn extract_solution(&self) -> Option<Map<P, V>> {
+    pub fn extract_solution(&self) -> Option<SelectedDependencies<P, V>> {
         self.memory.extract_solution()
     }
 

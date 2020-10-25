@@ -76,7 +76,7 @@ use crate::internal::incompatibility::Incompatibility;
 use crate::internal::partial_solution::PartialSolution;
 use crate::package::Package;
 use crate::range::Range;
-use crate::type_aliases::Map;
+use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
 
 /// Main function of the library.
@@ -85,7 +85,7 @@ pub fn resolve<P: Package, V: Version>(
     dependency_provider: &impl DependencyProvider<P, V>,
     package: P,
     version: impl Into<V>,
-) -> Result<Map<P, V>, PubGrubError<P, V>> {
+) -> Result<SelectedDependencies<P, V>, PubGrubError<P, V>> {
     let mut state = State::init(package.clone(), version.into());
     let mut added_dependencies: Map<P, Set<V>> = Map::default();
     let mut next = package;
