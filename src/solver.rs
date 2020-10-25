@@ -305,8 +305,7 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
     }
 
     /// Lists dependencies of a given package and version.
-    /// Returns [Dependencies::Unknown] if no information is available
-    /// regarding that package and version pair.
+    /// Returns [None] if no information is available regarding that package and version pair.
     fn dependencies(&self, package: &P, version: &V) -> Option<DependencyConstraints<P, V>> {
         self.dependencies
             .get(package)?
