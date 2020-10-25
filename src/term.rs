@@ -146,7 +146,7 @@ impl<'a, V: 'a + Version> Term<V> {
     /// Otherwise the relation is inconclusive.
     pub(crate) fn relation_with(&self, other_terms_intersection: &Term<V>) -> Relation {
         let full_intersection = self.intersection(other_terms_intersection.as_ref());
-        if &full_intersection == other_terms_intersection.as_ref() {
+        if &full_intersection == other_terms_intersection {
             Relation::Satisfied
         } else if full_intersection == Self::empty() {
             Relation::Contradicted
@@ -183,8 +183,8 @@ pub mod tests {
 
     pub fn strategy() -> impl Strategy<Value = Term<NumberVersion>> {
         prop_oneof![
-            crate::range::tests::strategy().prop_map(|range| Term::Positive(range)),
-            crate::range::tests::strategy().prop_map(|range| Term::Negative(range)),
+            crate::range::tests::strategy().prop_map(Term::Positive),
+            crate::range::tests::strategy().prop_map(Term::Negative),
         ]
     }
 

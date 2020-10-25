@@ -14,8 +14,10 @@
 //!  - [strictly_lower_than(v)](Range::strictly_lower_than): the set defined by `versions < v`
 //!  - [between(v1, v2)](Range::between): the set defined by `v1 <= versions < v2`
 
-use crate::version::Version;
+use std::cmp::Ordering;
 use std::fmt;
+
+use crate::version::Version;
 
 /// A Range is a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -183,34 +185,38 @@ impl<V: Version> Range<V> {
                 }
 
                 // Right contains an infinite interval:
-                (Some((l1, Some(l2))), Some((r1, None))) => {
-                    if l2 < r1 {
+                (Some((l1, Some(l2))), Some((r1, None))) => match l2.cmp(r1) {
+                    Ordering::Less => {
                         left = left_iter.next();
-                    } else if l2 == r1 {
+                    }
+                    Ordering::Equal => {
                         segments.extend(left_iter.cloned());
                         break;
-                    } else {
+                    }
+                    Ordering::Greater => {
                         let start = l1.max(r1).to_owned();
                         segments.push((start, Some(l2.to_owned())));
                         segments.extend(left_iter.cloned());
                         break;
                     }
-                }
+                },
 
                 // Left contains an infinite interval:
-                (Some((l1, None)), Some((r1, Some(r2)))) => {
-                    if r2 < l1 {
+                (Some((l1, None)), Some((r1, Some(r2)))) => match r2.cmp(l1) {
+                    Ordering::Less => {
                         right = right_iter.next();
-                    } else if r2 == l1 {
+                    }
+                    Ordering::Equal => {
                         segments.extend(right_iter.cloned());
                         break;
-                    } else {
+                    }
+                    Ordering::Greater => {
                         let start = l1.max(r1).to_owned();
                         segments.push((start, Some(r2.to_owned())));
                         segments.extend(right_iter.cloned());
                         break;
                     }
-                }
+                },
 
                 // Both sides contain an infinite interval:
                 (Some((l1, None)), Some((r1, None))) => {
@@ -291,13 +297,15 @@ fn interval_to_string<V: Version>(interval: &Interval<V>) -> String {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    use crate::version::NumberVersion;
     use proptest::prelude::*;
+
+    use crate::version::NumberVersion;
+
+    use super::*;
 
     pub fn strategy() -> impl Strategy<Value = Range<NumberVersion>> {
         prop::collection::vec(any::<u32>(), 0..10).prop_map(|mut vec| {
-            vec.sort();
+            vec.sort_unstable();
             vec.dedup();
             let mut pair_iter = vec.chunks_exact(2);
             let mut segments = Vec::with_capacity(vec.len() / 2 + 1);
@@ -312,7 +320,7 @@ pub mod tests {
     }
 
     fn version_strat() -> impl Strategy<Value = NumberVersion> {
-        any::<u32>().prop_map(|x| NumberVersion(x))
+        any::<u32>().prop_map(NumberVersion)
     }
 
     proptest! {
