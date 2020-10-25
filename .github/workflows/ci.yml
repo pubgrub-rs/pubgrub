@@ -10,7 +10,7 @@ env:
 
 jobs:
   test:
-    name: Build and test
+    name: Tests pass
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -43,7 +43,7 @@ jobs:
         run: cargo test --features=serde --verbose
 
   check_formatting:
-    name: Check formatting
+    name: Source code is formatted
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -58,7 +58,7 @@ jobs:
         run: cargo fmt --all -- --check
 
   check_documentation:
-    name: Check documentation
+    name: Documentation builds successfully
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -84,7 +84,7 @@ jobs:
         run: cargo +nightly doc --no-deps --document-private-items
 
   check_commit_conventions:
-    name: Check commit conventions
+    name: Commit messages follow project guidelines
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

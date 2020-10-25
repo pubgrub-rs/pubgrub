@@ -1,4 +1,6 @@
-name: Build and deploy documentation
+# Deploys the latest development documentation to Github Pages
+
+name: Deploy documentation
 on:
   push:
     branches: [ dev ]
@@ -7,7 +9,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  documentation:
+  deploy_documentation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
