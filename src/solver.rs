@@ -140,7 +140,16 @@ pub fn resolve<P: Package, V: Version>(
                 });
                 continue;
             }
-            Dependencies::Known(x) => x,
+            Dependencies::Known(x) => {
+                if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
+                    return Err(PubGrubError::ForbiddenEmptyDependency {
+                        package: p.clone(),
+                        version: v.clone(),
+                        dependent: dependent.clone(),
+                    });
+                }
+                x
+            }
         };
 
         // Add that package and version if the dependencies are not problematic.
