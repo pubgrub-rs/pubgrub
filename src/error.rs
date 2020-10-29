@@ -58,6 +58,19 @@ pub enum PubGrubError<P: Package, V: Version> {
         dependent: P,
     },
 
+    /// Error arising when the implementer of
+    /// [DependencyProvider](crate::solver::DependencyProvider)
+    /// returned a dependency on the requested package.
+    /// This technically means that the package directly depends on itself,
+    /// and is clearly some kind of mistake.
+    #[error("{package} {version} depends on itself")]
+    ForbiddenSelfDependency {
+        /// Package whose dependencies we want.
+        package: P,
+        /// Version of the package for which we want the dependencies.
+        version: V,
+    },
+
     /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
     #[error("We should cancel")]

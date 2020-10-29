@@ -42,3 +42,13 @@ fn should_always_find_a_satisfier() {
         Err(PubGrubError::ForbiddenEmptyDependency { .. })
     ));
 }
+
+#[test]
+fn cannot_depend_on_self() {
+    let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
+    dependency_provider.add_dependencies("a", 0, vec![("a", Range::any())]);
+    assert!(matches!(
+        resolve(&dependency_provider, "a", 0),
+        Err(PubGrubError::ForbiddenSelfDependency { .. })
+    ));
+}

@@ -141,6 +141,12 @@ pub fn resolve<P: Package, V: Version>(
                 continue;
             }
             Dependencies::Known(x) => {
+                if x.contains_key(&p) {
+                    return Err(PubGrubError::ForbiddenSelfDependency {
+                        package: p.clone(),
+                        version: v.clone(),
+                    });
+                }
                 if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
                     return Err(PubGrubError::ForbiddenEmptyDependency {
                         package: p.clone(),
