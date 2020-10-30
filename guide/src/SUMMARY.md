@@ -13,7 +13,7 @@
   - [Terms](./internals/terms.md)
   - [Incompatibilities](./internals/incompatibilities.md)
   - [Partial solution](./internals/partial_solution.md)
-  - [Conflict resolution]()
+  - [Conflict resolution](./internals/conflict_resolution.md)
   - [Building a report tree]()
 - [Testing and benchmarking](./testing/intro.md)
   - [Notes on reproducibility]()
