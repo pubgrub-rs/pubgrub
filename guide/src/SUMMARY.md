@@ -10,7 +10,7 @@
   - [Writing your own error reporting logic](./pubgrub_crate/custom_report.md)
 - [Internals of the PubGrub algorithm](./internals/intro.md)
   - [Overview of the algorithm](./internals/overview.md)
-  - [Terms]()
+  - [Terms](./internals/terms.md)
   - [Incompatibilities]()
   - [Partial solution]()
   - [Conflict resolution]()
