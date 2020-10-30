@@ -33,7 +33,7 @@ before the decision at the origin of that root cause.
 [cnf]: https://en.wikipedia.org/wiki/Conjunctive_normal_form
 [dnf]: https://en.wikipedia.org/wiki/Disjunctive_normal_form
 
-In this guide, we will note incompatibitities with curly braces.
+In this guide, we will note incompatibilities with curly braces.
 An incompatibility containing one term \\(T_a\\) for package \\(a\\)
 and one term \\(T_b\\) for package \\(b\\) will be noted
 

@@ -12,7 +12,7 @@
   - [Overview of the algorithm](./internals/overview.md)
   - [Terms](./internals/terms.md)
   - [Incompatibilities](./internals/incompatibilities.md)
-  - [Partial solution]()
+  - [Partial solution](./internals/partial_solution.md)
   - [Conflict resolution]()
   - [Building a report tree]()
 - [Testing and benchmarking](./testing/intro.md)
