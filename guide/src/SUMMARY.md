@@ -14,7 +14,7 @@
   - [Incompatibilities](./internals/incompatibilities.md)
   - [Partial solution](./internals/partial_solution.md)
   - [Conflict resolution](./internals/conflict_resolution.md)
-  - [Building a report tree]()
+  - [Building a report tree](./internals/report_tree.md)
 - [Testing and benchmarking](./testing/intro.md)
   - [Notes on reproducibility]()
   - [Property testing]()
