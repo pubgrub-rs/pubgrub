@@ -70,3 +70,20 @@ if \\(T_2\\) implies \\(T_1\\), i.e.
 when \\(T_2\\) is evaluated true then \\(T_1\\) must also be true.
 This is equivalent to saying that \\(T_2\\) is a subset of \\(T_1\\),
 which is verified if \\( T_2 \cap T_1 = T_2 \\).
+
+> **Note on comparability of terms:**
+>
+> Checking if a term is satisfied by another term is accomplished
+> in the code by verifying if the intersection of the two terms
+> equals the second term.
+> It is thus very important that terms have unique representations,
+> and by consequence also that **ranges have a unique representation**.
+>
+> In the provided `Range` type, ranges are implemented
+> as an ordered vec of non-intersecting semi-open intervals.
+> It is thus important that they are always reduced to their
+> canonical form.
+> For example, the range `2 <= v < 2` is actually empty
+> and thus should not be represented by `vec![(2, Some(2))]`
+> but by the empty `vec![]`.
+> **This requires special care when implementing range intersection**.
