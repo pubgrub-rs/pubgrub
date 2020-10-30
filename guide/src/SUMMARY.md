@@ -11,7 +11,7 @@
 - [Internals of the PubGrub algorithm](./internals/intro.md)
   - [Overview of the algorithm](./internals/overview.md)
   - [Terms](./internals/terms.md)
-  - [Incompatibilities]()
+  - [Incompatibilities](./internals/incompatibilities.md)
   - [Partial solution]()
   - [Conflict resolution]()
   - [Building a report tree]()

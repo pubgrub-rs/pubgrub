@@ -53,14 +53,14 @@ Given any two ranges of versions \\(r_1\\) and \\(r_2\\), the intersection of te
 based on those ranges is defined as follows,
 
 \\[\begin{eqnarray}
-[r_1] \cap [r_2] &=& [r_1 \cap r_2],                 \nonumber \\\\
-[r_1] \cap \neg [r_2] &=& [r_1 \cap \overline{r_2}], \nonumber \\\\
-\neg [r_1] \cap \neg [r_2] &=& \neg [r_1 \cup r_2].  \nonumber \\\\
+[r_1] \land [r_2] &=& [r_1 \cap r_2],                 \nonumber \\\\
+[r_1] \land \neg [r_2] &=& [r_1 \cap \overline{r_2}], \nonumber \\\\
+\neg [r_1] \land \neg [r_2] &=& \neg [r_1 \cup r_2].  \nonumber \\\\
 \end{eqnarray}\\]
 
 And for any two terms \\(T_1\\) and \\(T_2\\), their union and intersection are related by
 
-\\[ \overline{T_1 \cup T_2} = \overline{T_1} \cap \overline{T_1}. \\]
+\\[ \overline{T_1 \lor T_2} = \overline{T_1} \land \overline{T_1}. \\]
 
 
 ## Relation between terms
@@ -69,7 +69,7 @@ We say that a term \\(T_1\\) is satisfied by another term \\(T_2\\)
 if \\(T_2\\) implies \\(T_1\\), i.e.
 when \\(T_2\\) is evaluated true then \\(T_1\\) must also be true.
 This is equivalent to saying that \\(T_2\\) is a subset of \\(T_1\\),
-which is verified if \\( T_2 \cap T_1 = T_2 \\).
+which is verified if \\( T_2 \land T_1 = T_2 \\).
 
 > **Note on comparability of terms:**
 >
