@@ -34,24 +34,7 @@ by the current state of the partial solution.
 In our previous example, that would be the case if
 we had previously already made a decision for package b
 (in practice that exact situation could not happen but let's leave that subtlety for later).
-If an incompatibility is satisfied, we call that a conflict and must perform conflict resolution,
-and backtrack the partial solution to a state previous to the root cause of the conflict.
-
-
-## Conflict resolution overview
-
-Conflict resolution aims at finding the root cause of a conflict,
-recording it in an incompatibility,
-and backtracking the partial solution to a state
-previous to the decision at the root of the conflict.
-This is performed by a loop composed of two steps:
-
-1. Find the earliest assignment in the partial solution such that
-   the conflictual incompatibility is satisfied by
-   the partial solution until there.
-   That assignment is called the "satisfier".
-2. If the satisfier is the root cause of the conflict,
-   end the loop and backtrack the partial solution.
-   Otherwise, compute the "prior cause" of the satisfier,
-   which is a new incompatibility and continue the loop
-   with that one as the conflictual incompatibility.
+If an incompatibility is satisfied, we call that a conflict and must perform conflict resolution
+to backtrack the partial solution to a state previous to that conflict.
+Details on conflict resolution are presented in its
+[dedicated section](./conflict_resolution.md).
