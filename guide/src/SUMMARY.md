@@ -17,5 +17,5 @@
   - [Building a report tree](./internals/report_tree.md)
 - [Testing and benchmarking](./testing/intro.md)
   - [Property testing](./testing/property.md)
-  - [Benchmarking]()
+  - [Benchmarking](./testing/benchmarking.md)
 - [How can I contribute? Here are some ideas](./contributing.md)
