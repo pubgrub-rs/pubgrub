@@ -1,5 +1,8 @@
 # Benchmarking
 
+TODO: This section has to be improved.
+For now I'm just linking to issue #27 where
+I described a bit how to start with benchmarking.
 
 ## Performance analysis
 
