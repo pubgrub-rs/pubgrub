@@ -16,7 +16,6 @@
   - [Conflict resolution](./internals/conflict_resolution.md)
   - [Building a report tree](./internals/report_tree.md)
 - [Testing and benchmarking](./testing/intro.md)
-  - [Notes on reproducibility]()
   - [Property testing]()
   - [Benchmarking]()
 - [How can I contribute? Here are some ideas](./contributing.md)
