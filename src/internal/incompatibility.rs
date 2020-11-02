@@ -229,16 +229,15 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// CF definition of Relation enum.
-    pub fn relation(&self, mut terms: impl FnMut(&P) -> Term<V>) -> Relation<P, V> {
+    pub fn relation(&self, mut terms: impl FnMut(&P) -> Option<Term<V>>) -> Relation<P, V> {
         let mut relation = Relation::Satisfied;
         for (package, incompat_term) in self.package_terms.iter() {
-            match incompat_term.relation_with(&terms(package)) {
-                term::Relation::Satisfied => {}
-                term::Relation::Contradicted => {
-                    relation = Relation::Contradicted((package.clone(), incompat_term.clone()));
-                    break;
+            match terms(package).map(|term| incompat_term.relation_with(&term)) {
+                Some(term::Relation::Satisfied) => {}
+                Some(term::Relation::Contradicted) => {
+                    return Relation::Contradicted((package.clone(), incompat_term.clone()));
                 }
-                term::Relation::Inconclusive => {
+                _ => {
                     if relation == Relation::Satisfied {
                         relation =
                             Relation::AlmostSatisfied((package.clone(), incompat_term.clone()));

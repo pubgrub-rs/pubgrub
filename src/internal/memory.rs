@@ -38,11 +38,10 @@ impl<P: Package, V: Version> Memory<P, V> {
     }
 
     /// Retrieve intersection of terms in memory related to package.
-    pub fn term_intersection_for_package(&mut self, package: &P) -> Term<V> {
-        match self.assignments.get_mut(package) {
-            None => Term::any(),
-            Some(pa) => pa.assignment_intersection().clone(),
-        }
+    pub fn term_intersection_for_package(&mut self, package: &P) -> Option<&Term<V>> {
+        self.assignments
+            .get_mut(package)
+            .map(|pa| pa.assignment_intersection())
     }
 
     /// Building step of a Memory from a given assignment.
@@ -161,10 +160,10 @@ impl<V: Version> PackageAssignments<V> {
     /// selected version (no "decision")
     /// and if it contains at least one positive derivation term
     /// in the partial solution.
-    fn potential_package_filter<'a, 'b, P: Package>(
+    fn potential_package_filter<'a, P: Package>(
         &'a mut self,
-        package: &'b P,
-    ) -> Option<(&'b P, &'a Term<V>)> {
+        package: &'a P,
+    ) -> Option<(&'a P, &'a Term<V>)> {
         match self {
             PackageAssignments::Decision(_) => None,
             PackageAssignments::Derivations {
