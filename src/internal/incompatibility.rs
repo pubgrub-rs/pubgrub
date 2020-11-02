@@ -61,7 +61,7 @@ pub enum Relation<P: Package, V: Version> {
     Contradicted(PackageTerm<P, V>),
     /// If S satisfies all but one of I's terms and is inconclusive for the remaining term,
     /// we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
-    AlmostSatisfied(PackageTerm<P, V>),
+    AlmostSatisfied(P),
     /// Otherwise, we say that their relation is inconclusive.
     Inconclusive,
 }
@@ -233,8 +233,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                 }
                 term::Relation::Inconclusive => {
                     if relation == Relation::Satisfied {
-                        relation =
-                            Relation::AlmostSatisfied((package.clone(), incompat_term.clone()));
+                        relation = Relation::AlmostSatisfied((package.clone()));
                     } else {
                         relation = Relation::Inconclusive;
                     }
