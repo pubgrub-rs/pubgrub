@@ -138,7 +138,7 @@ impl<P: Package, V: Version> State<P, V> {
                     }
                     Derivation {
                         cause,
-                        term,
+                        term: _,
                         package,
                     } => {
                         if previous_satisfier_level != satisfier_level {
@@ -157,9 +157,6 @@ impl<P: Package, V: Version> State<P, V> {
                                 &package,
                                 &term,
                             );
-                            // eprintln!("\ncause 1: {}", &current_incompat);
-                            // eprintln!("cause 2: {}", &cause);
-                            // eprintln!("prior cause: {}\n", &prior_cause);
                             self.incompatibility_store.push(prior_cause.clone());
                             current_incompat = prior_cause;
                             current_incompat_changed = true;

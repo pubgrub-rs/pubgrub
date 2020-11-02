@@ -203,27 +203,20 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// Prior cause of two incompatibilities using the rule of resolution.
-    pub fn prior_cause(
-        id: usize,
-        incompat: &Self,
-        satisfier_cause: &Self,
-        package: &P,
-        satisfier: &Term<V>,
-    ) -> Self {
+    pub fn prior_cause(id: usize, incompat: &Self, satisfier_cause: &Self, package: &P) -> Self {
         let kind = Kind::DerivedFrom(incompat.id, satisfier_cause.id);
-        let mut t1 = incompat.package_terms.clone();
-        let mut t2 = satisfier_cause.package_terms.clone();
-        t1.remove(package);
-        t2.remove(package);
-        let mut prior_cause_terms = Self::intersection(&t1, &t2);
-        let term = incompat.package_terms.get(package).unwrap();
-        let p_term = term.union(&satisfier.negate());
-        if p_term != Term::any() {
-            prior_cause_terms.insert(package.clone(), p_term);
+        let mut incompat1 = incompat.package_terms.clone();
+        let mut incompat2 = satisfier_cause.package_terms.clone();
+        let t1 = incompat1.remove(package).unwrap();
+        let t2 = incompat2.remove(package).unwrap();
+        let mut package_terms = Self::intersection(&incompat1, &incompat2);
+        let term = t1.union(&t2);
+        if term != Term::any() {
+            package_terms.insert(package.clone(), term);
         }
         Self {
             id,
-            package_terms: prior_cause_terms,
+            package_terms,
             kind,
         }
     }
@@ -375,7 +368,7 @@ pub mod tests {
             i3.insert("p1", t1);
             i3.insert("p3", t3);
 
-            let i_resolution = Incompatibility::prior_cause(0, &i1, &i2, &"p2", &t2.negate());
+            let i_resolution = Incompatibility::prior_cause(0, &i1, &i2, &"p2");
             assert_eq!(i_resolution.package_terms, i3);
         }
 
