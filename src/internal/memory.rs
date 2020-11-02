@@ -21,10 +21,12 @@ pub struct Memory<P: Package, V: Version> {
 /// A package memory contains the potential decision and derivations
 /// that have already been made for a given package.
 #[derive(Clone)]
-struct PackageAssignments<V: Version> {
-    decision: Option<(V, Term<V>)>,
-    derivations_intersected: Term<V>,
-    derivations_not_intersected_yet: Vec<Term<V>>,
+enum PackageAssignments<V: Version> {
+    Decision((V, Term<V>)),
+    Derivations {
+        intersected: Term<V>,
+        not_intersected_yet: Vec<Term<V>>,
+    },
 }
 
 impl<P: Package, V: Version> Memory<P, V> {
@@ -39,7 +41,7 @@ impl<P: Package, V: Version> Memory<P, V> {
     pub fn term_intersection_for_package(&mut self, package: &P) -> Term<V> {
         match self.assignments.get_mut(package) {
             None => Term::any(),
-            Some(pa) => pa.assignment_intersection(),
+            Some(pa) => pa.assignment_intersection().clone(),
         }
     }
 
@@ -53,27 +55,50 @@ impl<P: Package, V: Version> Memory<P, V> {
 
     /// Add a decision to a Memory.
     fn add_decision(&mut self, package: P, version: V) {
-        let pa = self
-            .assignments
-            .entry(package)
-            .or_insert_with(PackageAssignments::new);
-        pa.decision = Some((version.clone(), Term::exact(version)));
-    }
-
-    /// Remove a decision from a Memory.
-    pub fn remove_decision(&mut self, package: &P) {
-        if let Some(pa) = self.assignments.get_mut(package) {
-            pa.decision = None;
+        if cfg!(debug_assertions) {
+            match self.assignments.get(&package) {
+                Some(PackageAssignments::Decision(v)) => assert_eq!(v.0, version),
+                Some(PackageAssignments::Derivations {
+                    intersected,
+                    not_intersected_yet,
+                }) => {
+                    debug_assert!(intersected.contains(&version));
+                    for term in not_intersected_yet {
+                        debug_assert!(term.contains(&version));
+                    }
+                }
+                _ => {}
+            }
         }
+
+        self.assignments.insert(
+            package,
+            PackageAssignments::Decision((version.clone(), Term::exact(version))),
+        );
     }
 
     /// Add a derivation to a Memory.
     fn add_derivation(&mut self, package: P, term: Term<V>) {
-        let pa = self
-            .assignments
-            .entry(package)
-            .or_insert_with(PackageAssignments::new);
-        pa.derivations_not_intersected_yet.push(term);
+        let pa =
+            self.assignments
+                .entry(package)
+                .or_insert_with(|| PackageAssignments::Derivations {
+                    intersected: Term::any(),
+                    not_intersected_yet: Vec::with_capacity(1),
+                });
+        match pa {
+            PackageAssignments::Decision((version, _)) => {
+                if cfg!(debug_assertions) {
+                    debug_assert!(term.contains(&version))
+                }
+            }
+            PackageAssignments::Derivations {
+                intersected: _,
+                not_intersected_yet,
+            } => {
+                not_intersected_yet.push(term);
+            }
+        }
     }
 
     /// Extract all packages that may potentially be picked next
@@ -92,11 +117,20 @@ impl<P: Package, V: Version> Memory<P, V> {
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
     pub fn extract_solution(&self) -> Option<SelectedDependencies<P, V>> {
-        if self.assignments.values().all(|pa| pa.is_valid()) {
+        if self.assignments.iter().all(|(_, pa)| match pa {
+            PackageAssignments::Decision(_) => true,
+            PackageAssignments::Derivations {
+                intersected,
+                not_intersected_yet,
+            } => intersected.is_negative() && not_intersected_yet.iter().all(|t| t.is_negative()),
+        }) {
             Some(
                 self.assignments
                     .iter()
-                    .filter_map(|(p, pa)| pa.decision.as_ref().map(|v| (p.clone(), v.0.clone())))
+                    .filter_map(|(p, pa)| match pa {
+                        PackageAssignments::Decision((v, _)) => Some((p.clone(), v.clone())),
+                        PackageAssignments::Derivations { .. } => None,
+                    })
                     .collect(),
             )
         } else {
@@ -106,49 +140,21 @@ impl<P: Package, V: Version> Memory<P, V> {
 }
 
 impl<V: Version> PackageAssignments<V> {
-    /// Empty package assignment
-    fn new() -> Self {
-        Self {
-            decision: None,
-            derivations_intersected: Term::any(),
-            derivations_not_intersected_yet: Vec::new(),
-        }
-    }
-
-    /// If a partial solution has, for every positive derivation,
-    /// a corresponding decision that satisfies that assignment,
-    /// it's a total solution and version solving has succeeded.
-    fn is_valid(&self) -> bool {
-        match self.decision {
-            None => {
-                self.derivations_intersected.is_negative()
-                    && self
-                        .derivations_not_intersected_yet
-                        .iter()
-                        .all(|t| t.is_negative())
-            }
-            Some(_) => true,
-        }
-    }
-
     /// Returns intersection of all assignments (decision included).
     /// Mutates itself to store the intersection result.
-    fn assignment_intersection(&mut self) -> Term<V> {
-        self.derivation_intersection();
-        match &self.decision {
-            None => self.derivations_intersected.clone(),
-            Some((_, decision_term)) => decision_term.intersection(&self.derivations_intersected),
+    fn assignment_intersection(&mut self) -> &Term<V> {
+        match self {
+            PackageAssignments::Decision((_, term)) => &*term,
+            PackageAssignments::Derivations {
+                intersected,
+                not_intersected_yet,
+            } => {
+                for derivation in not_intersected_yet.drain(..) {
+                    *intersected = intersected.intersection(&derivation);
+                }
+                &*intersected
+            }
         }
-    }
-
-    /// Returns intersection of all derivation terms.
-    /// Mutates itself to store the intersection result.
-    fn derivation_intersection(&mut self) -> &Term<V> {
-        for derivation in self.derivations_not_intersected_yet.iter() {
-            self.derivations_intersected = self.derivations_intersected.intersection(derivation);
-        }
-        self.derivations_not_intersected_yet.clear();
-        &self.derivations_intersected
     }
 
     /// A package is a potential pick if there isn't an already
@@ -159,16 +165,19 @@ impl<V: Version> PackageAssignments<V> {
         &'a mut self,
         package: &'b P,
     ) -> Option<(&'b P, &'a Term<V>)> {
-        if self.decision == None
-            && (self.derivations_intersected.is_positive()
-                || self
-                    .derivations_not_intersected_yet
-                    .iter()
-                    .any(|t| t.is_positive()))
-        {
-            Some((package, self.derivation_intersection()))
-        } else {
-            None
+        match self {
+            PackageAssignments::Decision(_) => None,
+            PackageAssignments::Derivations {
+                intersected,
+                not_intersected_yet,
+            } => {
+                if intersected.is_positive() || not_intersected_yet.iter().any(|t| t.is_positive())
+                {
+                    Some((package, self.assignment_intersection()))
+                } else {
+                    None
+                }
+            }
         }
     }
 }
