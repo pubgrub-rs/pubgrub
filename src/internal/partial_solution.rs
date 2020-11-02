@@ -170,6 +170,32 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             .cloned()
     }
 
+    /// We can add the version to the partial solution as a decision
+    /// if it doesn't produce any conflict with the new incompatibilities.
+    /// In practice I think it can only produce a conflict if one of the dependencies
+    /// (which are used to make the new incompatibilities)
+    /// is already in the partial solution with an incompatible version.
+    pub fn add_version(
+        &mut self,
+        package: P,
+        version: V,
+        new_incompatibilities: &[Incompatibility<P, V>],
+    ) {
+        for incompat in new_incompatibilities {
+            let relation = incompat.relation(|p| {
+                if p == &package {
+                    Some(Term::exact(version.clone()))
+                } else {
+                    self.memory.term_intersection_for_package(p).cloned()
+                }
+            });
+            if relation == Relation::Satisfied {
+                return;
+            }
+        }
+        self.add_decision(package, version);
+    }
+
     /// Check if the terms in the partial solution satisfy the incompatibility.
     pub fn relation(&mut self, incompat: &Incompatibility<P, V>) -> Relation<P, V> {
         incompat.relation(|package| self.memory.term_intersection_for_package(package).cloned())
