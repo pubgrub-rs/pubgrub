@@ -233,7 +233,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                 }
                 term::Relation::Inconclusive => {
                     if relation == Relation::Satisfied {
-                        relation = Relation::AlmostSatisfied((package.clone()));
+                        relation = Relation::AlmostSatisfied(package.clone());
                     } else {
                         relation = Relation::Inconclusive;
                     }
