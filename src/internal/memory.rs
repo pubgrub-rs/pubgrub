@@ -78,24 +78,22 @@ impl<P: Package, V: Version> Memory<P, V> {
 
     /// Add a derivation to a Memory.
     fn add_derivation(&mut self, package: P, term: Term<V>) {
-        let pa =
-            self.assignments
-                .entry(package)
-                .or_insert_with(|| PackageAssignments::Derivations {
-                    intersected: Term::any(),
-                    not_intersected_yet: Vec::with_capacity(1),
-                });
-        match pa {
-            PackageAssignments::Decision((version, _)) => {
-                if cfg!(debug_assertions) {
-                    debug_assert!(term.contains(&version))
+        use std::collections::hash_map::Entry;
+        match self.assignments.entry(package) {
+            Entry::Occupied(mut o) => match o.get_mut() {
+                PackageAssignments::Decision(_) => debug_assert!(false),
+                PackageAssignments::Derivations {
+                    intersected: _,
+                    not_intersected_yet,
+                } => {
+                    not_intersected_yet.push(term);
                 }
-            }
-            PackageAssignments::Derivations {
-                intersected: _,
-                not_intersected_yet,
-            } => {
-                not_intersected_yet.push(term);
+            },
+            Entry::Vacant(v) => {
+                v.insert(PackageAssignments::Derivations {
+                    intersected: term,
+                    not_intersected_yet: Vec::new(),
+                });
             }
         }
     }
@@ -116,25 +114,25 @@ impl<P: Package, V: Version> Memory<P, V> {
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
     pub fn extract_solution(&self) -> Option<SelectedDependencies<P, V>> {
-        if self.assignments.iter().all(|(_, pa)| match pa {
-            PackageAssignments::Decision(_) => true,
-            PackageAssignments::Derivations {
-                intersected,
-                not_intersected_yet,
-            } => intersected.is_negative() && not_intersected_yet.iter().all(|t| t.is_negative()),
-        }) {
-            Some(
-                self.assignments
-                    .iter()
-                    .filter_map(|(p, pa)| match pa {
-                        PackageAssignments::Decision((v, _)) => Some((p.clone(), v.clone())),
-                        PackageAssignments::Derivations { .. } => None,
-                    })
-                    .collect(),
-            )
-        } else {
-            None
+        let mut solution = Map::default();
+        for (p, pa) in &self.assignments {
+            match pa {
+                PackageAssignments::Decision((v, _)) => {
+                    solution.insert(p.clone(), v.clone());
+                }
+                PackageAssignments::Derivations {
+                    intersected,
+                    not_intersected_yet,
+                } => {
+                    if intersected.is_positive()
+                        || not_intersected_yet.iter().any(|t| t.is_positive())
+                    {
+                        return None;
+                    }
+                }
+            }
         }
+        Some(solution)
     }
 }
 
@@ -148,9 +146,10 @@ impl<V: Version> PackageAssignments<V> {
                 intersected,
                 not_intersected_yet,
             } => {
-                for derivation in not_intersected_yet.drain(..) {
+                for derivation in not_intersected_yet.iter() {
                     *intersected = intersected.intersection(&derivation);
                 }
+                not_intersected_yet.clear();
                 &*intersected
             }
         }
