@@ -24,8 +24,6 @@ pub enum Assignment<P: Package, V: Version> {
     Derivation {
         /// The package corresponding to the derivation.
         package: P,
-        /// Term of the derivation.
-        term: Term<V>,
         /// Incompatibility cause of the derivation.
         cause: Incompatibility<P, V>,
     },
@@ -46,7 +44,7 @@ impl<P: Package, V: Version> Assignment<P, V> {
     pub fn as_term(&self) -> Term<V> {
         match &self {
             Self::Decision { version, .. } => Term::exact(version.clone()),
-            Self::Derivation { term, .. } => term.clone(),
+            Self::Derivation { package, cause } => cause.get(&package).unwrap().negate(),
         }
     }
 }

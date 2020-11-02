@@ -81,22 +81,19 @@ impl<P: Package, V: Version> State<P, V> {
                         // root_cause is guaranteed to be almost satisfied by the partial solution
                         // according to PubGrub documentation.
                         match self.partial_solution.relation(&root_cause) {
-                            Relation::AlmostSatisfied((package_almost, term)) => {
+                            Relation::AlmostSatisfied((package_almost, _)) => {
                                 changed = vec![package_almost.clone()];
                                 // Add (not term) to the partial solution with incompat as cause.
-                                self.partial_solution.add_derivation(package_almost, term.negate(), root_cause);
+                                self.partial_solution.add_derivation(package_almost, root_cause);
                             }
                             _ => return Err(PubGrubError::Failure("This should never happen, root_cause is guaranteed to be almost satisfied by the partial solution".into())),
                         }
                     }
-                    Relation::AlmostSatisfied((package_almost, term)) => {
+                    Relation::AlmostSatisfied((package_almost, _)) => {
                         changed.push(package_almost.clone());
                         // Add (not term) to the partial solution with incompat as cause.
-                        self.partial_solution.add_derivation(
-                            package_almost,
-                            term.negate(),
-                            incompat.clone(),
-                        );
+                        self.partial_solution
+                            .add_derivation(package_almost, incompat.clone());
                     }
                     _ => {}
                 }
@@ -136,11 +133,7 @@ impl<P: Package, V: Version> State<P, V> {
                         );
                         return Ok(current_incompat);
                     }
-                    Derivation {
-                        cause,
-                        term: _,
-                        package,
-                    } => {
+                    Derivation { cause, package } => {
                         if previous_satisfier_level != satisfier_level {
                             self.backtrack(
                                 current_incompat.clone(),
