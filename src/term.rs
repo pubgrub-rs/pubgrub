@@ -3,7 +3,7 @@
 //! A term is the fundamental unit of operation of the PubGrub algorithm.
 //! It is a positive or negative expression regarding a set of versions.
 
-use crate::range::Range;
+use crate::range::{Range, Relation};
 use crate::version::Version;
 use std::fmt;
 
@@ -28,7 +28,7 @@ impl<V: Version> Term<V> {
     }
 
     /// A term that is never true.
-    pub(crate) fn empty() -> Self {
+    pub fn empty() -> Self {
         Self::Positive(Range::none())
     }
 
@@ -104,21 +104,6 @@ impl<V: Version> Term<V> {
     }
 }
 
-/// Describe a relation between a set of terms S and another term t.
-///
-/// As a shorthand, we say that a term v
-/// satisfies or contradicts a term t if {v} satisfies or contradicts it.
-pub(crate) enum Relation {
-    /// We say that a set of terms S "satisfies" a term t
-    /// if t must be true whenever every term in S is true.
-    Satisfied,
-    /// Conversely, S "contradicts" t if t must be false
-    /// whenever every term in S is true.
-    Contradicted,
-    /// If neither of these is true we say that S is "inconclusive" for t.
-    Inconclusive,
-}
-
 /// Relation between terms.
 impl<'a, V: 'a + Version> Term<V> {
     /// Check if a set of terms satisfies this term.
@@ -148,14 +133,24 @@ impl<'a, V: 'a + Version> Term<V> {
 
     /// Check if a set of terms satisfies or contradicts a given term.
     /// Otherwise the relation is inconclusive.
-    pub(crate) fn relation_with(&self, other_terms_intersection: &Term<V>) -> Relation {
-        let full_intersection = self.intersection(other_terms_intersection.as_ref());
-        if &full_intersection == other_terms_intersection {
-            Relation::Satisfied
-        } else if full_intersection == Self::empty() {
-            Relation::Contradicted
-        } else {
-            Relation::Inconclusive
+    pub(crate) fn relation_with(&self, other: &Term<V>) -> Relation {
+        match (self, other) {
+            (Self::Positive(r1), Self::Positive(r2)) => r2.relation(r1),
+            (Self::Positive(r1), Self::Negative(r2)) => match r2.negate().relation(r1) {
+                Relation::Satisfied => {
+                    if r2 == &Range::any() {
+                        Relation::Contradicted
+                    } else {
+                        Relation::Inconclusive
+                    }
+                }
+                x => x,
+            },
+            (Self::Negative(r1), Self::Positive(r2)) => r2.relation(&r1.negate()),
+            (Self::Negative(r1), Self::Negative(r2)) => match r1.relation(r2) {
+                Relation::Contradicted => Relation::Inconclusive,
+                x => x,
+            },
         }
     }
 }

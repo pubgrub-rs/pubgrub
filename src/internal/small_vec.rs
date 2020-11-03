@@ -38,7 +38,7 @@ impl<T> SmallVec<T> {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &T> {
         self.as_slice().iter()
     }
 }

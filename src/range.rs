@@ -237,6 +237,88 @@ impl<V: Version> Range<V> {
     }
 }
 
+/// Describe a relation between a set of terms S and another term t.
+///
+/// As a shorthand, we say that a term v
+/// satisfies or contradicts a term t if {v} satisfies or contradicts it.
+#[derive(Eq, PartialEq, Debug)]
+pub(crate) enum Relation {
+    /// We say that a set of terms S "satisfies" a term t
+    /// if t must be true whenever every term in S is true.
+    Satisfied,
+    /// Conversely, S "contradicts" t if t must be false
+    /// whenever every term in S is true.
+    Contradicted,
+    /// If neither of these is true we say that S is "inconclusive" for t.
+    Inconclusive,
+}
+
+// Set operations.
+impl<V: Version> Range<V> {
+    /// Compute the relation of two sets of versions.
+    pub(crate) fn relation(&self, other: &Self) -> Relation {
+        let mut state = None;
+        for s in self.segments.iter() {
+            match other.contains_interval(s) {
+                Relation::Satisfied => match state {
+                    None | Some(Relation::Satisfied) => state = Some(Relation::Satisfied),
+                    _ => return Relation::Inconclusive,
+                },
+                Relation::Inconclusive => return Relation::Inconclusive,
+                Relation::Contradicted => match state {
+                    None | Some(Relation::Contradicted) => state = Some(Relation::Contradicted),
+                    _ => return Relation::Inconclusive,
+                },
+            };
+        }
+        state.unwrap_or(Relation::Satisfied)
+    }
+
+    fn contains_interval(&self, other: &Interval<V>) -> Relation {
+        match other {
+            (o1, Some(o2)) => {
+                for seg in self.segments.iter() {
+                    match seg {
+                        (s1, Some(s2)) => {
+                            if o2 < s1 {
+                                break;
+                            }
+                            if s1 <= o1 && o2 <= s2 {
+                                return Relation::Satisfied;
+                            }
+                            if !(s1 >= o2 || o1 >= s2) {
+                                return Relation::Inconclusive;
+                            }
+                        }
+                        (s1, None) => {
+                            if s1 <= o1 {
+                                return Relation::Satisfied;
+                            }
+                            if s1 < o2 {
+                                return Relation::Inconclusive;
+                            }
+                        }
+                    }
+                }
+            }
+            (o1, None) => {
+                if let Some((s1, None)) = self.segments.iter().rev().next() {
+                    if s1 <= o1 {
+                        return Relation::Satisfied;
+                    }
+                }
+                if self.segments.iter().any(|seg| match seg {
+                    (_, Some(s2)) => o1 < s2,
+                    _ => true,
+                }) {
+                    return Relation::Inconclusive;
+                }
+            }
+        };
+        Relation::Contradicted
+    }
+}
+
 // Other useful functions.
 impl<V: Version> Range<V> {
     /// Check if a range contains a given version.
@@ -379,6 +461,53 @@ pub mod tests {
         #[test]
         fn intesection_contains_both(r1 in strategy(), r2 in strategy(), version in version_strat()) {
             assert_eq!(r1.intersection(&r2).contains(&version), r1.contains(&version) && r2.contains(&version));
+        }
+
+        // Testing relation -----------------------------------
+
+        #[test]
+        fn relation_with_any_is_satisfied(range in strategy()) {
+            prop_assert_eq!(range.relation(&Range::any()), Relation::Satisfied);
+        }
+
+        #[test]
+        fn relation_with_none_is_contradicted(range in strategy()) {
+            prop_assert_eq!(range.relation(&Range::none()), if range == Range::none() {
+                Relation::Satisfied
+            } else {
+                Relation::Contradicted
+            });
+        }
+
+        #[test]
+        fn relation_with_self_is_satisfied(range in strategy()) {
+            prop_assert_eq!(range.relation(&range), Relation::Satisfied);
+        }
+
+        #[test]
+        fn relation_matchs_intersection(r1 in strategy(), r2 in strategy()) {
+            let full_intersection = r1.intersection(&r2);
+            let by_intersection = if full_intersection == r2 {
+                Relation::Satisfied
+            } else if full_intersection == Range::none() {
+                Relation::Contradicted
+            } else {
+                Relation::Inconclusive
+            };
+            prop_assert_eq!(by_intersection, r2.relation(&r1));
+        }
+
+        #[test]
+        fn relation_contains_both(r1 in strategy(), r2 in strategy(), version in version_strat()) {
+            match r1.relation(&r2) {
+                Relation::Satisfied => {
+                    prop_assert!(r2.contains(&version) || !r1.contains(&version));
+                }
+                Relation::Contradicted => {
+                    prop_assert!(!(r1.contains(&version) && r2.contains(&version)));
+                }
+                _ => {}
+            }
         }
 
         // Testing union -----------------------------------

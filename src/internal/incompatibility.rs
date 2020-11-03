@@ -9,9 +9,9 @@ use std::fmt;
 use crate::internal::arena::{Arena, Id};
 use crate::internal::small_map::SmallMap;
 use crate::package::Package;
-use crate::range::Range;
+use crate::range::{self, Range};
 use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
-use crate::term::{self, Term};
+use crate::term::Term;
 use crate::version::Version;
 
 /// An incompatibility is a set of terms for different packages
@@ -177,11 +177,11 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         let mut relation = Relation::Satisfied;
         for (package, incompat_term) in self.package_terms.iter() {
             match terms(package).map(|term| incompat_term.relation_with(&term)) {
-                Some(term::Relation::Satisfied) => {}
-                Some(term::Relation::Contradicted) => {
+                Some(range::Relation::Satisfied) => {}
+                Some(range::Relation::Contradicted) => {
                     return Relation::Contradicted((package.clone(), incompat_term.clone()));
                 }
-                None | Some(term::Relation::Inconclusive) => {
+                None | Some(range::Relation::Inconclusive) => {
                     // If a package is not present, the intersection is the same as [Term::any].
                     // According to the rules of satisfactions, the relation would be inconclusive.
                     // It could also be satisfied if the incompatibility term was also [Term::any],
