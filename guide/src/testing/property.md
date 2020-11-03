@@ -108,6 +108,29 @@ Here are some of these:
 ## Comparison with a SAT solver
 
 In addition to the previous properties,
-we can also compare the result of pubgrub with the one of a SAT solver.
+we can also compare the result of pubgrub with the one of an SAT solver.
+The [SAT problem](https://en.wikipedia.org/wiki/Boolean_satisfiability_problem) asks if there is a
+set of assignments for some Boolean variables so that all the provided Boolean logic statements 
+evaluate to true. So if we can describe version solving as Boolean logic statements then we can use
+these well tested tools to compare with our output.
 
-TODO: explain a bit more about that.
+We start by making a variable for each version of each package that expresses whether that version 
+is selected to be used in the output. Lets call it \\( B_p_v \\).
+
+One of the main constraints of version solving is that we can only have one version selected
+ for each package. We can encode that by adding a logic statement \\( \\neg B_p_a \\parallel \\neg B_p_b \\)
+ where \\(_a\\) and \\(_b\\) are different versions of package \\(_p\\). We use a more efficient but
+ harder to understand encoding in the code, but this makes the point that it can be done.
+
+The next main constraint of version solving is that for a version to be selected then for each of
+ its dependencies there must be a selected version satisfying that dependency. We can encode that by 
+ adding a logic statement \\( \\neg B_p_v \\parallel B_d_a \\parallel  ...  \\parallel  B_d_k \\) for
+ each dependency of each version, where \\( {_a,  ... ,  _k} \\) are the versions that match the dependency.
+ 
+The last constraint of version solving is that the root package needs to be selected. So we add the
+logic statement \\( \\neg B_p_v \\) for the root package and version.
+
+What comparisons can we do?
+
+- **If pubgrub cannot find a solution then neither can the SAT solver.**
+- **If pubgrub finds a solution then adding statements that match it dose not lead to a contradiction.**
