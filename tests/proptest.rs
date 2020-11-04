@@ -118,7 +118,7 @@ pub fn registry_strategy<N: Package + Ord>(
     let max_crates = 40;
     let max_versions = 15;
     let shrinkage = 40;
-    let complicated_len = 10usize;
+    let complicated_len = 5;
 
     // If this is false than the crate will depend on the nonexistent "bad"
     // instead of the complex set we generated for it.
@@ -155,10 +155,9 @@ pub fn registry_strategy<N: Package + Ord>(
         list_of_crates_with_versions,
         list_of_raw_dependency,
         reverse_alphabetical,
-        1..(complicated_len + 1),
     )
         .prop_map(
-            move |(crate_vers_by_name, raw_dependencies, reverse_alphabetical, complicated_len)| {
+            move |(crate_vers_by_name, raw_dependencies, reverse_alphabetical)| {
                 let mut list_of_pkgid: Vec<(
                     (N, NumberVersion),
                     Option<Vec<(N, Range<NumberVersion>)>>,
@@ -173,10 +172,12 @@ pub fn registry_strategy<N: Package + Ord>(
                         })
                     })
                     .collect();
+                if reverse_alphabetical {
+                    list_of_pkgid.reverse();
+                }
                 let len_all_pkgid = list_of_pkgid.len();
                 for (a, b, (c, d)) in raw_dependencies {
                     let (a, b) = order_index(a, b, len_all_pkgid);
-                    let (a, b) = if reverse_alphabetical { (b, a) } else { (a, b) };
                     let ((dep_name, _), _) = list_of_pkgid[a].to_owned();
                     if &(list_of_pkgid[b].0).0 == &dep_name {
                         continue;
@@ -205,15 +206,12 @@ pub fn registry_strategy<N: Package + Ord>(
 
                 let mut dependency_provider = OfflineDependencyProvider::<N, NumberVersion>::new();
 
-                let complicated_len = std::cmp::min(complicated_len, list_of_pkgid.len());
-                let complicated: Vec<_> = if reverse_alphabetical {
-                    &list_of_pkgid[..complicated_len]
-                } else {
-                    &list_of_pkgid[(list_of_pkgid.len() - complicated_len)..]
-                }
-                .iter()
-                .map(|(x, _)| (x.0.clone(), x.1))
-                .collect();
+                let complicated: Vec<_> = list_of_pkgid
+                    .iter()
+                    .rev()
+                    .take(complicated_len)
+                    .map(|(x, _)| (x.0.clone(), x.1))
+                    .collect();
 
                 for ((name, ver), deps) in list_of_pkgid {
                     dependency_provider.add_dependencies(
