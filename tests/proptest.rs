@@ -478,3 +478,44 @@ proptest! {
         }
     }
 }
+
+#[cfg(feature = "serde")]
+#[test]
+fn large_case() {
+    for case in std::fs::read_dir("test-examples").unwrap() {
+        let case = case.unwrap().path();
+        let name = case.file_name().unwrap().to_string_lossy();
+        eprintln!("{}", name);
+        let data = std::fs::read_to_string(&case).unwrap();
+        if name.ends_with("u16_NumberVersion.ron") {
+            let dependency_provider: OfflineDependencyProvider<u16, NumberVersion> =
+                ron::de::from_str(&data).unwrap();
+            let mut sat = SatResolve::new(&dependency_provider);
+            let all_versions = dependency_provider.list_available_versions(&0).unwrap();
+            for n in &all_versions {
+                if let Ok(s) = resolve(&dependency_provider.clone(), 0, n.clone()) {
+                    assert!(sat.sat_is_valid_solution(&s));
+                } else {
+                    assert!(!sat.sat_resolve(&0, n));
+                }
+            }
+        } else if name.ends_with("str_SemanticVersion.ron") {
+            let dependency_provider: OfflineDependencyProvider<
+                &str,
+                pubgrub::version::SemanticVersion,
+            > = ron::de::from_str(&data).unwrap();
+            let mut sat = SatResolve::new(&dependency_provider);
+            let all_versions = dependency_provider
+                .list_available_versions(&"root")
+                .unwrap();
+            assert!(!all_versions.is_empty());
+            for n in &all_versions {
+                if let Ok(s) = resolve(&dependency_provider.clone(), "root", n.clone()) {
+                    assert!(sat.sat_is_valid_solution(&s));
+                } else {
+                    assert!(!sat.sat_resolve(&"root", n));
+                }
+            }
+        }
+    }
+}

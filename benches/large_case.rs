@@ -39,7 +39,7 @@ fn bench_nested(c: &mut Criterion) {
             });
         } else if name.ends_with("str_SemanticVersion.ron") {
             group.bench_function(name, |b| {
-                bench::<&str, SemanticVersion>(b, &data, "serde");
+                bench::<&str, SemanticVersion>(b, &data, "root");
             });
         }
     }
