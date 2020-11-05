@@ -72,7 +72,39 @@ to generate random but valid registries of packages and dependencies.
 This is the work that has been done in `tests/proptest.rs`
 for the `registry_strategy()` function.
 
-TODO: brief explanation of how that is done.
+The simplest implementation of `registry_strategy()` would be 
+`any::<Map<P, Map<V, Map<P, Range<V>>>>()`, with some machinery to convert to a `OfflineDependencyProvider`.
+While this works, almost all the cases will not be solvable, as with a high probability the 
+depended on package will not exist. 
+
+Let's defer picking the dependency's until we have a list of available names.
+Luckily proptest has a [Index]
+type for this use case of picking something out of a list that has not yet bean generated. This 
+leaves us with `any::Map<P, Map<V, Map<Index, Range<V>>>()`, with more machinery to get the `P` for each index.
+While this works, almost all the cases will not be solvable, as with a high probability the 
+`Range<V>` will not match any synthesized versions.
+
+[Index]: (https://docs.rs/proptest/0.10/proptest/sample/struct.Index.html) 
+
+Let's use [Index] to ensure our `Range`s are relevant. But we have two many [Index]s to talk about,
+so lets give them some names. Lets say `Ip` for the one to pick the package, `Ia` and `Ib` for
+the ones that define the range. This leaves us with `any::Map<P, Map<V, Map<Ip, (Ia, Ib)>>()`.
+We convert by picking a dependency `P` using `Ip` then look up all the versions synthesized for that
+package. Then we can call `Range::between(versions[Ia], versions[Ib].bump())` to make a range. 
+Ok, half the time this will not be a valid range but we can fix it. If `versions[Ib] < versions[Ia]`
+ then we use `Range::between(versions[Ib], versions[Ia].bump())`.
+
+Now we finally have something that makes interesting registries! But not particularly realistic ones,
+almost all of them end up with packages that indirectly depend on themselves. That kind of circular 
+dependency is not allowed by most uses of PubGrub. To fix this lets make sure that we have a DAG,
+by having each package only depend on packages of a lower index. One problem solved only to make a
+new one. The [pigeonhole principle](https://en.wikipedia.org/wiki/Pigeonhole_principle) strikes again. 
+Low index packages depend on all previous packages, and high index packages depend on two few.
+The solution is to represent dependencies in a side list `Vec<(Ip, Id, (Ia, Ib))>`. If `Ip < Id` then
+we switch them to maintain the DAG. In each record we add a dependency to `packages[Ip]` on 
+`packages[Id]` in the range `versions[Ia], versions[Ib].bump()` as described above. And this is the 
+best we currently know how to do, suggestions are welcome.
+
 
 Generating random indexes of packages may produce cases
 where dependency resolution would take too long.
