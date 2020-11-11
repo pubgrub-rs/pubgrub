@@ -111,12 +111,12 @@ If `Ip < Id` then we switch them to maintain the acyclic nature of the graph.
 This is currently how we generate registries of dependencies,
 suggestions to improve are welcome!
 
-Generating random indexes of packages may produce cases
+Generating random registries of packages may produce cases
 where dependency resolution would take too long.
 For this reason, we introduced in the `DependencyProvider` trait definition
 a function called `should_cancel` which is called in the solver loop.
 By default it does nothing but can be overwritten such as
-in `TimeoutDependencyProvider` defined there,
+in `TimeoutDependencyProvider` (defined in `tests/proptest.rs`),
 where the solver is stopped after a certain amount of time.
 
 Once all this is setup, we have to come up with good properties.
@@ -137,8 +137,7 @@ Here are some of these:
   removing a dependency cannot get us in a situation where
   the solver does not find a solution anymore.
   Only adding dependencies should impact that.
-- **Removing a package that does not appear in the dependency tree
-  of a solution cannot break a solution**.
+- **Removing a package that does not appear in a solution cannot break that solution**.
   Just as before, it should not impact the existence of a solution.
 
 
