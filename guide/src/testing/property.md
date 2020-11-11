@@ -12,7 +12,7 @@ depending on required access to some private implementation details.
 
 We have multiple example cases inside `tests/examples.rs`.
 Those mainly come from [dart documentation of the solver][dart-solver]
-and are simple end-to-end example for which we know the results.
+and are simple end-to-end examples for which we know the expected results.
 The first example called `no_conflict` is a simple case where
 the root package depends on one package which itself has a dependency
 to another package.
@@ -72,39 +72,44 @@ to generate random but valid registries of packages and dependencies.
 This is the work that has been done in `tests/proptest.rs`
 for the `registry_strategy()` function.
 
-The simplest implementation of `registry_strategy()` would be 
-`any::<Map<P, Map<V, Map<P, Range<V>>>>()`, with some machinery to convert to a `OfflineDependencyProvider`.
-While this works, almost all the cases will not be solvable, as with a high probability the 
-depended on package will not exist. 
+The simplest implementation of `registry_strategy()` would be
+`any::<Map<P, Map<V, Map<P, Range<V>>>>()`, with some machinery to convert to an `OfflineDependencyProvider`.
+While this works, it would almost certainly generate unsolvable dependencies.
+Indeed random package names in dependencies have an almost null probability
+of being the same than existing package names.
 
-Let's defer picking the dependency's until we have a list of available names.
-Luckily proptest has a [Index]
-type for this use case of picking something out of a list that has not yet bean generated. This 
-leaves us with `any::Map<P, Map<V, Map<Index, Range<V>>>()`, with more machinery to get the `P` for each index.
-While this works, almost all the cases will not be solvable, as with a high probability the 
-`Range<V>` will not match any synthesized versions.
+Let's defer picking the dependencies until we have a list of available names.
+Luckily proptest has an [Index]
+type for this use case of picking something out of a list that has not yet been generated.
+This leaves us with `any::Map<P, Map<V, Map<Index, Range<V>>>()`,
+with more machinery to get the `P` for each index.
+While this works, the generated versions have very low probability
+of being the same than existing versions for a given package.
 
-[Index]: (https://docs.rs/proptest/0.10/proptest/sample/struct.Index.html) 
+[Index]: https://docs.rs/proptest/0.10/proptest/sample/struct.Index.html
 
-Let's use [Index] to ensure our `Range`s are relevant. But we have two many [Index]s to talk about,
-so lets give them some names. Lets say `Ip` for the one to pick the package, `Ia` and `Ib` for
-the ones that define the range. This leaves us with `any::Map<P, Map<V, Map<Ip, (Ia, Ib)>>()`.
-We convert by picking a dependency `P` using `Ip` then look up all the versions synthesized for that
-package. Then we can call `Range::between(versions[Ia], versions[Ib].bump())` to make a range. 
-Ok, half the time this will not be a valid range but we can fix it. If `versions[Ib] < versions[Ia]`
- then we use `Range::between(versions[Ib], versions[Ia].bump())`.
+Let's also use [Index] to ensure our `Range`s are relevant.
+To identify each [Index] we will name `Ip` the one for package names,
+and `Ia` and `Ib` the ones to define version ranges.
+This leaves us with `any::Map<P, Map<V, Map<Ip, (Ia, Ib)>>()`.
+The conversion from `Map<Ip, (Ia, Ib)>` to `Map<P, Range<V>>` is done by first picking
+a dependency `P` using `Ip` and then picking up two versions for that package
+with the `Ia` and `Ib` indices.
+We can then call `Range::between(versions[Ia], versions[Ib].bump())` to build a range.
+If `versions[Ib] < versions[Ia]`, we use `Range::between(versions[Ib], versions[Ia].bump())` instead.
 
-Now we finally have something that makes interesting registries! But not particularly realistic ones,
-almost all of them end up with packages that indirectly depend on themselves. That kind of circular 
-dependency is not allowed by most uses of PubGrub. To fix this lets make sure that we have a DAG,
-by having each package only depend on packages of a lower index. One problem solved only to make a
-new one. The [pigeonhole principle](https://en.wikipedia.org/wiki/Pigeonhole_principle) strikes again. 
-Low index packages depend on all previous packages, and high index packages depend on two few.
-The solution is to represent dependencies in a side list `Vec<(Ip, Id, (Ia, Ib))>`. If `Ip < Id` then
-we switch them to maintain the DAG. In each record we add a dependency to `packages[Ip]` on 
-`packages[Id]` in the range `versions[Ia], versions[Ib].bump()` as described above. And this is the 
-best we currently know how to do, suggestions are welcome.
-
+Now we finally have something that makes interesting registries! But not particularly realistic ones
+since almost all of them end up with packages that indirectly depend on themselves.
+PubGrub is designed to solve dependencies with at most one version per package,
+so that kind of circular dependencies will very often end up unsolvable.
+<!-- One problem solved only to make a new one, -->
+<!-- the [pigeonhole principle](https://en.wikipedia.org/wiki/Pigeonhole_principle) strikes again! -->
+To fix this lets make sure that we have a DAG,
+by having each package only depend on packages with a lower index.
+One solution is to represent dependencies in a side list `Vec<(Ip, Id, (Ia, Ib))>`.
+If `Ip < Id` then we switch them to maintain the acyclic nature of the graph.
+This is currently how we generate registries of dependencies,
+suggestions to improve are welcome!
 
 Generating random indexes of packages may produce cases
 where dependency resolution would take too long.
