@@ -180,12 +180,12 @@ or at least one of versions \\((v_1, v_2, \cdots, v_k)\\) of package \\(d\\)
 is present in the solution.
 Finally, the last constraint of version solving (3) is encoded with the following unit clause,
 
-\\[ \neg b_{r,v_r} \\]
+\\[ b_{r,v_r} \\]
 
 where \\((r, v_r)\\) is the root package version for which we are solving dependencies.
 
 Once the conversion to the SAT formulation is done,
 we can verify the following property:
 
-- **Pubgrub can find a solution if and only if the SAT solver also does.**
-<!-- - **If pubgrub finds a solution then adding statements that match it does not lead to a contradiction.** -->
+- **If pubgrub finds a solution, the SAT solver is also satisfied by that solution.**
+- **If pubgrub does not find a solution, neither does the SAT solver.**
