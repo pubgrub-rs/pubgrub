@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::package::Package;
-use pubgrub::solver::{DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::Map;
+use pubgrub::solver::{Dependencies, DependencyProvider, OfflineDependencyProvider};
+use pubgrub::type_aliases::{Map, SelectedDependencies};
 use pubgrub::version::Version;
 use std::hash::Hash;
 use varisat::ExtendFormula;
@@ -76,7 +76,11 @@ impl<P: Package, V: Version + Hash> SatResolve<P, V> {
 
         // active packages need each of there `deps` to be satisfied
         for (p, v, var) in &all_versions {
-            for (p1, range) in dp.get_dependencies(p, v).unwrap().unwrap() {
+            let deps = match dp.get_dependencies(p, v).unwrap() {
+                Dependencies::Unknown => panic!(),
+                Dependencies::Known(d) => d,
+            };
+            for (p1, range) in deps.iter() {
                 let empty_vec = vec![];
                 let mut matches: Vec<varisat::Lit> = all_versions_by_p
                     .get(&p1)
@@ -123,7 +127,7 @@ impl<P: Package, V: Version + Hash> SatResolve<P, V> {
         }
     }
 
-    pub fn sat_is_valid_solution(&mut self, pids: &Map<P, V>) -> bool {
+    pub fn sat_is_valid_solution(&mut self, pids: &SelectedDependencies<P, V>) -> bool {
         let mut assumption = vec![];
 
         for (p, vs) in &self.all_versions_by_p {

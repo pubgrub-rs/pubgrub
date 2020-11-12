@@ -75,7 +75,7 @@ use crate::internal::incompatibility::Incompatibility;
 use crate::internal::partial_solution::PartialSolution;
 use crate::package::Package;
 use crate::range::Range;
-use crate::type_aliases::Map;
+use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
 
 /// Main function of the library.
@@ -84,7 +84,7 @@ pub fn resolve<P: Package, V: Version>(
     dependency_provider: &impl DependencyProvider<P, V>,
     package: P,
     version: impl Into<V>,
-) -> Result<Map<P, V>, PubGrubError<P, V>> {
+) -> Result<SelectedDependencies<P, V>, PubGrubError<P, V>> {
     let mut state = State::init(package.clone(), version.into());
     let mut added_dependencies: Map<P, Set<V>> = Map::default();
     let mut next = package;
@@ -134,13 +134,13 @@ pub fn resolve<P: Package, V: Version>(
                 version: v.clone(),
                 source: err,
             })? {
-            None => {
+            Dependencies::Unknown => {
                 state.add_incompatibility(|id| {
                     Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
                 });
                 continue;
             }
-            Some(x) => x,
+            Dependencies::Known(x) => x,
         };
 
         // Add that package and version if the dependencies are not problematic.
@@ -170,6 +170,24 @@ pub fn resolve<P: Package, V: Version>(
     }
 }
 
+/// An enum used by [DependencyProvider] that holds information about package dependencies.
+/// For each [Package] there is a [Range] of concrete versions it allows as a dependency.
+#[derive(Clone)]
+pub enum Dependencies<P: Package, V: Version> {
+    /// Package dependencies are unavailable.
+    Unknown,
+    /// Container for all available package versions.
+    Known(DependencyConstraints<P, V>),
+}
+
+/// Subtype of [Dependencies] which holds information about
+/// all possible versions a given package can accept.
+/// There is a difference in semantics between an empty [Map<P, Range<V>>](crate::type_aliases::Map)
+/// inside [DependencyConstraints] and [Dependencies::Unknown]:
+/// the former means the package has no dependencies and it is a known fact,
+/// while the latter means they could not be fetched by [DependencyProvider].
+pub type DependencyConstraints<P, V> = Map<P, Range<V>>;
+
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
 /// An implementor needs to be supplied to the [resolve] function.
 pub trait DependencyProvider<P: Package, V: Version> {
@@ -179,12 +197,12 @@ pub trait DependencyProvider<P: Package, V: Version> {
     fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>>;
 
     /// Retrieves the package dependencies.
-    /// Return None if its dependencies are unknown.
+    /// Return [Dependencies::Unknown] if its dependencies are unknown.
     fn get_dependencies(
         &self,
         package: &P,
         version: &V,
-    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>>;
+    ) -> Result<Dependencies<P, V>, Box<dyn Error>>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
@@ -201,7 +219,7 @@ pub trait DependencyProvider<P: Package, V: Version> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct OfflineDependencyProvider<P: Package, V: Version + Hash> {
-    dependencies: Map<P, Map<V, Map<P, Range<V>>>>,
+    dependencies: Map<P, Map<V, DependencyConstraints<P, V>>>,
 }
 
 impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
@@ -253,11 +271,8 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
 
     /// Lists dependencies of a given package and version.
     /// Returns [None] if no information is available regarding that package and version pair.
-    fn dependencies(&self, package: &P, version: &V) -> Option<Map<P, Range<V>>> {
-        self.dependencies
-            .get(package)?
-            .get(version)
-            .map(|m| m.iter().map(|x| (x.0.clone(), x.1.clone())).collect())
+    fn dependencies(&self, package: &P, version: &V) -> Option<DependencyConstraints<P, V>> {
+        self.dependencies.get(package)?.get(version).cloned()
     }
 }
 
@@ -276,7 +291,10 @@ impl<P: Package, V: Version + Hash> DependencyProvider<P, V> for OfflineDependen
         &self,
         package: &P,
         version: &V,
-    ) -> Result<Option<Map<P, Range<V>>>, Box<dyn Error>> {
-        Ok(self.dependencies(package, version))
+    ) -> Result<Dependencies<P, V>, Box<dyn Error>> {
+        Ok(match self.dependencies(package, version) {
+            None => Dependencies::Unknown,
+            Some(dependencies) => Dependencies::Known(dependencies),
+        })
     }
 }

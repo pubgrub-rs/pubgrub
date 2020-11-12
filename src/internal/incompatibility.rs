@@ -9,6 +9,7 @@ use std::fmt;
 use crate::package::Package;
 use crate::range::Range;
 use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
+use crate::solver::DependencyConstraints;
 use crate::term::{self, Term};
 use crate::type_aliases::Map;
 use crate::version::Version;
@@ -112,7 +113,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         start_id: usize,
         package: P,
         version: V,
-        deps: &Map<P, Range<V>>,
+        deps: &DependencyConstraints<P, V>,
     ) -> Vec<Self> {
         deps.iter()
             .enumerate()

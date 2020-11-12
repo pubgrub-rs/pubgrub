@@ -75,11 +75,9 @@
 //! and [SemanticVersion](version::SemanticVersion) for versions.
 //! This may be done quite easily by implementing the two following functions.
 //! ```
-//! # use pubgrub::solver::DependencyProvider;
+//! # use pubgrub::solver::{DependencyProvider, Dependencies};
 //! # use pubgrub::version::SemanticVersion;
 //! # use std::error::Error;
-//! # use pubgrub::range::Range;
-//! # use pubgrub::type_aliases::Map;
 //! #
 //! # struct MyDependencyProvider;
 //! #
@@ -95,7 +93,7 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Option<Map<String, Range<SemanticVersion>>>, Box<dyn Error>> {
+//!     ) -> Result<Dependencies<String, SemanticVersion>, Box<dyn Error>> {
 //!         unimplemented!()
 //!     }
 //! }
@@ -121,7 +119,8 @@
 //!
 //! When everything goes well, the algorithm finds and returns the complete
 //! set of direct and indirect dependencies satisfying all the constraints.
-//! The packages and versions selected are returned in a [Map<P, V>](type_aliases::Map).
+//! The packages and versions selected are returned as
+//! [SelectedDepedencies<P, V>](type_aliases::SelectedDependencies).
 //! But sometimes there is no solution because dependencies are incompatible.
 //! In such cases, [resolve(...)](solver::resolve) returns a
 //! [PubGrubError::NoSolution(derivation_tree)](error::PubGrubError::NoSolution),

@@ -61,7 +61,7 @@ impl<P: Package, V: Version> State<P, V> {
     }
 
     /// Unit propagation is the core mechanism of the solving algorithm.
-    /// CF https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation
+    /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     pub fn unit_propagation(&mut self, package: P) -> Result<(), PubGrubError<P, V>> {
         let mut current_package = package.clone();
         let mut changed = vec![package];
@@ -111,7 +111,7 @@ impl<P: Package, V: Version> State<P, V> {
     }
 
     /// Return the root cause and the backtracked model.
-    /// CF https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation
+    /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     fn conflict_resolution(
         &mut self,
         incompatibility: &Incompatibility<P, V>,
