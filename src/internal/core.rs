@@ -8,7 +8,7 @@ use std::{collections::HashSet as Set, rc::Rc};
 use crate::error::PubGrubError;
 use crate::internal::assignment::Assignment::{Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
-use crate::internal::partial_solution::PartialSolution;
+use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::package::Package;
 use crate::report::DerivationTree;
 use crate::version::Version;
@@ -81,7 +81,7 @@ impl<P: Package, V: Version> State<P, V> {
                         // root_cause is guaranteed to be almost satisfied by the partial solution
                         // according to PubGrub documentation.
                         match self.partial_solution.relation(&root_cause) {
-                            Relation::AlmostSatisfied(package_almost, term) => {
+                            Relation::AlmostSatisfied((package_almost, term)) => {
                                 changed = vec![package_almost.clone()];
                                 // Add (not term) to the partial solution with incompat as cause.
                                 self.partial_solution.add_derivation(package_almost, term.negate(), root_cause);
@@ -89,7 +89,7 @@ impl<P: Package, V: Version> State<P, V> {
                             _ => return Err(PubGrubError::Failure("This should never happen, root_cause is guaranteed to be almost satisfied by the partial solution".into())),
                         }
                     }
-                    Relation::AlmostSatisfied(package_almost, term) => {
+                    Relation::AlmostSatisfied((package_almost, term)) => {
                         changed.push(package_almost.clone());
                         // Add (not term) to the partial solution with incompat as cause.
                         self.partial_solution.add_derivation(
@@ -154,8 +154,8 @@ impl<P: Package, V: Version> State<P, V> {
                                 id,
                                 &current_incompat,
                                 &cause,
-                                package,
-                                term,
+                                &package,
+                                &term,
                             );
                             // eprintln!("\ncause 1: {}", &current_incompat);
                             // eprintln!("cause 2: {}", &cause);
@@ -175,7 +175,7 @@ impl<P: Package, V: Version> State<P, V> {
         &mut self,
         incompat: Incompatibility<P, V>,
         incompat_changed: bool,
-        decision_level: usize,
+        decision_level: DecisionLevel,
     ) {
         self.partial_solution.backtrack(decision_level);
         if incompat_changed {
