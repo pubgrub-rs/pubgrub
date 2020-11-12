@@ -42,6 +42,23 @@ jobs:
       - name: Run tests
         run: cargo test --features=serde --verbose
 
+  clippy:
+    name: No warnings from Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install stable Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: clippy
+
+      - name: Check Clippy lints
+        env:
+          RUSTFLAGS: -D warnings
+        run: cargo clippy
+
   check_formatting:
     name: Source code is formatted
     runs-on: ubuntu-latest
