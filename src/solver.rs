@@ -68,7 +68,6 @@
 use std::collections::BTreeSet as Set;
 use std::error::Error;
 use std::hash::Hash;
-use std::iter::FromIterator;
 
 use crate::error::PubGrubError;
 use crate::internal::core::State;
@@ -187,41 +186,7 @@ pub enum Dependencies<P: Package, V: Version> {
 /// inside [DependencyConstraints] and [Dependencies::Unknown]:
 /// the former means the package has no dependencies and it is a known fact,
 /// while the latter means they could not be fetched by [DependencyProvider].
-#[derive(Debug, Clone)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(transparent)
-)]
-pub struct DependencyConstraints<P: Package, V: Version>(Map<P, Range<V>>);
-
-impl<P: Package, V: Version> Default for DependencyConstraints<P, V> {
-    fn default() -> Self {
-        DependencyConstraints(Map::default())
-    }
-}
-
-impl<P: Package, V: Version> DependencyConstraints<P, V> {
-    /// An iterator over inner values of [Map<P, Range<V>>](crate::type_aliases::Map)
-    pub fn iter(&self) -> impl Iterator<Item = (&P, &Range<V>)> {
-        self.0.iter()
-    }
-}
-
-impl<P: Package, V: Version> IntoIterator for DependencyConstraints<P, V> {
-    type Item = (P, Range<V>);
-    type IntoIter = std::collections::hash_map::IntoIter<P, Range<V>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl<P: Package, V: Version> FromIterator<(P, Range<V>)> for DependencyConstraints<P, V> {
-    fn from_iter<T: IntoIterator<Item = (P, Range<V>)>>(iter: T) -> Self {
-        DependencyConstraints(iter.into_iter().collect())
-    }
-}
+pub type DependencyConstraints<P, V> = Map<P, Range<V>>;
 
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
 /// An implementor needs to be supplied to the [resolve] function.
@@ -307,10 +272,7 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
     /// Lists dependencies of a given package and version.
     /// Returns [None] if no information is available regarding that package and version pair.
     fn dependencies(&self, package: &P, version: &V) -> Option<DependencyConstraints<P, V>> {
-        self.dependencies
-            .get(package)?
-            .get(version)
-            .map(|m| m.iter().map(|x| (x.0.clone(), x.1.clone())).collect())
+        self.dependencies.get(package)?.get(version).cloned()
     }
 }
 
