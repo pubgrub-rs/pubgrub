@@ -34,7 +34,7 @@ the `make_decision` method.
 ```rust
 fn make_decision<T: Borrow<P>, U: Borrow<Range<V>>>(
     &self,
-    packages: impl Iterator<Item = (T, U)>,
+    potential_packages: impl Iterator<Item = (T, U)>,
 ) -> Result<(T, Option<V>), Box<dyn Error>>;
 ```
 
