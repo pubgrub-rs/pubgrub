@@ -1,7 +1,6 @@
 # Caching dependencies in a DependencyProvider
 
-Due to potential backtracking, the resolver may ask dependencies of a package multiple times.
-A dependency provider can also survive one resolution and be reused for another one,
+A dependency provider can be reused for multiple resolutions,
 usually of the same package and thus asking for the same dependencies.
 Since dependencies are generally immutable, caching them is a valid strategy
 to avoid slow operations that may be needed such as fetching remote data.
@@ -28,7 +27,7 @@ impl<P: Package, V: Version> DependencyCache<P, V> {
     /// Initialize cached dependencies.
     pub fn new() -> Self { ... }
     /// Fetch dependencies of a given package on the network and store them in the cache.
-    pub fn fetch_dependencies(&mut self, package: &P, version: &V) -> Result<(), Box<dyn Error>> { ... }
+    pub fn fetch(&mut self, package: &P, version: &V) -> Result<(), Box<dyn Error>> { ... }
     /// Extract dependencies of a given package from the cache.
     pub fn get(&self, package: &P, version: &V) -> Dependencies { ... }
 }
@@ -52,8 +51,8 @@ impl<P: Package, V: Version> DependencyProvider<P, V> for CachingDependencyProvi
         match self.cached_dependencies.get(package, version) {
             deps @ Dependencies::Kown(_) => Ok(deps),
             Dependencies::Unknown => {
-                self.cached_dependencies.borrow_mut().fetch_dependencies(package, version)?;
-                self.cached_dependencies.get(package, version)
+                self.cached_dependencies.borrow_mut().fetch(package, version)?;
+                Ok(self.cached_dependencies.get(package, version))
             }
         }
     }
