@@ -15,19 +15,19 @@ jobs:
           mdbook-version: '0.4.3'
           # mdbook-version: 'latest'
 
+      # Build to ./guide/book
       - run: cd guide && mdbook build
-
-      # ( Build to ./dist or other directory... )
 
       - name: Deploy to Netlify
         uses: nwtgck/actions-netlify@v1.1
         with:
           publish-dir: './guide/book'
+          production-deploy: true
           # production-branch: dev
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          deploy-message: "Deploy from GitHub Actions"
+          # deploy-message: "Deploy from GitHub Actions"
           enable-pull-request-comment: false
-          enable-commit-comment: true
+          enable-commit-comment: false
           overwrites-pull-request-comment: true
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
