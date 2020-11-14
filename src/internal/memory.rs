@@ -54,19 +54,14 @@ impl<P: Package, V: Version> Memory<P, V> {
 
     /// Add a decision to a Memory.
     fn add_decision(&mut self, package: P, version: V) {
+        // Check that add_decision is never used in the wrong context.
         if cfg!(debug_assertions) {
-            match self.assignments.get(&package) {
-                Some(PackageAssignments::Decision(v)) => assert_eq!(v.0, version),
-                Some(PackageAssignments::Derivations {
-                    intersected,
-                    not_intersected_yet,
-                }) => {
-                    debug_assert!(intersected.contains(&version));
-                    for term in not_intersected_yet {
-                        debug_assert!(term.contains(&version));
-                    }
-                }
-                _ => {}
+            match self.assignments.get_mut(&package) {
+                None => panic!("Assignments must already exist"),
+                // Cannot be called when a decision has already been taken.
+                Some(PackageAssignments::Decision(_)) => panic!("Already existing decision"),
+                // Cannot be called if the versions is not contained in the terms intersection.
+                Some(pa) => debug_assert!(pa.assignment_intersection().contains(&version)),
             }
         }
 
