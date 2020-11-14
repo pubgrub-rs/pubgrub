@@ -33,13 +33,13 @@ fn should_always_find_a_satisfier() {
     dependency_provider.add_dependencies("a", 0, vec![("b", Range::none())]);
     assert!(matches!(
         resolve(&dependency_provider, "a", 0),
-        Err(PubGrubError::ForbiddenEmptyDependency { .. })
+        Err(PubGrubError::DependencyOnTheEmptySet { .. })
     ));
 
     dependency_provider.add_dependencies("c", 0, vec![("a", Range::any())]);
     assert!(matches!(
         resolve(&dependency_provider, "c", 0),
-        Err(PubGrubError::ForbiddenEmptyDependency { .. })
+        Err(PubGrubError::DependencyOnTheEmptySet { .. })
     ));
 }
 
@@ -49,6 +49,6 @@ fn cannot_depend_on_self() {
     dependency_provider.add_dependencies("a", 0, vec![("a", Range::any())]);
     assert!(matches!(
         resolve(&dependency_provider, "a", 0),
-        Err(PubGrubError::ForbiddenSelfDependency { .. })
+        Err(PubGrubError::SelfDependency { .. })
     ));
 }

@@ -49,7 +49,7 @@ pub enum PubGrubError<P: Package, V: Version> {
     /// This technically means that the package can not be selected,
     /// but is clearly some kind of mistake.
     #[error("Package {dependent} required by {package} {version} depends on the empty set")]
-    ForbiddenEmptyDependency {
+    DependencyOnTheEmptySet {
         /// Package whose dependencies we want.
         package: P,
         /// Version of the package for which we want the dependencies.
@@ -64,7 +64,7 @@ pub enum PubGrubError<P: Package, V: Version> {
     /// This technically means that the package directly depends on itself,
     /// and is clearly some kind of mistake.
     #[error("{package} {version} depends on itself")]
-    ForbiddenSelfDependency {
+    SelfDependency {
         /// Package whose dependencies we want.
         package: P,
         /// Version of the package for which we want the dependencies.

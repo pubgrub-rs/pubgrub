@@ -142,13 +142,13 @@ pub fn resolve<P: Package, V: Version>(
             }
             Dependencies::Known(x) => {
                 if x.contains_key(&p) {
-                    return Err(PubGrubError::ForbiddenSelfDependency {
+                    return Err(PubGrubError::SelfDependency {
                         package: p.clone(),
                         version: v.clone(),
                     });
                 }
                 if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
-                    return Err(PubGrubError::ForbiddenEmptyDependency {
+                    return Err(PubGrubError::DependencyOnTheEmptySet {
                         package: p.clone(),
                         version: v.clone(),
                         dependent: dependent.clone(),
