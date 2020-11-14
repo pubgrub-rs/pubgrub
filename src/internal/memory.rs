@@ -137,7 +137,7 @@ impl<V: Version> PackageAssignments<V> {
     /// Mutates itself to store the intersection result.
     fn assignment_intersection(&mut self) -> &Term<V> {
         match self {
-            PackageAssignments::Decision((_, term)) => &*term,
+            PackageAssignments::Decision((_, term)) => term,
             PackageAssignments::Derivations {
                 intersected,
                 not_intersected_yet,
@@ -146,7 +146,7 @@ impl<V: Version> PackageAssignments<V> {
                     *intersected = intersected.intersection(&derivation);
                 }
                 not_intersected_yet.clear();
-                &*intersected
+                intersected
             }
         }
     }
