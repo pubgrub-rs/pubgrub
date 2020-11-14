@@ -48,7 +48,7 @@ pub enum PubGrubError<P: Package, V: Version> {
     /// returned a dependency on an empty range.
     /// This technically means that the package can not be selected,
     /// but is clearly some kind of mistake.
-    #[error("Retrieving dependency {dependent} of {package} {version} is the empty set")]
+    #[error("Package {dependent} required by {package} {version} depends on the empty set")]
     ForbiddenEmptyDependency {
         /// Package whose dependencies we want.
         package: P,
