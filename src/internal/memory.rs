@@ -76,6 +76,7 @@ impl<P: Package, V: Version> Memory<P, V> {
         use std::collections::hash_map::Entry;
         match self.assignments.entry(package) {
             Entry::Occupied(mut o) => match o.get_mut() {
+                // Check that add_derivation is never called in the wrong context.
                 PackageAssignments::Decision(_) => debug_assert!(false),
                 PackageAssignments::Derivations {
                     intersected: _,
