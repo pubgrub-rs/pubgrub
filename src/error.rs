@@ -43,6 +43,34 @@ pub enum PubGrubError<P: Package, V: Version> {
         source: Box<dyn std::error::Error>,
     },
 
+    /// Error arising when the implementer of
+    /// [DependencyProvider](crate::solver::DependencyProvider)
+    /// returned a dependency on an empty range.
+    /// This technically means that the package can not be selected,
+    /// but is clearly some kind of mistake.
+    #[error("Package {dependent} required by {package} {version} depends on the empty set")]
+    DependencyOnTheEmptySet {
+        /// Package whose dependencies we want.
+        package: P,
+        /// Version of the package for which we want the dependencies.
+        version: V,
+        /// The dependent package that requires us to pick from the empty set.
+        dependent: P,
+    },
+
+    /// Error arising when the implementer of
+    /// [DependencyProvider](crate::solver::DependencyProvider)
+    /// returned a dependency on the requested package.
+    /// This technically means that the package directly depends on itself,
+    /// and is clearly some kind of mistake.
+    #[error("{package} {version} depends on itself")]
+    SelfDependency {
+        /// Package whose dependencies we want.
+        package: P,
+        /// Version of the package for which we want the dependencies.
+        version: V,
+    },
+
     /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
     #[error("We should cancel")]

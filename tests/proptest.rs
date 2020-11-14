@@ -326,8 +326,8 @@ proptest! {
                     (Ok(l), Ok(r)) => assert_eq!(l, r),
                     (Err(PubGrubError::NoSolution(derivation_l)), Err(PubGrubError::NoSolution(derivation_r))) => {
                         prop_assert_eq!(
-                            DefaultStringReporter::report(&derivation_l).to_string(),
-                            DefaultStringReporter::report(&derivation_r).to_string()
+                            DefaultStringReporter::report(&derivation_l),
+                            DefaultStringReporter::report(&derivation_r)
                         )},
                     _ => panic!("not the same result")
                 }
