@@ -12,10 +12,11 @@ The `DependencyProvider` trait is defined as follows.
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
 /// An implementor needs to be supplied to the [resolve] function.
 pub trait DependencyProvider<P: Package, V: Version> {
-    /// Chooses which package the [resolve] should decide on next.
-    /// If there are available versions for that package,
-    /// return `Some(v)` where `v` is one such version,
-    /// otherwise return `None`.
+    /// Decision making is the process of choosing the next package
+    /// and version that will be appended to the partial solution.
+    /// Every time such a decision must be made,
+    /// potential valid packages and version ranges are preselected by the resolver,
+    /// and the dependency provider must choose.
     ///
     /// Note: the type `T`, used both in the method arguments and the return type,
     /// ensures that this method returns an item from the `packages` argument.
