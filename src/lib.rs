@@ -181,7 +181,7 @@
 //! Notice that we also used
 //! [collapse_noversion()](crate::report::DerivationTree::collapse_noversion) above.
 //! This method simplifies the derivation tree to get rid of the
-//! [NoVersion](crate::report::External::NoVersion)
+//! [NoVersions](crate::report::External::NoVersions)
 //! external incompatibilities in the derivation tree.
 //! So instead of seeing things like this in the report:
 //! ```txt

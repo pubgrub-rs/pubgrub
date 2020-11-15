@@ -40,7 +40,7 @@ pub struct Incompatibility<P: Package, V: Version> {
 #[derive(Debug, Clone)]
 enum Kind<P: Package, V: Version> {
     NotRoot(P, V),
-    NoVersion(P, Range<V>),
+    NoVersions(P, Range<V>),
     UnavailableDependencies(P, Range<V>),
     FromDependencyOf(P, Range<V>, P, Range<V>),
     DerivedFrom(usize, usize),
@@ -83,7 +83,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Create an incompatibility to remember
     /// that a given range does not contain any version.
-    pub fn no_version(id: usize, package: P, term: Term<V>) -> Self {
+    pub fn no_versions(id: usize, package: P, term: Term<V>) -> Self {
         let range = match &term {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
@@ -93,7 +93,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         Self {
             id,
             package_terms,
-            kind: Kind::NoVersion(package, range),
+            kind: Kind::NoVersions(package, range),
         }
     }
 
@@ -301,8 +301,8 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             Kind::NotRoot(package, version) => {
                 DerivationTree::External(External::NotRoot(package.clone(), version.clone()))
             }
-            Kind::NoVersion(package, range) => {
-                DerivationTree::External(External::NoVersion(package.clone(), range.clone()))
+            Kind::NoVersions(package, range) => {
+                DerivationTree::External(External::NoVersions(package.clone(), range.clone()))
             }
             Kind::UnavailableDependencies(package, range) => DerivationTree::External(
                 External::UnavailableDependencies(package.clone(), range.clone()),
