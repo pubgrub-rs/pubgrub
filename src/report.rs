@@ -72,35 +72,35 @@ impl<P: Package, V: Version> DerivationTree<P, V> {
     /// [DependencyProvider](crate::solver::DependencyProvider)
     /// was not run in some kind of offline mode that may not
     /// have access to all versions existing.
-    pub fn collapse_noversion(&mut self) {
+    pub fn collapse_no_versions(&mut self) {
         match self {
             DerivationTree::External(_) => {}
             DerivationTree::Derived(derived) => {
                 match (&mut *derived.cause1, &mut *derived.cause2) {
                     (DerivationTree::External(External::NoVersions(p, r)), ref mut cause2) => {
-                        cause2.collapse_noversion();
+                        cause2.collapse_no_versions();
                         *self = cause2
                             .clone()
-                            .merge_noversion(p.to_owned(), r.to_owned())
+                            .merge_no_versions(p.to_owned(), r.to_owned())
                             .unwrap_or_else(|| self.to_owned());
                     }
                     (ref mut cause1, DerivationTree::External(External::NoVersions(p, r))) => {
-                        cause1.collapse_noversion();
+                        cause1.collapse_no_versions();
                         *self = cause1
                             .clone()
-                            .merge_noversion(p.to_owned(), r.to_owned())
+                            .merge_no_versions(p.to_owned(), r.to_owned())
                             .unwrap_or_else(|| self.to_owned());
                     }
                     _ => {
-                        derived.cause1.collapse_noversion();
-                        derived.cause2.collapse_noversion();
+                        derived.cause1.collapse_no_versions();
+                        derived.cause2.collapse_no_versions();
                     }
                 }
             }
         }
     }
 
-    fn merge_noversion(self, package: P, range: Range<V>) -> Option<Self> {
+    fn merge_no_versions(self, package: P, range: Range<V>) -> Option<Self> {
         match self {
             // TODO: take care of the Derived case.
             // Once done, we can remove the Option.
