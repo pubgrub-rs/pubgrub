@@ -77,26 +77,17 @@ impl<P: Package, V: Version> State<P, V> {
                     // If the partial solution satisfies the incompatibility
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
-                        let root_cause = self.conflict_resolution(&incompat)?;
-                        // root_cause is guaranteed to be almost satisfied by the partial solution
-                        // according to PubGrub documentation.
-                        match self.partial_solution.relation(&root_cause) {
-                            Relation::AlmostSatisfied((package_almost, term)) => {
-                                changed = vec![package_almost.clone()];
-                                // Add (not term) to the partial solution with incompat as cause.
-                                self.partial_solution.add_derivation(package_almost, term.negate(), root_cause);
-                            }
-                            _ => return Err(PubGrubError::Failure("This should never happen, root_cause is guaranteed to be almost satisfied by the partial solution".into())),
-                        }
+                        let (package_almost, root_cause) = self.conflict_resolution(&incompat)?;
+                        changed = vec![package_almost.clone()];
+                        // Add to the partial solution with incompat as cause.
+                        self.partial_solution
+                            .add_derivation(package_almost, root_cause);
                     }
-                    Relation::AlmostSatisfied((package_almost, term)) => {
+                    Relation::AlmostSatisfied(package_almost) => {
                         changed.push(package_almost.clone());
                         // Add (not term) to the partial solution with incompat as cause.
-                        self.partial_solution.add_derivation(
-                            package_almost,
-                            term.negate(),
-                            incompat.clone(),
-                        );
+                        self.partial_solution
+                            .add_derivation(package_almost, incompat.clone());
                     }
                     _ => {}
                 }
@@ -115,7 +106,7 @@ impl<P: Package, V: Version> State<P, V> {
     fn conflict_resolution(
         &mut self,
         incompatibility: &Incompatibility<P, V>,
-    ) -> Result<Incompatibility<P, V>, PubGrubError<P, V>> {
+    ) -> Result<(P, Incompatibility<P, V>), PubGrubError<P, V>> {
         let mut current_incompat = incompatibility.clone();
         let mut current_incompat_changed = false;
         loop {
@@ -128,26 +119,22 @@ impl<P: Package, V: Version> State<P, V> {
                     .partial_solution
                     .find_satisfier_and_previous_satisfier_level(&current_incompat);
                 match satisfier {
-                    Decision { .. } => {
+                    Decision { package, .. } => {
                         self.backtrack(
                             current_incompat.clone(),
                             current_incompat_changed,
                             previous_satisfier_level,
                         );
-                        return Ok(current_incompat);
+                        return Ok((package, current_incompat));
                     }
-                    Derivation {
-                        cause,
-                        term,
-                        package,
-                    } => {
+                    Derivation { cause, package } => {
                         if previous_satisfier_level != satisfier_level {
                             self.backtrack(
                                 current_incompat.clone(),
                                 current_incompat_changed,
                                 previous_satisfier_level,
                             );
-                            return Ok(current_incompat);
+                            return Ok((package, current_incompat));
                         } else {
                             let id = self.incompatibility_store.len();
                             let prior_cause = Incompatibility::prior_cause(
@@ -155,11 +142,7 @@ impl<P: Package, V: Version> State<P, V> {
                                 &current_incompat,
                                 &cause,
                                 &package,
-                                &term,
                             );
-                            // eprintln!("\ncause 1: {}", &current_incompat);
-                            // eprintln!("cause 2: {}", &cause);
-                            // eprintln!("prior cause: {}\n", &prior_cause);
                             self.incompatibility_store.push(prior_cause.clone());
                             current_incompat = prior_cause;
                             current_incompat_changed = true;

@@ -48,7 +48,9 @@ impl<P: Package, V: Version> Memory<P, V> {
     pub fn add_assignment(&mut self, assignment: &Assignment<P, V>) {
         match assignment {
             Decision { package, version } => self.add_decision(package.clone(), version.clone()),
-            Derivation { package, term, .. } => self.add_derivation(package.clone(), term.clone()),
+            Derivation { package, cause } => {
+                self.add_derivation(package.clone(), cause.get(&package).unwrap().negate())
+            }
         }
     }
 

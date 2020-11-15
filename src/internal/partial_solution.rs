@@ -88,12 +88,8 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Add a derivation to the partial solution.
-    pub fn add_derivation(&mut self, package: P, term: Term<V>, cause: Incompatibility<P, V>) {
-        self.add_assignment(Derivation {
-            package,
-            term,
-            cause,
-        });
+    pub fn add_derivation(&mut self, package: P, cause: Incompatibility<P, V>) {
+        self.add_assignment(Derivation { package, cause });
     }
 
     /// If a partial solution has, for every positive derivation,
