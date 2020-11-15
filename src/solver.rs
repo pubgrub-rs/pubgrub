@@ -126,62 +126,68 @@ pub fn resolve<P: Package, V: Version>(
             Some(x) => x,
         };
 
-        // Retrieve that package dependencies.
-        let dependencies = match dependency_provider
-            .get_dependencies(&p, &v)
-            .map_err(|err| PubGrubError::ErrorRetrievingDependencies {
-                package: p.clone(),
-                version: v.clone(),
-                source: err,
-            })? {
-            Dependencies::Unknown => {
-                state.add_incompatibility(|id| {
-                    Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
-                });
-                continue;
-            }
-            Dependencies::Known(x) => {
-                if x.contains_key(&p) {
-                    return Err(PubGrubError::SelfDependency {
-                        package: p.clone(),
-                        version: v.clone(),
-                    });
-                }
-                if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
-                    return Err(PubGrubError::DependencyOnTheEmptySet {
-                        package: p.clone(),
-                        version: v.clone(),
-                        dependent: dependent.clone(),
-                    });
-                }
-                x
-            }
-        };
-
-        // Add that package and version if the dependencies are not problematic.
-        let start_id = state.incompatibility_store.len();
-        let dep_incompats =
-            Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
         if added_dependencies
             .entry(p.clone())
             .or_default()
             .insert(v.clone())
         {
+            // Retrieve that package dependencies.
+            let dependencies =
+                match dependency_provider
+                    .get_dependencies(&p, &v)
+                    .map_err(|err| PubGrubError::ErrorRetrievingDependencies {
+                        package: p.clone(),
+                        version: v.clone(),
+                        source: err,
+                    })? {
+                    Dependencies::Unknown => {
+                        state.add_incompatibility(|id| {
+                            Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
+                        });
+                        continue;
+                    }
+                    Dependencies::Known(x) => {
+                        if x.contains_key(&p) {
+                            return Err(PubGrubError::SelfDependency {
+                                package: p.clone(),
+                                version: v.clone(),
+                            });
+                        }
+                        if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
+                            return Err(PubGrubError::DependencyOnTheEmptySet {
+                                package: p.clone(),
+                                version: v.clone(),
+                                dependent: dependent.clone(),
+                            });
+                        }
+                        x
+                    }
+                };
+
+            // Add that package and version if the dependencies are not problematic.
+            let start_id = state.incompatibility_store.len();
+            let dep_incompats =
+                Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
+
             for incompat in dep_incompats.iter() {
                 state.add_incompatibility(|_| incompat.clone());
             }
+            if dep_incompats
+                .iter()
+                .any(|incompat| state.is_terminal(incompat))
+            {
+                // For a dependency incompatibility to be terminal,
+                // it can only mean that root depend on not root?
+                return Err(PubGrubError::Failure(
+                    "Root package depends on itself at a different version?".into(),
+                ));
+            }
+            state.partial_solution.add_version(p, v, &dep_incompats);
+        } else {
+            // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
+            // terms and can add the decision directly.
+            state.partial_solution.add_decision(p, v);
         }
-        if dep_incompats
-            .iter()
-            .any(|incompat| state.is_terminal(incompat))
-        {
-            // For a dependency incompatibility to be terminal,
-            // it can only mean that root depend on not root?
-            return Err(PubGrubError::Failure(
-                "Root package depends on itself at a different version?".into(),
-            ));
-        }
-        state.partial_solution.add_version(p, v, &dep_incompats);
     }
 }
 

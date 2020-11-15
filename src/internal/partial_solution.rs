@@ -181,28 +181,26 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         version: V,
         new_incompatibilities: &[Incompatibility<P, V>],
     ) {
-        self.add_decision(package, version);
-        if self.satisfies_any_of(new_incompatibilities) {
-            self.remove_last_decision();
+        let not_satisfied = |incompat: &Incompatibility<P, V>| {
+            incompat.relation(|p| {
+                if p == &package {
+                    Some(Term::exact(version.clone()))
+                } else {
+                    self.memory.term_intersection_for_package(p).cloned()
+                }
+            }) != Relation::Satisfied
+        };
+
+        // Check none of the dependencies (new_incompatibilities)
+        // would create a conflict (be satisfied).
+        if new_incompatibilities.iter().all(not_satisfied) {
+            self.add_decision(package, version);
         }
-    }
-
-    /// Can ONLY be called if the last assignment added was a decision.
-    fn remove_last_decision(&mut self) {
-        self.decision_level -= DecisionLevel(1);
-        let last_assignment = self.history.pop().unwrap().assignment;
-        self.memory.remove_decision(last_assignment.package());
-    }
-
-    fn satisfies_any_of(&mut self, incompatibilities: &[Incompatibility<P, V>]) -> bool {
-        incompatibilities
-            .iter()
-            .any(|incompat| self.relation(incompat) == Relation::Satisfied)
     }
 
     /// Check if the terms in the partial solution satisfy the incompatibility.
     pub fn relation(&mut self, incompat: &Incompatibility<P, V>) -> Relation<P, V> {
-        incompat.relation(|package| self.memory.term_intersection_for_package(package))
+        incompat.relation(|package| self.memory.term_intersection_for_package(package).cloned())
     }
 
     /// Find satisfier and previous satisfier decision level.
