@@ -96,12 +96,12 @@ impl SemanticVersion {
 
     /// Bump the minor number of a version.
     pub fn bump_minor(self) -> Self {
-        Self::new(self.major, self.minor + 1, self.patch)
+        Self::new(self.major, self.minor + 1, 0)
     }
 
     /// Bump the major number of a version.
     pub fn bump_major(self) -> Self {
-        Self::new(self.major + 1, self.minor, self.patch)
+        Self::new(self.major + 1, 0, 0)
     }
 }
 
