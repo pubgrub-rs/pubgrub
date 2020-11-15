@@ -238,11 +238,11 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                     return Relation::Contradicted((package.clone(), incompat_term.clone()));
                 }
                 None | Some(term::Relation::Inconclusive) => {
-                    // If a package is not present, the intersection is the same as any.
-                    // And according to the rules of satisfactions, the relation would be inconclusive.
-                    // It could also be satisfied if the incompatibility term was also any.
-                    // But we systematically remove those from incompatibilities.
-                    // So we're safe on that front.
+                    // If a package is not present, the intersection is the same as [Term::any].
+                    // According to the rules of satisfactions, the relation would be inconclusive.
+                    // It could also be satisfied if the incompatibility term was also [Term::any],
+                    // but we systematically remove those from incompatibilities
+                    // so we're safe on that front.
                     if relation == Relation::Satisfied {
                         relation =
                             Relation::AlmostSatisfied((package.clone(), incompat_term.clone()));
