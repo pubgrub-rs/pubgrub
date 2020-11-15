@@ -181,21 +181,21 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         version: V,
         new_incompatibilities: &[Incompatibility<P, V>],
     ) {
-        let satisfied = |incompat: &Incompatibility<P, V>| {
+        let not_satisfied = |incompat: &Incompatibility<P, V>| {
             incompat.relation(|p| {
                 if p == &package {
                     Some(Term::exact(version.clone()))
                 } else {
                     self.memory.term_intersection_for_package(p).cloned()
                 }
-            }) == Relation::Satisfied
+            }) != Relation::Satisfied
         };
-        // Preventive check that none of the dependencies (new_incompatibilities)
+
+        // Check none of the dependencies (new_incompatibilities)
         // would create a conflict (be satisfied).
-        if new_incompatibilities.iter().any(satisfied) {
-            return;
+        if new_incompatibilities.iter().all(not_satisfied) {
+            self.add_decision(package, version);
         }
-        self.add_decision(package, version);
     }
 
     /// Check if the terms in the partial solution satisfy the incompatibility.
