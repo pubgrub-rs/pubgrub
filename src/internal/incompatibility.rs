@@ -39,10 +39,15 @@ pub struct Incompatibility<P: Package, V: Version> {
 
 #[derive(Debug, Clone)]
 enum Kind<P: Package, V: Version> {
+    /// Initial incompatibility aiming at picking the root package for the first decision.
     NotRoot(P, V),
+    /// No versions from range satisfy given constraints.
     NoVersions(P, Range<V>),
+    /// Dependencies of the package are unavailable for versions in that range.
     UnavailableDependencies(P, Range<V>),
+    /// Incompatibility coming from the dependencies of a given package.
     FromDependencyOf(P, Range<V>, P, Range<V>),
+    /// Derived from two causes. Stores cause ids.
     DerivedFrom(usize, usize),
 }
 
