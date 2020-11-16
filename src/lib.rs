@@ -77,15 +77,15 @@
 //! ```
 //! # use pubgrub::solver::{DependencyProvider, Dependencies};
 //! # use pubgrub::version::SemanticVersion;
+//! # use pubgrub::range::Range;
+//! # use pubgrub::type_aliases::Map;
 //! # use std::error::Error;
+//! # use std::borrow::Borrow;
 //! #
 //! # struct MyDependencyProvider;
 //! #
 //! impl DependencyProvider<String, SemanticVersion> for MyDependencyProvider {
-//!     fn list_available_versions(
-//!         &self,
-//!         package: &String
-//!     ) -> Result<Vec<SemanticVersion>, Box<dyn Error>> {
+//!     fn choose_package_version<T: Borrow<String>, U: Borrow<Range<SemanticVersion>>>(&self,packages: impl Iterator<Item=(T, U)>) -> Result<(T, Option<SemanticVersion>), Box<dyn Error>> {
 //!         unimplemented!()
 //!     }
 //!
@@ -98,11 +98,20 @@
 //!     }
 //! }
 //! ```
+//!
 //! The first method
-//! [list_available_versions](crate::solver::DependencyProvider::list_available_versions)
-//! should return all available versions of a package.
-//! The second method
-//! [get_dependencies](crate::solver::DependencyProvider::get_dependencies)
+//! [choose_package_version](crate::solver::DependencyProvider::choose_package_version)
+//! chooses a package and available version compatible with the provided options.
+//! A helper function
+//! [choose_package_with_fewest_versions](crate::solver::choose_package_with_fewest_versions)
+//! is provided for convenience
+//! in cases when lists of available versions for packages are easily obtained.
+//! The strategy of that helper function consists in choosing the package
+//! with the fewest number of compatible versions to speed up resolution.
+//! But in general you are free to employ whatever strategy suits you best
+//! to pick a package and a version.
+//!
+//! The second method [get_dependencies](crate::solver::DependencyProvider::get_dependencies)
 //! aims at retrieving the dependencies of a given package at a given version.
 //! Returns [None] if dependencies are unknown.
 //!

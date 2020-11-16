@@ -2,35 +2,39 @@
 
 use std::{collections::BTreeSet as Set, error::Error};
 
+use pubgrub::error::PubGrubError;
+use pubgrub::package::Package;
+use pubgrub::range::Range;
+use pubgrub::report::{DefaultStringReporter, Reporter};
+use pubgrub::solver::{
+    choose_package_with_fewest_versions, resolve, Dependencies, DependencyProvider,
+    OfflineDependencyProvider,
+};
+use pubgrub::version::{NumberVersion, Version};
+
 use proptest::collection::{btree_map, vec};
 use proptest::prelude::*;
 use proptest::sample::Index;
 use proptest::string::string_regex;
 
-use pubgrub::range::Range;
-use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::{
-    error::PubGrubError, package::Package, report::DefaultStringReporter, report::Reporter,
-    version::NumberVersion, version::Version,
-};
-
 use crate::sat_dependency_provider::SatResolve;
 
 mod sat_dependency_provider;
 
-/// The same as DP but takes versions from the opposite end:
-/// if DP returns versions from newest to oldest, this returns them from oldest to newest.
+/// The same as [OfflineDependencyProvider] but takes versions from the opposite end:
+/// if [OfflineDependencyProvider] returns versions from newest to oldest, this returns them from oldest to newest.
 #[derive(Clone)]
-struct ReverseDependencyProvider<DP>(DP);
+struct OldestVersionsDependencyProvider<P: Package, V: Version>(OfflineDependencyProvider<P, V>);
 
-impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
-    for ReverseDependencyProvider<DP>
-{
-    fn list_available_versions(&self, p: &P) -> Result<Vec<V>, Box<dyn Error>> {
-        self.0.list_available_versions(p).map(|mut v| {
-            v.reverse();
-            v
-        })
+impl<P: Package, V: Version> DependencyProvider<P, V> for OldestVersionsDependencyProvider<P, V> {
+    fn choose_package_version<T: std::borrow::Borrow<P>, U: std::borrow::Borrow<Range<V>>>(
+        &self,
+        potential_packages: impl Iterator<Item = (T, U)>,
+    ) -> Result<(T, Option<V>), Box<dyn Error>> {
+        Ok(choose_package_with_fewest_versions(
+            |p| self.0.versions(p).into_iter().flatten().cloned(),
+            potential_packages,
+        ))
     }
 
     fn get_dependencies(&self, p: &P, v: &V) -> Result<Dependencies<P, V>, Box<dyn Error>> {
@@ -61,8 +65,11 @@ impl<DP> TimeoutDependencyProvider<DP> {
 impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
     for TimeoutDependencyProvider<DP>
 {
-    fn list_available_versions(&self, p: &P) -> Result<Vec<V>, Box<dyn Error>> {
-        self.dp.list_available_versions(p)
+    fn choose_package_version<T: std::borrow::Borrow<P>, U: std::borrow::Borrow<Range<V>>>(
+        &self,
+        potential_packages: impl Iterator<Item = (T, U)>,
+    ) -> Result<(T, Option<V>), Box<dyn Error>> {
+        self.dp.choose_package_version(potential_packages)
     }
 
     fn get_dependencies(&self, p: &P, v: &V) -> Result<Dependencies<P, V>, Box<dyn Error>> {
@@ -178,7 +185,7 @@ pub fn registry_strategy<N: Package + Ord>(
                     let (a, b) = order_index(a, b, len_all_pkgid);
                     let (a, b) = if reverse_alphabetical { (b, a) } else { (a, b) };
                     let ((dep_name, _), _) = list_of_pkgid[a].to_owned();
-                    if &(list_of_pkgid[b].0).0 == &dep_name {
+                    if (list_of_pkgid[b].0).0 == dep_name {
                         continue;
                     }
                     let s = &crate_vers_by_name[&dep_name];
@@ -341,7 +348,7 @@ proptest! {
     fn prop_reversed_version_errors_the_same(
         (dependency_provider, cases) in registry_strategy(0u16..665, 666)
     )  {
-        let reverse_provider = ReverseDependencyProvider(dependency_provider.clone());
+        let reverse_provider = OldestVersionsDependencyProvider(dependency_provider.clone());
         for (name, ver) in cases {
             let l = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
             let r = resolve(&TimeoutDependencyProvider::new(reverse_provider.clone(), 50_000), name, ver);
@@ -362,9 +369,9 @@ proptest! {
         let mut removed_provider = dependency_provider.clone();
         for (package_idx, version_idx, dep_idx) in indexes_to_remove {
             let package = package_idx.get(&packages);
-            let versions = dependency_provider
-                .list_available_versions(package)
-                .unwrap();
+            let versions: Vec<_> = dependency_provider
+                .versions(package)
+                .unwrap().collect();
             let version = version_idx.get(&versions);
             let dependencies: Vec<(u16, Range<NumberVersion>)> = match dependency_provider
                 .get_dependencies(package, version)
@@ -377,7 +384,7 @@ proptest! {
                 let dependency = dep_idx.get(&dependencies).0;
                 removed_provider.add_dependencies(
                     **package,
-                    *version,
+                    **version,
                     dependencies.into_iter().filter(|x| x.0 != dependency),
                 )
             }
@@ -414,10 +421,9 @@ proptest! {
             .packages()
             .flat_map(|&p| {
                 dependency_provider
-                    .list_available_versions(&p)
+                    .versions(&p)
                     .unwrap()
-                    .into_iter()
-                    .map(move |v| (p, v))
+                    .map(move |v| (p, v.clone()))
             })
             .collect();
         let to_remove: Set<(_, _)> = indexes_to_remove.iter().map(|x| x.get(&all_versions)).cloned().collect();

@@ -65,14 +65,13 @@
 //! to satisfy the dependencies of that package and version pair.
 //! If there is no solution, the reason will be provided as clear as possible.
 
-use std::collections::BTreeSet as Set;
+use std::borrow::Borrow;
+use std::collections::{BTreeMap, BTreeSet as Set};
 use std::error::Error;
-use std::hash::Hash;
 
 use crate::error::PubGrubError;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
-use crate::internal::partial_solution::PartialSolution;
 use crate::package::Package;
 use crate::range::Range;
 use crate::type_aliases::{Map, SelectedDependencies};
@@ -95,43 +94,56 @@ pub fn resolve<P: Package, V: Version>(
 
         state.unit_propagation(next)?;
 
-        // Pick the next package.
-        let (p, term) = match state.partial_solution.pick_package(dependency_provider)? {
-            None => {
-                return state.partial_solution.extract_solution().ok_or_else(|| {
-                    PubGrubError::Failure(
-                        "How did we end up with no package to choose but no solution?".into(),
-                    )
-                })
-            }
-            Some(x) => x,
-        };
-        next = p.clone();
-        let available_versions =
-            dependency_provider
-                .list_available_versions(&p)
-                .map_err(|err| PubGrubError::ErrorRetrievingVersions {
-                    package: p.clone(),
-                    source: err,
-                })?;
+        let potential_packages = state.partial_solution.potential_packages();
+        if potential_packages.is_none() {
+            drop(potential_packages);
+            // The borrow checker did not like using a match on potential_packages.
+            // This `if ... is_none ... drop` is a workaround.
+            // I believe this is a case where Polonius could help, when and if it lands in rustc.
+            return state.partial_solution.extract_solution().ok_or_else(|| {
+                PubGrubError::Failure(
+                    "How did we end up with no package to choose but no solution?".into(),
+                )
+            });
+        }
+        let decision = dependency_provider
+            .choose_package_version(potential_packages.unwrap())
+            .map_err(PubGrubError::ErrorChoosingPackageVersion)?;
+        next = decision.0.clone();
 
         // Pick the next compatible version.
-        let v = match PartialSolution::<P, V>::pick_version(&available_versions[..], &term) {
+        let v = match decision.1 {
             None => {
+                let term = state
+                    .partial_solution
+                    .term_intersection_for_package(&next)
+                    .expect("a package was chosen but we don't have a term.")
+                    .clone();
                 state.add_incompatibility(|id| {
-                    Incompatibility::no_versions(id, p.clone(), term.clone())
+                    Incompatibility::no_versions(id, next.clone(), term.clone())
                 });
                 continue;
             }
             Some(x) => x,
         };
+        if !state
+            .partial_solution
+            .term_intersection_for_package(&next)
+            .expect("a package was chosen but we don't have a term.")
+            .contains(&v)
+        {
+            return Err(PubGrubError::ErrorChoosingPackageVersion(
+                "choose_package_version picked an incompatible version".into(),
+            ));
+        }
 
         if added_dependencies
-            .entry(p.clone())
+            .entry(next.clone())
             .or_default()
             .insert(v.clone())
         {
             // Retrieve that package dependencies.
+            let p = &next;
             let dependencies =
                 match dependency_provider
                     .get_dependencies(&p, &v)
@@ -182,11 +194,13 @@ pub fn resolve<P: Package, V: Version>(
                     "Root package depends on itself at a different version?".into(),
                 ));
             }
-            state.partial_solution.add_version(p, v, &dep_incompats);
+            state
+                .partial_solution
+                .add_version(p.clone(), v, &dep_incompats);
         } else {
             // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
             // terms and can add the decision directly.
-            state.partial_solution.add_decision(p, v);
+            state.partial_solution.add_decision(next.clone(), v);
         }
     }
 }
@@ -212,10 +226,35 @@ pub type DependencyConstraints<P, V> = Map<P, Range<V>>;
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
 /// An implementor needs to be supplied to the [resolve] function.
 pub trait DependencyProvider<P: Package, V: Version> {
-    /// Lists available versions for a given package.
-    /// The strategy of which version should be preferably picked in the list of available versions
-    /// is implied by the order of the list: first version in the list will be tried first.
-    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>>;
+    /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
+    /// is the process of choosing the next package
+    /// and version that will be appended to the partial solution.
+    /// Every time such a decision must be made,
+    /// potential valid packages and version ranges are preselected by the resolver,
+    /// and the dependency provider must choose.
+    ///
+    /// The strategy employed to choose such package and version
+    /// cannot change the existence of a solution or not,
+    /// but can drastically change the performances of the solver,
+    /// or the properties of the solution.
+    /// The documentation of Pub (PubGrub implementation for the dart programming language)
+    /// states the following:
+    ///
+    /// > Pub chooses the latest matching version of the package
+    /// > with the fewest versions that match the outstanding constraint.
+    /// > This tends to find conflicts earlier if any exist,
+    /// > since these packages will run out of versions to try more quickly.
+    /// > But there's likely room for improvement in these heuristics.
+    ///
+    /// A helper function [choose_package_with_fewest_versions] is provided to ease
+    /// implementations of this method if you can produce an iterator
+    /// of the available versions in preference order for any package.
+    ///
+    /// Note: the type `T` ensures that this returns an item from the `packages` argument.
+    fn choose_package_version<T: Borrow<P>, U: Borrow<Range<V>>>(
+        &self,
+        potential_packages: impl Iterator<Item = (T, U)>,
+    ) -> Result<(T, Option<V>), Box<dyn Error>>;
 
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
@@ -235,15 +274,45 @@ pub trait DependencyProvider<P: Package, V: Version> {
     }
 }
 
+/// This is a helper function to make it easy to implement
+/// [DependencyProvider::choose_package_version].
+/// It takes a function `list_available_versions` that takes a package and returns an iterator
+/// of the available versions in preference order.
+/// The helper finds the package from the `packages` argument with the fewest versions from
+/// `list_available_versions` contained in the constraints. Then takes that package and finds the
+/// first version contained in the constraints.
+pub fn choose_package_with_fewest_versions<P: Package, V: Version, T, U, I, F>(
+    list_available_versions: F,
+    potential_packages: impl Iterator<Item = (T, U)>,
+) -> (T, Option<V>)
+where
+    T: Borrow<P>,
+    U: Borrow<Range<V>>,
+    I: Iterator<Item = V>,
+    F: Fn(&P) -> I,
+{
+    let count_valid = |(p, range): &(T, U)| {
+        list_available_versions(p.borrow())
+            .filter(|v| range.borrow().contains(v.borrow()))
+            .count()
+    };
+    let (pkg, range) = potential_packages
+        .min_by_key(count_valid)
+        .expect("potential_packages gave us an empty iterator");
+    let version =
+        list_available_versions(pkg.borrow()).find(|v| range.borrow().contains(v.borrow()));
+    (pkg, version)
+}
+
 /// A basic implementation of [DependencyProvider].
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct OfflineDependencyProvider<P: Package, V: Version + Hash> {
-    dependencies: Map<P, Map<V, DependencyConstraints<P, V>>>,
+pub struct OfflineDependencyProvider<P: Package, V: Version> {
+    dependencies: Map<P, BTreeMap<V, DependencyConstraints<P, V>>>,
 }
 
-impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
+impl<P: Package, V: Version> OfflineDependencyProvider<P, V> {
     /// Creates an empty OfflineDependencyProvider with no dependencies.
     pub fn new() -> Self {
         Self {
@@ -282,12 +351,10 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
         self.dependencies.keys()
     }
 
-    /// Lists versions of saved packages.
+    /// Lists versions of saved packages in sorted order.
     /// Returns [None] if no information is available regarding that package.
-    fn versions(&self, package: &P) -> Option<Set<V>> {
-        self.dependencies
-            .get(package)
-            .map(|k| k.keys().cloned().collect())
+    pub fn versions(&self, package: &P) -> Option<impl Iterator<Item = &V>> {
+        self.dependencies.get(package).map(|k| k.keys())
     }
 
     /// Lists dependencies of a given package and version.
@@ -299,13 +366,24 @@ impl<P: Package, V: Version + Hash> OfflineDependencyProvider<P, V> {
 
 /// An implementation of [DependencyProvider] that
 /// contains all dependency information available in memory.
-/// Versions are listed with the newest versions first.
-impl<P: Package, V: Version + Hash> DependencyProvider<P, V> for OfflineDependencyProvider<P, V> {
-    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
-        Ok(self
-            .versions(package)
-            .map(|v| v.into_iter().rev().collect())
-            .unwrap_or_default())
+/// Packages are picked with the fewest versions contained in the constraints first.
+/// Versions are picked with the newest versions first.
+impl<P: Package, V: Version> DependencyProvider<P, V> for OfflineDependencyProvider<P, V> {
+    fn choose_package_version<T: Borrow<P>, U: Borrow<Range<V>>>(
+        &self,
+        potential_packages: impl Iterator<Item = (T, U)>,
+    ) -> Result<(T, Option<V>), Box<dyn Error>> {
+        Ok(choose_package_with_fewest_versions(
+            |p| {
+                self.dependencies
+                    .get(p)
+                    .into_iter()
+                    .flat_map(|k| k.keys())
+                    .rev()
+                    .cloned()
+            },
+            potential_packages,
+        ))
     }
 
     fn get_dependencies(

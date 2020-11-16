@@ -5,6 +5,7 @@
 
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::package::Package;
+use crate::range::Range;
 use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
@@ -102,7 +103,7 @@ impl<P: Package, V: Version> Memory<P, V> {
     /// selected version (no "decision")
     /// and if it contains at least one positive derivation term
     /// in the partial solution.
-    pub fn potential_packages(&mut self) -> impl Iterator<Item = (&P, &Term<V>)> {
+    pub fn potential_packages(&mut self) -> impl Iterator<Item = (&P, &Range<V>)> {
         self.assignments
             .iter_mut()
             .filter_map(|(p, pa)| pa.potential_package_filter(p))
@@ -160,7 +161,7 @@ impl<V: Version> PackageAssignments<V> {
     fn potential_package_filter<'a, P: Package>(
         &'a mut self,
         package: &'a P,
-    ) -> Option<(&'a P, &'a Term<V>)> {
+    ) -> Option<(&'a P, &'a Range<V>)> {
         match self {
             PackageAssignments::Decision(_) => None,
             PackageAssignments::Derivations {
@@ -169,7 +170,7 @@ impl<V: Version> PackageAssignments<V> {
             } => {
                 if intersected.is_positive() || not_intersected_yet.iter().any(|t| t.is_positive())
                 {
-                    Some((package, self.assignment_intersection()))
+                    Some((package, self.assignment_intersection().unwrap_positive()))
                 } else {
                     None
                 }

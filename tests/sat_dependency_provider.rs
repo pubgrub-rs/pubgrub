@@ -4,7 +4,6 @@ use pubgrub::package::Package;
 use pubgrub::solver::{Dependencies, DependencyProvider, OfflineDependencyProvider};
 use pubgrub::type_aliases::{Map, SelectedDependencies};
 use pubgrub::version::Version;
-use std::hash::Hash;
 use varisat::ExtendFormula;
 
 const fn num_bits<T>() -> usize {
@@ -52,7 +51,7 @@ pub struct SatResolve<P: Package, V: Version> {
     all_versions_by_p: Map<P, Vec<(V, varisat::Var)>>,
 }
 
-impl<P: Package, V: Version + Hash> SatResolve<P, V> {
+impl<P: Package, V: Version> SatResolve<P, V> {
     pub fn new(dp: &OfflineDependencyProvider<P, V>) -> Self {
         let mut cnf = varisat::CnfFormula::new();
 
@@ -61,14 +60,14 @@ impl<P: Package, V: Version + Hash> SatResolve<P, V> {
 
         for p in dp.packages() {
             let mut versions_for_p = vec![];
-            for v in dp.list_available_versions(p).unwrap() {
+            for v in dp.versions(p).unwrap() {
                 let new_var = cnf.new_var();
                 all_versions.push((p.clone(), v.clone(), new_var));
                 versions_for_p.push(new_var);
                 all_versions_by_p
                     .entry(p.clone())
                     .or_default()
-                    .push((v, new_var));
+                    .push((v.clone(), new_var));
             }
             // no two versions of the same package
             sat_at_most_one(&mut cnf, &versions_for_p);
