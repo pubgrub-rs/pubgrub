@@ -119,7 +119,7 @@ pub fn resolve<P: Package, V: Version>(
         let v = match PartialSolution::<P, V>::pick_version(&available_versions[..], &term) {
             None => {
                 state.add_incompatibility(|id| {
-                    Incompatibility::no_version(id, p.clone(), term.clone())
+                    Incompatibility::no_versions(id, p.clone(), term.clone())
                 });
                 continue;
             }

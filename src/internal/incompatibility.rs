@@ -39,10 +39,15 @@ pub struct Incompatibility<P: Package, V: Version> {
 
 #[derive(Debug, Clone)]
 enum Kind<P: Package, V: Version> {
+    /// Initial incompatibility aiming at picking the root package for the first decision.
     NotRoot(P, V),
-    NoVersion(P, Range<V>),
+    /// No versions from range satisfy given constraints.
+    NoVersions(P, Range<V>),
+    /// Dependencies of the package are unavailable for versions in that range.
     UnavailableDependencies(P, Range<V>),
+    /// Incompatibility coming from the dependencies of a given package.
     FromDependencyOf(P, Range<V>, P, Range<V>),
+    /// Derived from two causes. Stores cause ids.
     DerivedFrom(usize, usize),
 }
 
@@ -83,7 +88,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Create an incompatibility to remember
     /// that a given range does not contain any version.
-    pub fn no_version(id: usize, package: P, term: Term<V>) -> Self {
+    pub fn no_versions(id: usize, package: P, term: Term<V>) -> Self {
         let range = match &term {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
@@ -93,7 +98,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         Self {
             id,
             package_terms,
-            kind: Kind::NoVersion(package, range),
+            kind: Kind::NoVersions(package, range),
         }
     }
 
@@ -301,8 +306,8 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             Kind::NotRoot(package, version) => {
                 DerivationTree::External(External::NotRoot(package.clone(), version.clone()))
             }
-            Kind::NoVersion(package, range) => {
-                DerivationTree::External(External::NoVersion(package.clone(), range.clone()))
+            Kind::NoVersions(package, range) => {
+                DerivationTree::External(External::NoVersions(package.clone(), range.clone()))
             }
             Kind::UnavailableDependencies(package, range) => DerivationTree::External(
                 External::UnavailableDependencies(package.clone(), range.clone()),

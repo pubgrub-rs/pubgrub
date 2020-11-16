@@ -172,16 +172,16 @@
 //! match resolve(&dependency_provider, root_package, root_version) {
 //!     Ok(solution) => println!("{:?}", solution),
 //!     Err(PubGrubError::NoSolution(mut derivation_tree)) => {
-//!         derivation_tree.collapse_noversion();
+//!         derivation_tree.collapse_no_versions();
 //!         eprintln!("{}", DefaultStringReporter::report(&derivation_tree));
 //!     }
 //!     Err(err) => panic!("{:?}", err),
 //! };
 //! ```
 //! Notice that we also used
-//! [collapse_noversion()](crate::report::DerivationTree::collapse_noversion) above.
+//! [collapse_no_versions()](crate::report::DerivationTree::collapse_no_versions) above.
 //! This method simplifies the derivation tree to get rid of the
-//! [NoVersion](crate::report::External::NoVersion)
+//! [NoVersions](crate::report::External::NoVersions)
 //! external incompatibilities in the derivation tree.
 //! So instead of seeing things like this in the report:
 //! ```txt

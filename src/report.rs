@@ -35,11 +35,10 @@ pub enum DerivationTree<P: Package, V: Version> {
 /// they have their own reason.
 #[derive(Debug, Clone)]
 pub enum External<P: Package, V: Version> {
-    /// Initial incompatibility aiming at picking the root package
-    /// for the first decision.
+    /// Initial incompatibility aiming at picking the root package for the first decision.
     NotRoot(P, V),
-    /// No version exist in that range.
-    NoVersion(P, Range<V>),
+    /// No versions from range satisfy given constraints.
+    NoVersions(P, Range<V>),
     /// Dependencies of the package are unavailable for versions in that range.
     UnavailableDependencies(P, Range<V>),
     /// Incompatibility coming from the dependencies of a given package.
@@ -64,7 +63,7 @@ pub struct Derived<P: Package, V: Version> {
 }
 
 impl<P: Package, V: Version> DerivationTree<P, V> {
-    /// Merge the [NoVersion](External::NoVersion) external incompatibilities
+    /// Merge the [NoVersions](External::NoVersions) external incompatibilities
     /// with the other one they are matched with
     /// in a derived incompatibility.
     /// This cleans up quite nicely the generated report.
@@ -72,44 +71,44 @@ impl<P: Package, V: Version> DerivationTree<P, V> {
     /// [DependencyProvider](crate::solver::DependencyProvider)
     /// was not run in some kind of offline mode that may not
     /// have access to all versions existing.
-    pub fn collapse_noversion(&mut self) {
+    pub fn collapse_no_versions(&mut self) {
         match self {
             DerivationTree::External(_) => {}
             DerivationTree::Derived(derived) => {
                 match (&mut *derived.cause1, &mut *derived.cause2) {
-                    (DerivationTree::External(External::NoVersion(p, r)), ref mut cause2) => {
-                        cause2.collapse_noversion();
+                    (DerivationTree::External(External::NoVersions(p, r)), ref mut cause2) => {
+                        cause2.collapse_no_versions();
                         *self = cause2
                             .clone()
-                            .merge_noversion(p.to_owned(), r.to_owned())
+                            .merge_no_versions(p.to_owned(), r.to_owned())
                             .unwrap_or_else(|| self.to_owned());
                     }
-                    (ref mut cause1, DerivationTree::External(External::NoVersion(p, r))) => {
-                        cause1.collapse_noversion();
+                    (ref mut cause1, DerivationTree::External(External::NoVersions(p, r))) => {
+                        cause1.collapse_no_versions();
                         *self = cause1
                             .clone()
-                            .merge_noversion(p.to_owned(), r.to_owned())
+                            .merge_no_versions(p.to_owned(), r.to_owned())
                             .unwrap_or_else(|| self.to_owned());
                     }
                     _ => {
-                        derived.cause1.collapse_noversion();
-                        derived.cause2.collapse_noversion();
+                        derived.cause1.collapse_no_versions();
+                        derived.cause2.collapse_no_versions();
                     }
                 }
             }
         }
     }
 
-    fn merge_noversion(self, package: P, range: Range<V>) -> Option<Self> {
+    fn merge_no_versions(self, package: P, range: Range<V>) -> Option<Self> {
         match self {
             // TODO: take care of the Derived case.
             // Once done, we can remove the Option.
             DerivationTree::Derived(_) => Some(self),
             DerivationTree::External(External::NotRoot(_, _)) => {
-                panic!("How did we end up with a NoVersion merged with a NotRoot?")
+                panic!("How did we end up with a NoVersions merged with a NotRoot?")
             }
-            DerivationTree::External(External::NoVersion(_, r)) => Some(DerivationTree::External(
-                External::NoVersion(package, range.union(&r)),
+            DerivationTree::External(External::NoVersions(_, r)) => Some(DerivationTree::External(
+                External::NoVersions(package, range.union(&r)),
             )),
             DerivationTree::External(External::UnavailableDependencies(_, r)) => {
                 Some(DerivationTree::External(External::UnavailableDependencies(
@@ -144,7 +143,7 @@ impl<P: Package, V: Version> fmt::Display for External<P, V> {
             Self::NotRoot(package, version) => {
                 write!(f, "we are solving dependencies of {} {}", package, version)
             }
-            Self::NoVersion(package, range) => {
+            Self::NoVersions(package, range) => {
                 if range == &Range::any() {
                     write!(f, "there is no available version for {}", package)
                 } else {
