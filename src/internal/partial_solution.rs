@@ -3,20 +3,14 @@
 //! The partial solution is the current state
 //! of the solution being built by the algorithm.
 
-use crate::internal::incompatibility::PackageTerm;
+use crate::internal::assignment::Assignment::{self, Decision, Derivation};
+use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::memory::Memory;
 use crate::package::Package;
+use crate::range::Range;
 use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
-use crate::{
-    error::PubGrubError,
-    internal::incompatibility::{Incompatibility, Relation},
-};
-use crate::{
-    internal::assignment::Assignment::{self, Decision, Derivation},
-    solver::DependencyProvider,
-};
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct DecisionLevel(u32);
@@ -99,6 +93,11 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         self.memory.extract_solution()
     }
 
+    /// Compute, cache and retrieve the intersection of all terms for this package.
+    pub fn term_intersection_for_package(&mut self, package: &P) -> Option<&Term<V>> {
+        self.memory.term_intersection_for_package(package)
+    }
+
     /// Backtrack the partial solution to a given decision level.
     pub fn backtrack(&mut self, decision_level: DecisionLevel) {
         // TODO: improve with dichotomic search.
@@ -121,49 +120,15 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         partial_solution
     }
 
-    /// Heuristic to pick the next package to add to the partial solution.
-    /// This should be a package with a positive derivation but no decision yet.
-    /// If multiple choices are possible, use a heuristic.
-    ///
-    /// Current heuristic employed by this and Pub's implementations is to choose
-    /// the package with the fewest versions matching the outstanding constraint.
-    /// This tends to find conflicts earlier if any exist,
-    /// since these packages will run out of versions to try more quickly.
-    pub fn pick_package(
-        &mut self,
-        dependency_provider: &impl DependencyProvider<P, V>,
-    ) -> Result<Option<PackageTerm<P, V>>, PubGrubError<P, V>> {
-        let mut out: Option<PackageTerm<P, V>> = None;
-        let mut min_key = usize::MAX;
-        for (p, term) in self.memory.potential_packages() {
-            let key = dependency_provider
-                .list_available_versions(p)
-                .map_err(|err| PubGrubError::ErrorRetrievingVersions {
-                    package: p.clone(),
-                    source: err,
-                })?
-                .iter()
-                .filter(|&v| term.contains(v))
-                .count();
-            if key < min_key {
-                min_key = key;
-                out = Some((p.clone(), term.clone()));
-            }
+    /// Extract potential packages for the next iteration of unit propagation.
+    /// Return `None` if there is no suitable package anymore, which stops the algorithm.
+    pub fn potential_packages(&mut self) -> Option<impl Iterator<Item = (&P, &Range<V>)>> {
+        let mut iter = self.memory.potential_packages().peekable();
+        if iter.peek().is_some() {
+            Some(iter)
+        } else {
+            None
         }
-        Ok(out)
-    }
-
-    /// Pub chooses the latest matching version of the package
-    /// that match the outstanding constraint.
-    ///
-    /// Here we just pick the first one that satisfies the terms.
-    /// It is the responsibility of the provider of `available_versions`
-    /// to list them with preferred versions first.
-    pub fn pick_version(available_versions: &[V], partial_solution_term: &Term<V>) -> Option<V> {
-        available_versions
-            .iter()
-            .find(|v| partial_solution_term.contains(v))
-            .cloned()
     }
 
     /// We can add the version to the partial solution as a decision

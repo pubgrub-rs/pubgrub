@@ -4,7 +4,7 @@ use std::time::Duration;
 extern crate criterion;
 use self::criterion::*;
 
-use pubgrub::solver::{resolve, DependencyProvider, OfflineDependencyProvider};
+use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::NumberVersion;
 
 fn bench_nested(c: &mut Criterion) {
@@ -20,10 +20,9 @@ fn bench_nested(c: &mut Criterion) {
                 let s = std::fs::read_to_string(&case).unwrap();
                 let dependency_provider: OfflineDependencyProvider<u16, NumberVersion> =
                     ron::de::from_str(&s).unwrap();
-                let all_versions = dependency_provider.list_available_versions(&0).unwrap();
 
                 b.iter(|| {
-                    for &n in &all_versions {
+                    for &n in dependency_provider.versions(&0).unwrap() {
                         let _ = resolve(&dependency_provider, 0, n);
                     }
                 });

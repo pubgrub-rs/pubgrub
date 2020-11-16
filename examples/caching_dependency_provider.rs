@@ -2,22 +2,20 @@
 
 use std::cell::RefCell;
 use std::error::Error;
-use std::hash::Hash;
 
 use pubgrub::package::Package;
+use pubgrub::range::Range;
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
 use pubgrub::version::{NumberVersion, Version};
 
 // An example implementing caching dependency provider that will
 // store queried dependencies in memory and check them before querying more from remote.
-struct CachingDependencyProvider<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>> {
+struct CachingDependencyProvider<P: Package, V: Version, DP: DependencyProvider<P, V>> {
     remote_dependencies: DP,
     cached_dependencies: RefCell<OfflineDependencyProvider<P, V>>,
 }
 
-impl<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>>
-    CachingDependencyProvider<P, V, DP>
-{
+impl<P: Package, V: Version, DP: DependencyProvider<P, V>> CachingDependencyProvider<P, V, DP> {
     pub fn new(remote_dependencies_provider: DP) -> Self {
         CachingDependencyProvider {
             remote_dependencies: remote_dependencies_provider,
@@ -26,12 +24,14 @@ impl<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>>
     }
 }
 
-impl<P: Package, V: Version + Hash, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
+impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
     for CachingDependencyProvider<P, V, DP>
 {
-    // Lists only from remote for simplicity
-    fn list_available_versions(&self, package: &P) -> Result<Vec<V>, Box<dyn Error>> {
-        self.remote_dependencies.list_available_versions(package)
+    fn choose_package_version<T: std::borrow::Borrow<P>, U: std::borrow::Borrow<Range<V>>>(
+        &self,
+        packages: impl Iterator<Item = (T, U)>,
+    ) -> Result<(T, Option<V>), Box<dyn Error>> {
+        self.remote_dependencies.choose_package_version(packages)
     }
 
     // Caches dependencies if they were already queried

@@ -18,19 +18,6 @@ pub enum PubGrubError<P: Package, V: Version> {
     /// Error arising when the implementer of
     /// [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method
-    /// [list_available_versions](crate::solver::DependencyProvider::list_available_versions).
-    #[error("Retrieving available versions of package {package} failed")]
-    ErrorRetrievingVersions {
-        /// Package for which we want the list of versions.
-        package: P,
-        /// Error raised by the implementer of
-        /// [DependencyProvider](crate::solver::DependencyProvider).
-        source: Box<dyn std::error::Error>,
-    },
-
-    /// Error arising when the implementer of
-    /// [DependencyProvider](crate::solver::DependencyProvider)
-    /// returned an error in the method
     /// [get_dependencies](crate::solver::DependencyProvider::get_dependencies).
     #[error("Retrieving dependencies of {package} {version} failed")]
     ErrorRetrievingDependencies {
@@ -70,6 +57,13 @@ pub enum PubGrubError<P: Package, V: Version> {
         /// Version of the package for which we want the dependencies.
         version: V,
     },
+
+    /// Error arising when the implementer of
+    /// [DependencyProvider](crate::solver::DependencyProvider)
+    /// returned an error in the method
+    /// [choose_package_version](crate::solver::DependencyProvider::choose_package_version).
+    #[error("Decision making failed")]
+    ErrorChoosingPackageVersion(Box<dyn std::error::Error>),
 
     /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
