@@ -48,6 +48,8 @@ accessible for convenience.
 Discussion and development happens here on github and on our
 [Zulip stream](https://rust-lang.zulipchat.com/#narrow/stream/260232-t-cargo.2FPubGrub).
 Please join in!
+Remember to always be considerate of others,
+who may have different native languages, cultures and experiences.
 
 
 ## PubGrub
