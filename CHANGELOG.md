@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ## [0.2.0] - 2020-11-17 - [(diff with 0.1.0)][diff-0.2.0]
 
+This release brings many important improvements to PubGrub.
+The gist of it is:
+
+- A bug in the algorithm was [fixed](https://github.com/pubgrub-rs/pubgrub/pull/23).
+- The solver is now implemented in a `resolve` function taking as argument
+  an implementer of the `DependencyProvider` trait,
+  which has more control over the decision making process.
+- End-to-end property testing of large synthetic registries was added.
+- Huge performance improvements (more than 10x better performances).
+
 ### Changes affecting the public API
 
 #### Added
