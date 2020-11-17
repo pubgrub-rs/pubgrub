@@ -50,6 +50,8 @@ Discussion and development happens here on github and on our
 Please join in!
 Remember to always be considerate of others,
 who may have different native languages, cultures and experiences.
+We want everyone to feel welcomed,
+let us know with a private message on Zulip if you don't feel that way.
 
 
 ## PubGrub
