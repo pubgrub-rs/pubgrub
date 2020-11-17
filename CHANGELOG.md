@@ -133,5 +133,5 @@ The gist of it is:
 
 [0.2.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.2.0
 [0.1.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.1.0
-[diff-unreleased]: https://github.com/pubgrub-rs/pubgrub/compare/v0.2.0...HEAD
+[diff-unreleased]: https://github.com/pubgrub-rs/pubgrub/compare/relase...dev
 [diff-0.2.0]: https://github.com/mpizenberg/elm-pointer-events/compare/v0.1.0...v0.2.0
