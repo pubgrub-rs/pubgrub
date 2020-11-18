@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased [(diff)][diff-unreleased]
 
-## [0.2.0] - 2020-11-17 - [(diff with 0.1.0)][diff-0.2.0]
+## [0.2.0] - 2020-11-18 - [(diff with 0.1.0)][diff-0.2.0]
 
 This release brings many important improvements to PubGrub.
 The gist of it is:
