@@ -23,7 +23,7 @@ The gist of it is:
 - Links to code items in the code documenation.
 - New `"serde"` feature that allows serializing some library types, useful for making simple reproducible bug reports.
 - New variants for `error::PubGrubError` which are `DependencyOnTheEmptySet`,
-  `SelfDependency`, `ErrorChoosingPackageVersion` and `ErrorShouldCancel`.
+  `SelfDependency`, `ErrorChoosingPackageVersion` and `ErrorInShouldCancel`.
 - New `type_alias::Map` defined as `rustc_hash::FxHashMap`.
 - New `type_alias::SelectedDependencies<P, V>` defined as `Map<P, V>`.
 - The types `Dependencies` and `DependencyConstraints` were introduced to clarify intent.
