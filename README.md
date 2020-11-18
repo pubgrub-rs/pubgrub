@@ -3,7 +3,7 @@
 ![license](https://img.shields.io/crates/l/pubgrub.svg)
 [![crates.io](https://img.shields.io/crates/v/pubgrub.svg?logo=rust)][crates]
 [![docs.rs](https://img.shields.io/badge/docs.rs-pubgrub-yellow)][docs]
-[![guide](https://img.shields.io/badge/guide-pubgrub-ff69b4?logo=read-the-docs)][guide]
+[![guide](https://img.shields.io/badge/guide-pubgrub-pink?logo=read-the-docs)][guide]
 
 Version solving consists in efficiently finding a set of packages and versions
 that satisfy all the constraints of a given project dependencies.
