@@ -90,7 +90,7 @@ pub fn resolve<P: Package, V: Version>(
     loop {
         dependency_provider
             .should_cancel()
-            .map_err(|err| PubGrubError::ErrorShouldCancel(err))?;
+            .map_err(|err| PubGrubError::ErrorInShouldCancel(err))?;
 
         state.unit_propagation(next)?;
 

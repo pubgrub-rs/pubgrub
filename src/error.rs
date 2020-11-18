@@ -68,7 +68,7 @@ pub enum PubGrubError<P: Package, V: Version> {
     /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
     #[error("We should cancel")]
-    ErrorShouldCancel(Box<dyn std::error::Error>),
+    ErrorInShouldCancel(Box<dyn std::error::Error>),
 
     /// Something unexpected happened.
     #[error("{0}")]
