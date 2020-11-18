@@ -2,8 +2,8 @@
 
 [package]
 name = "pubgrub"
-version = "0.1.0"
-authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>", "Alex Tokarev <aleksator@gmail.com>"]
+version = "0.2.0"
+authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>", "Alex Tokarev <aleksator@gmail.com>", "Jacob Finkelman <Eh2406@wayne.edu>"]
 edition = "2018"
 description = "PubGrub version solving algorithm"
 readme = "README.md"
@@ -11,7 +11,7 @@ repository = "https://github.com/mpizenberg/pubgrub-rs"
 license = "MPL-2.0"
 keywords = ["dependency", "pubgrub", "semver", "solver", "version"]
 categories = ["algorithms"]
-include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples/**"]
+include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples/**", "benches/**"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
