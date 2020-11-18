@@ -39,7 +39,7 @@ the provided `Package` and `Version` traits.
 A [guide][guide] with both high-level explanations and
 in-depth algorithm details is available online.
 The [API documentation is available on docs.rs][docs].
-A WIP version of the [API docs for the dev branch][docs-dev] is also
+A version of the [API docs for the unreleased functionality][docs-dev] from `dev` branch is also
 accessible for convenience.
 
 
