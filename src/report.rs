@@ -37,7 +37,7 @@ pub enum DerivationTree<P: Package, V: Version> {
 pub enum External<P: Package, V: Version> {
     /// Initial incompatibility aiming at picking the root package for the first decision.
     NotRoot(P, V),
-    /// No versions from range satisfy given constraints.
+    /// There are no versions in the given range for this package.
     NoVersions(P, Range<V>),
     /// Dependencies of the package are unavailable for versions in that range.
     UnavailableDependencies(P, Range<V>),
