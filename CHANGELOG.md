@@ -9,19 +9,19 @@ All notable changes to this project will be documented in this file.
 This release brings many important improvements to PubGrub.
 The gist of it is:
 
-- A bug in the algorithm was [fixed](https://github.com/pubgrub-rs/pubgrub/pull/23).
+- A bug in the algorithm's implementation was [fixed](https://github.com/pubgrub-rs/pubgrub/pull/23).
 - The solver is now implemented in a `resolve` function taking as argument
   an implementer of the `DependencyProvider` trait,
   which has more control over the decision making process.
 - End-to-end property testing of large synthetic registries was added.
-- Huge performance improvements (more than 10x better performances).
+- More than 10x performance improvement.
 
 ### Changes affecting the public API
 
 #### Added
 
 - Links to code items in the code documenation.
-- New `"serde"` feature that serialize and deserialize few types in the API.
+- New `"serde"` feature that allows serializing some library types, useful for making simple reproducible bug reports.
 - New variants for `error::PubGrubError` which are `DependencyOnTheEmptySet`,
   `SelfDependency`, `ErrorChoosingPackageVersion` and `ErrorShouldCancel`.
 - New `type_alias::Map` defined as `rustc_hash::FxHashMap`.
@@ -34,8 +34,6 @@ The gist of it is:
 
 #### Changed
 
-- Using SPDX license identifiers instead of MPL-2.0 classic file headers.
-- `./github/workflows/` CI workflow was improved, including check for conventional commits.
 - The `Solver` trait was replaced by a `DependencyProvider` trait
   which now must implement a `choose_package_version` method
   instead of `list_available_versions`.
@@ -80,6 +78,8 @@ The gist of it is:
 
 #### Changed
 
+- CI workflow was improved (`./github/workflows/`), including a check for [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) and [Clippy ](https://github.com/rust-lang/rust-clippy) for source code linting.
+- Using SPDX license identifiers instead of MPL-2.0 classic file headers.
 - `State.incompatibilities` is now wrapped inside a `Rc`.
 - `DecisionLevel(u32)` is used in place of `usize` for partial solution decision levels.
 - `State.conflict_resolution` now also returns the almost satisfied package
