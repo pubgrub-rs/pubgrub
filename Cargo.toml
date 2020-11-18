@@ -2,8 +2,8 @@
 
 [package]
 name = "pubgrub"
-version = "0.1.0"
-authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>", "Alex Tokarev <aleksator@gmail.com>"]
+version = "0.2.0"
+authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>", "Alex Tokarev <aleksator@gmail.com>", "Jacob Finkelman <Eh2406@wayne.edu>"]
 edition = "2018"
 description = "PubGrub version solving algorithm"
 readme = "README.md"

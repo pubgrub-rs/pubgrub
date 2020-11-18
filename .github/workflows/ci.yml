@@ -111,4 +111,3 @@ jobs:
         uses: wagoid/commitlint-github-action@v2
         with:
           configFile: .commitlintrc.yml
-          failOnWarnings: true
