@@ -1,6 +1,4 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// SPDX-License-Identifier: MPL-2.0
 
 //! A term is the fundamental unit of operation of the PubGrub algorithm.
 //! It is a positive or negative expression regarding a set of versions.
@@ -22,7 +20,7 @@ pub enum Term<V: Version> {
     Negative(Range<V>),
 }
 
-// Base methods.
+/// Base methods.
 impl<V: Version> Term<V> {
     /// A term that is always true.
     pub(crate) fn any() -> Self {
@@ -47,11 +45,6 @@ impl<V: Version> Term<V> {
         }
     }
 
-    /// Simply check if a term is negative.
-    pub(crate) fn is_negative(&self) -> bool {
-        !self.is_positive()
-    }
-
     /// Negate a term.
     /// Evaluation of a negated term always returns
     /// the opposite of the evaluation of the original one.
@@ -63,15 +56,24 @@ impl<V: Version> Term<V> {
     }
 
     /// Evaluate a term regarding a given choice of version.
-    pub(crate) fn accept_version(&self, v: &V) -> bool {
+    pub(crate) fn contains(&self, v: &V) -> bool {
         match self {
             Self::Positive(range) => range.contains(v),
             Self::Negative(range) => !(range.contains(v)),
         }
     }
+
+    /// Unwrap the range contains in a positive term.
+    /// Will panic if used on a negative range.
+    pub(crate) fn unwrap_positive(&self) -> &Range<V> {
+        match self {
+            Self::Positive(range) => range,
+            _ => panic!("Negative term cannot unwrap positive range"),
+        }
+    }
 }
 
-// Set operations with terms.
+/// Set operations with terms.
 impl<V: Version> Term<V> {
     /// Compute the intersection of two terms.
     /// If at least one term is positive, the intersection is also positive.
@@ -92,12 +94,6 @@ impl<V: Version> Term<V> {
     /// If at least one term is negative, the union is also negative.
     pub(crate) fn union(&self, other: &Term<V>) -> Term<V> {
         (self.negate().intersection(&other.negate())).negate()
-    }
-
-    /// Compute the intersection of multiple terms.
-    /// Return None if the iterator is empty.
-    pub(crate) fn intersect_all<T: AsRef<Term<V>>>(all_terms: impl Iterator<Item = T>) -> Term<V> {
-        all_terms.fold(Self::any(), |acc, term| acc.intersection(term.as_ref()))
     }
 
     /// Indicate if this term is a subset of another term.
@@ -123,7 +119,7 @@ pub(crate) enum Relation {
     Inconclusive,
 }
 
-// Relation between terms.
+/// Relation between terms.
 impl<'a, V: 'a + Version> Term<V> {
     /// Check if a set of terms satisfies this term.
     ///
@@ -133,8 +129,8 @@ impl<'a, V: 'a + Version> Term<V> {
     /// It turns out that this can also be expressed with set operations:
     ///    S satisfies t if and only if  ⋂ S ⊆ t
     #[cfg(test)]
-    fn satisfied_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
-        Self::intersect_all(terms).subset_of(self)
+    fn satisfied_by(&self, terms_intersection: &Term<V>) -> bool {
+        terms_intersection.subset_of(self)
     }
 
     /// Check if a set of terms contradicts this term.
@@ -146,19 +142,15 @@ impl<'a, V: 'a + Version> Term<V> {
     ///    S contradicts t if and only if ⋂ S is disjoint with t
     ///    S contradicts t if and only if  (⋂ S) ⋂ t = ∅
     #[cfg(test)]
-    fn contradicted_by(&self, terms: impl Iterator<Item = &'a Term<V>>) -> bool {
-        Self::intersect_all(terms).intersection(self) == Self::empty()
+    fn contradicted_by(&self, terms_intersection: &Term<V>) -> bool {
+        terms_intersection.intersection(self) == Self::empty()
     }
 
     /// Check if a set of terms satisfies or contradicts a given term.
     /// Otherwise the relation is inconclusive.
-    pub(crate) fn relation_with<T: AsRef<Term<V>>>(
-        &self,
-        other_terms: impl Iterator<Item = T>,
-    ) -> Relation {
-        let others_intersection = Self::intersect_all(other_terms);
-        let full_intersection = self.intersection(&others_intersection);
-        if full_intersection == others_intersection {
+    pub(crate) fn relation_with(&self, other_terms_intersection: &Term<V>) -> Relation {
+        let full_intersection = self.intersection(other_terms_intersection.as_ref());
+        if &full_intersection == other_terms_intersection {
             Relation::Satisfied
         } else if full_intersection == Self::empty() {
             Relation::Contradicted
@@ -195,8 +187,8 @@ pub mod tests {
 
     pub fn strategy() -> impl Strategy<Value = Term<NumberVersion>> {
         prop_oneof![
-            crate::range::tests::strategy().prop_map(|range| Term::Positive(range)),
-            crate::range::tests::strategy().prop_map(|range| Term::Negative(range)),
+            crate::range::tests::strategy().prop_map(Term::Positive),
+            crate::range::tests::strategy().prop_map(Term::Negative),
         ]
     }
 
@@ -205,13 +197,13 @@ pub mod tests {
         // Testing relation --------------------------------
 
         #[test]
-        fn relation_with(term in strategy(), set in prop::collection::vec(strategy(), 0..3)) {
-            match term.relation_with(set.iter()) {
-                Relation::Satisfied => assert!(term.satisfied_by(set.iter())),
-                Relation::Contradicted => assert!(term.contradicted_by(set.iter())),
+        fn relation_with(term1 in strategy(), term2 in strategy()) {
+            match term1.relation_with(&term2) {
+                Relation::Satisfied => assert!(term1.satisfied_by(&term2)),
+                Relation::Contradicted => assert!(term1.contradicted_by(&term2)),
                 Relation::Inconclusive => {
-                    assert!(!term.satisfied_by(set.iter()));
-                    assert!(!term.contradicted_by(set.iter()));
+                    assert!(!term1.satisfied_by(&term2));
+                    assert!(!term1.contradicted_by(&term2));
                 }
             }
         }

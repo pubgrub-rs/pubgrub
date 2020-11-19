@@ -1,16 +1,14 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// SPDX-License-Identifier: MPL-2.0
 
 //! Core model and functions
 //! to write a functional PubGrub algorithm.
 
-use std::collections::HashSet as Set;
+use std::{collections::HashSet as Set, rc::Rc};
 
 use crate::error::PubGrubError;
 use crate::internal::assignment::Assignment::{Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
-use crate::internal::partial_solution::PartialSolution;
+use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::package::Package;
 use crate::report::DerivationTree;
 use crate::version::Version;
@@ -22,7 +20,7 @@ pub struct State<P: Package, V: Version> {
     root_version: V,
 
     /// TODO: remove pub.
-    pub incompatibilities: Vec<Incompatibility<P, V>>,
+    pub incompatibilities: Rc<Vec<Incompatibility<P, V>>>,
 
     /// Partial solution.
     /// TODO: remove pub.
@@ -30,8 +28,8 @@ pub struct State<P: Package, V: Version> {
 
     /// The store is the reference storage for all incompatibilities.
     /// The id field in one incompatibility refers
-    /// to the position in the `incompatibility_store` vec,
-    /// NOT the position in the `incompatibilities` vec.
+    /// to the position in the [incompatibility_store](State::incompatibility_store) vec,
+    /// NOT the position in the [incompatibilities](State::incompatibilities) vec.
     /// TODO: remove pub.
     pub incompatibility_store: Vec<Incompatibility<P, V>>,
 }
@@ -44,7 +42,7 @@ impl<P: Package, V: Version> State<P, V> {
         Self {
             root_package,
             root_version,
-            incompatibilities: vec![not_root_incompat.clone()],
+            incompatibilities: Rc::new(vec![not_root_incompat.clone()]),
             partial_solution: PartialSolution::empty(),
             incompatibility_store: vec![not_root_incompat],
         }
@@ -54,7 +52,7 @@ impl<P: Package, V: Version> State<P, V> {
     pub fn add_incompatibility<F: Fn(usize) -> Incompatibility<P, V>>(&mut self, gen_incompat: F) {
         let incompat = gen_incompat(self.incompatibility_store.len());
         self.incompatibility_store.push(incompat.clone());
-        incompat.merge_into(&mut self.incompatibilities);
+        incompat.merge_into(Rc::make_mut(&mut self.incompatibilities));
     }
 
     /// Check if an incompatibility is terminal.
@@ -63,15 +61,14 @@ impl<P: Package, V: Version> State<P, V> {
     }
 
     /// Unit propagation is the core mechanism of the solving algorithm.
-    /// CF https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation
+    /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     pub fn unit_propagation(&mut self, package: P) -> Result<(), PubGrubError<P, V>> {
         let mut current_package = package.clone();
         let mut changed = vec![package];
         loop {
             // Iterate over incompatibilities in reverse order
             // to evaluate first the newest incompatibilities.
-            let mut loop_incompatibilities = self.incompatibilities.clone();
-            while let Some(incompat) = loop_incompatibilities.pop() {
+            for incompat in Rc::clone(&self.incompatibilities).iter().rev() {
                 // We only care about that incompatibility if it contains the current package.
                 if incompat.get(&current_package) == None {
                     continue;
@@ -80,26 +77,17 @@ impl<P: Package, V: Version> State<P, V> {
                     // If the partial solution satisfies the incompatibility
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
-                        let root_cause = self.conflict_resolution(&incompat)?;
-                        // root_cause is guaranteed to be almost satisfied by the partial solution
-                        // according to PubGrub documentation.
-                        match self.partial_solution.relation(&root_cause) {
-                            Relation::AlmostSatisfied(package_almost, term) => {
-                                changed = vec![package_almost.clone()];
-                                // Add (not term) to the partial solution with incompat as cause.
-                                self.partial_solution.add_derivation(package_almost, term.negate(), root_cause);
-                            }
-                            _ => return Err(PubGrubError::Failure("This should never happen, root_cause is guaranteed to be almost satisfied by the partial solution".into())),
-                        }
+                        let (package_almost, root_cause) = self.conflict_resolution(&incompat)?;
+                        changed = vec![package_almost.clone()];
+                        // Add to the partial solution with incompat as cause.
+                        self.partial_solution
+                            .add_derivation(package_almost, root_cause);
                     }
-                    Relation::AlmostSatisfied(package_almost, term) => {
+                    Relation::AlmostSatisfied(package_almost) => {
                         changed.push(package_almost.clone());
                         // Add (not term) to the partial solution with incompat as cause.
-                        self.partial_solution.add_derivation(
-                            package_almost,
-                            term.negate(),
-                            incompat,
-                        );
+                        self.partial_solution
+                            .add_derivation(package_almost, incompat.clone());
                     }
                     _ => {}
                 }
@@ -114,11 +102,11 @@ impl<P: Package, V: Version> State<P, V> {
     }
 
     /// Return the root cause and the backtracked model.
-    /// CF https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation
+    /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     fn conflict_resolution(
         &mut self,
         incompatibility: &Incompatibility<P, V>,
-    ) -> Result<Incompatibility<P, V>, PubGrubError<P, V>> {
+    ) -> Result<(P, Incompatibility<P, V>), PubGrubError<P, V>> {
         let mut current_incompat = incompatibility.clone();
         let mut current_incompat_changed = false;
         loop {
@@ -131,29 +119,30 @@ impl<P: Package, V: Version> State<P, V> {
                     .partial_solution
                     .find_satisfier_and_previous_satisfier_level(&current_incompat);
                 match satisfier {
-                    Decision { .. } => {
+                    Decision { package, .. } => {
                         self.backtrack(
                             current_incompat.clone(),
                             current_incompat_changed,
                             previous_satisfier_level,
                         );
-                        return Ok(current_incompat);
+                        return Ok((package, current_incompat));
                     }
-                    Derivation { cause, .. } => {
+                    Derivation { cause, package } => {
                         if previous_satisfier_level != satisfier_level {
                             self.backtrack(
                                 current_incompat.clone(),
                                 current_incompat_changed,
                                 previous_satisfier_level,
                             );
-                            return Ok(current_incompat);
+                            return Ok((package, current_incompat));
                         } else {
                             let id = self.incompatibility_store.len();
-                            let prior_cause =
-                                Incompatibility::prior_cause(id, &current_incompat, &cause);
-                            // eprintln!("\ncause 1: {}", &current_incompat);
-                            // eprintln!("cause 2: {}", &cause);
-                            // eprintln!("prior cause: {}\n", &prior_cause);
+                            let prior_cause = Incompatibility::prior_cause(
+                                id,
+                                &current_incompat,
+                                &cause,
+                                &package,
+                            );
                             self.incompatibility_store.push(prior_cause.clone());
                             current_incompat = prior_cause;
                             current_incompat_changed = true;
@@ -169,11 +158,11 @@ impl<P: Package, V: Version> State<P, V> {
         &mut self,
         incompat: Incompatibility<P, V>,
         incompat_changed: bool,
-        decision_level: usize,
+        decision_level: DecisionLevel,
     ) {
         self.partial_solution.backtrack(decision_level);
         if incompat_changed {
-            incompat.merge_into(&mut self.incompatibilities);
+            incompat.merge_into(Rc::make_mut(&mut self.incompatibilities));
         }
     }
 

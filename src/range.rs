@@ -1,6 +1,4 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// SPDX-License-Identifier: MPL-2.0
 
 //! Ranges are constraints defining sets of versions.
 //!
@@ -9,18 +7,22 @@
 //! of the ranges building blocks.
 //!
 //! Those building blocks are:
-//!  - `none()`: the empty set
-//!  - `any()`: the set of all possible versions
-//!  - `exact(v)`: the set containing only the version v
-//!  - `higherThan(v)`: the set defined by `v <= versions`
-//!  - `lowerThan(v)`: the set defined by `versions < v` (note the "strictly" lower)
-//!  - `between(v1, v2)`: the set defined by `v1 <= versions < v2`
+//!  - [none()](Range::none): the empty set
+//!  - [any()](Range::any): the set of all possible versions
+//!  - [exact(v)](Range::exact): the set containing only the version v
+//!  - [higher_than(v)](Range::higher_than): the set defined by `v <= versions`
+//!  - [strictly_lower_than(v)](Range::strictly_lower_than): the set defined by `versions < v`
+//!  - [between(v1, v2)](Range::between): the set defined by `v1 <= versions < v2`
+
+use std::cmp::Ordering;
+use std::fmt;
 
 use crate::version::Version;
-use std::fmt;
 
 /// A Range is a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Range<V: Version> {
     segments: Vec<Interval<V>>,
 }
@@ -183,34 +185,38 @@ impl<V: Version> Range<V> {
                 }
 
                 // Right contains an infinite interval:
-                (Some((l1, Some(l2))), Some((r1, None))) => {
-                    if l2 < r1 {
+                (Some((l1, Some(l2))), Some((r1, None))) => match l2.cmp(r1) {
+                    Ordering::Less => {
                         left = left_iter.next();
-                    } else if l2 == r1 {
+                    }
+                    Ordering::Equal => {
                         segments.extend(left_iter.cloned());
                         break;
-                    } else {
+                    }
+                    Ordering::Greater => {
                         let start = l1.max(r1).to_owned();
                         segments.push((start, Some(l2.to_owned())));
                         segments.extend(left_iter.cloned());
                         break;
                     }
-                }
+                },
 
                 // Left contains an infinite interval:
-                (Some((l1, None)), Some((r1, Some(r2)))) => {
-                    if r2 < l1 {
+                (Some((l1, None)), Some((r1, Some(r2)))) => match r2.cmp(l1) {
+                    Ordering::Less => {
                         right = right_iter.next();
-                    } else if r2 == l1 {
+                    }
+                    Ordering::Equal => {
                         segments.extend(right_iter.cloned());
                         break;
-                    } else {
+                    }
+                    Ordering::Greater => {
                         let start = l1.max(r1).to_owned();
                         segments.push((start, Some(r2.to_owned())));
                         segments.extend(right_iter.cloned());
                         break;
                     }
-                }
+                },
 
                 // Both sides contain an infinite interval:
                 (Some((l1, None)), Some((r1, None))) => {
@@ -291,13 +297,15 @@ fn interval_to_string<V: Version>(interval: &Interval<V>) -> String {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    use crate::version::NumberVersion;
     use proptest::prelude::*;
 
+    use crate::version::NumberVersion;
+
+    use super::*;
+
     pub fn strategy() -> impl Strategy<Value = Range<NumberVersion>> {
-        prop::collection::vec(any::<usize>(), 0..10).prop_map(|mut vec| {
-            vec.sort();
+        prop::collection::vec(any::<u32>(), 0..10).prop_map(|mut vec| {
+            vec.sort_unstable();
             vec.dedup();
             let mut pair_iter = vec.chunks_exact(2);
             let mut segments = Vec::with_capacity(vec.len() / 2 + 1);
@@ -312,7 +320,7 @@ pub mod tests {
     }
 
     fn version_strat() -> impl Strategy<Value = NumberVersion> {
-        any::<usize>().prop_map(|x| NumberVersion(x))
+        any::<u32>().prop_map(NumberVersion)
     }
 
     proptest! {
@@ -327,6 +335,11 @@ pub mod tests {
         #[test]
         fn double_negate_is_identity(range in strategy()) {
             assert_eq!(range.negate().negate(), range);
+        }
+
+        #[test]
+        fn negate_contains_opposite(range in strategy(), version in version_strat()) {
+            assert_ne!(range.contains(&version), range.negate().contains(&version));
         }
 
         // Testing intersection ----------------------------
@@ -361,11 +374,21 @@ pub mod tests {
             assert_eq!(range.negate().intersection(&range), Range::none());
         }
 
+        #[test]
+        fn intesection_contains_both(r1 in strategy(), r2 in strategy(), version in version_strat()) {
+            assert_eq!(r1.intersection(&r2).contains(&version), r1.contains(&version) && r2.contains(&version));
+        }
+
         // Testing union -----------------------------------
 
         #[test]
         fn union_of_complements_is_any(range in strategy()) {
             assert_eq!(range.negate().union(&range), Range::any());
+        }
+
+        #[test]
+        fn union_contains_either(r1 in strategy(), r2 in strategy(), version in version_strat()) {
+            assert_eq!(r1.union(&r2).contains(&version), r1.contains(&version) || r2.contains(&version));
         }
 
         // Testing contains --------------------------------

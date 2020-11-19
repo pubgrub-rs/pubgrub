@@ -1,0 +1,40 @@
+# Deploys the latest development documentation to Github Pages
+
+name: Deploy documentation
+on:
+  push:
+    branches: [ dev ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deploy_documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+
+      - name: Download cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: documentation
+
+      - name: Build documentation
+        run: cargo +nightly doc --no-deps
+
+      - name: Deploy documentation
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./target/doc
+          force_orphan: true

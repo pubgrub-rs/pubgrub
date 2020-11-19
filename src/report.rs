@@ -1,16 +1,14 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// SPDX-License-Identifier: MPL-2.0
 
 //! Build a report as clear as possible as to why
 //! dependency solving failed.
 
-use std::collections::HashMap as Map;
 use std::fmt;
 
 use crate::package::Package;
 use crate::range::Range;
 use crate::term::Term;
+use crate::type_aliases::Map;
 use crate::version::Version;
 
 /// Reporter trait.
@@ -19,7 +17,7 @@ pub trait Reporter<P: Package, V: Version> {
     type Output;
 
     /// Generate a report from the derivation tree
-    /// describing the solver failure.
+    /// describing the resolution failure.
     fn report(derivation_tree: &DerivationTree<P, V>) -> Self::Output;
 }
 
@@ -37,11 +35,10 @@ pub enum DerivationTree<P: Package, V: Version> {
 /// they have their own reason.
 #[derive(Debug, Clone)]
 pub enum External<P: Package, V: Version> {
-    /// Initial incompatibility aiming at picking the root package
-    /// for the first decision.
+    /// Initial incompatibility aiming at picking the root package for the first decision.
     NotRoot(P, V),
-    /// No version exist in that range.
-    NoVersion(P, Range<V>),
+    /// There are no versions in the given range for this package.
+    NoVersions(P, Range<V>),
     /// Dependencies of the package are unavailable for versions in that range.
     UnavailableDependencies(P, Range<V>),
     /// Incompatibility coming from the dependencies of a given package.
@@ -66,51 +63,52 @@ pub struct Derived<P: Package, V: Version> {
 }
 
 impl<P: Package, V: Version> DerivationTree<P, V> {
-    /// Merge the `NoVersion` external incompatibilities
+    /// Merge the [NoVersions](External::NoVersions) external incompatibilities
     /// with the other one they are matched with
     /// in a derived incompatibility.
     /// This cleans up quite nicely the generated report.
-    /// You might want to do this if you know that the solver
+    /// You might want to do this if you know that the
+    /// [DependencyProvider](crate::solver::DependencyProvider)
     /// was not run in some kind of offline mode that may not
     /// have access to all versions existing.
-    pub fn collapse_noversion(&mut self) {
+    pub fn collapse_no_versions(&mut self) {
         match self {
             DerivationTree::External(_) => {}
             DerivationTree::Derived(derived) => {
                 match (&mut *derived.cause1, &mut *derived.cause2) {
-                    (DerivationTree::External(External::NoVersion(p, r)), ref mut cause2) => {
-                        cause2.collapse_noversion();
+                    (DerivationTree::External(External::NoVersions(p, r)), ref mut cause2) => {
+                        cause2.collapse_no_versions();
                         *self = cause2
                             .clone()
-                            .merge_noversion(p.to_owned(), r.to_owned())
-                            .unwrap_or(self.to_owned());
+                            .merge_no_versions(p.to_owned(), r.to_owned())
+                            .unwrap_or_else(|| self.to_owned());
                     }
-                    (ref mut cause1, DerivationTree::External(External::NoVersion(p, r))) => {
-                        cause1.collapse_noversion();
+                    (ref mut cause1, DerivationTree::External(External::NoVersions(p, r))) => {
+                        cause1.collapse_no_versions();
                         *self = cause1
                             .clone()
-                            .merge_noversion(p.to_owned(), r.to_owned())
-                            .unwrap_or(self.to_owned());
+                            .merge_no_versions(p.to_owned(), r.to_owned())
+                            .unwrap_or_else(|| self.to_owned());
                     }
                     _ => {
-                        derived.cause1.collapse_noversion();
-                        derived.cause2.collapse_noversion();
+                        derived.cause1.collapse_no_versions();
+                        derived.cause2.collapse_no_versions();
                     }
                 }
             }
         }
     }
 
-    fn merge_noversion(self, package: P, range: Range<V>) -> Option<Self> {
+    fn merge_no_versions(self, package: P, range: Range<V>) -> Option<Self> {
         match self {
             // TODO: take care of the Derived case.
             // Once done, we can remove the Option.
             DerivationTree::Derived(_) => Some(self),
             DerivationTree::External(External::NotRoot(_, _)) => {
-                panic!("How did we end up with a NoVersion merged with a NotRoot?")
+                panic!("How did we end up with a NoVersions merged with a NotRoot?")
             }
-            DerivationTree::External(External::NoVersion(_, r)) => Some(DerivationTree::External(
-                External::NoVersion(package, range.union(&r)),
+            DerivationTree::External(External::NoVersions(_, r)) => Some(DerivationTree::External(
+                External::NoVersions(package, range.union(&r)),
             )),
             DerivationTree::External(External::UnavailableDependencies(_, r)) => {
                 Some(DerivationTree::External(External::UnavailableDependencies(
@@ -145,7 +143,7 @@ impl<P: Package, V: Version> fmt::Display for External<P, V> {
             Self::NotRoot(package, version) => {
                 write!(f, "we are solving dependencies of {} {}", package, version)
             }
-            Self::NoVersion(package, range) => {
+            Self::NoVersions(package, range) => {
                 if range == &Range::any() {
                     write!(f, "there is no available version for {}", package)
                 } else {
@@ -178,7 +176,7 @@ impl<P: Package, V: Version> fmt::Display for External<P, V> {
     }
 }
 
-/// Default reporter able to generate an explanation as a `String`.
+/// Default reporter able to generate an explanation as a [String].
 pub struct DefaultStringReporter {
     /// Number of explanations already with a line reference.
     ref_count: usize,
@@ -194,19 +192,19 @@ impl DefaultStringReporter {
     fn new() -> Self {
         Self {
             ref_count: 0,
-            shared_with_ref: Map::new(),
+            shared_with_ref: Map::default(),
             lines: Vec::new(),
         }
     }
 
     fn build_recursive<P: Package, V: Version>(&mut self, derived: &Derived<P, V>) {
         self.build_recursive_helper(derived);
-        derived.shared_id.map(|id| {
+        if let Some(id) = derived.shared_id {
             if self.shared_with_ref.get(&id) == None {
                 self.add_line_ref();
                 self.shared_with_ref.insert(id, self.ref_count);
             }
-        });
+        };
     }
 
     fn build_recursive_helper<P: Package, V: Version>(&mut self, current: &Derived<P, V>) {
@@ -461,9 +459,9 @@ impl DefaultStringReporter {
     fn add_line_ref(&mut self) {
         let new_count = self.ref_count + 1;
         self.ref_count = new_count;
-        self.lines
-            .last_mut()
-            .map(|line| *line = format!("{} ({})", line, new_count));
+        if let Some(line) = self.lines.last_mut() {
+            *line = format!("{} ({})", line, new_count);
+        }
     }
 
     fn line_ref_of(&self, shared_id: Option<usize>) -> Option<usize> {

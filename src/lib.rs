@@ -1,6 +1,4 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// SPDX-License-Identifier: MPL-2.0
 
 //! PubGrub version solving algorithm.
 //!
@@ -12,23 +10,26 @@
 //!
 //! # Package and Version traits
 //!
-//! All the code in this crate is manipulating packages and versions,
-//! and for this to work, we defined a `Package` and `Version` traits,
+//! All the code in this crate is manipulating packages and versions, and for this to work
+//! we defined a [Package](package::Package) and [Version](version::Version) traits
 //! that are used as bounds on most of the exposed types and functions.
 //!
-//! Package identifiers needs to implement our `Package` trait,
+//! Package identifiers needs to implement our [Package](package::Package) trait,
 //! which is automatic if the type already implements
-//! `Clone + Eq + Hash + Debug + Display`.
-//! So things like `String` will work out of the box.
+//! [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
+//! So things like [String] will work out of the box.
 //!
-//! Our `Version` trait requires `Clone + Ord + Debug + Display`
+//! Our [Version](version::Version) trait requires
+//! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display)
 //! and also the definition of two methods,
-//! `lowest() -> Self` which returns the lowest version existing,
-//! and `bump(&self) -> Self` which returns the next smallest version
+//! [lowest() -> Self](version::Version::lowest) which returns the lowest version existing,
+//! and [bump(&self) -> Self](version::Version::bump) which returns the next smallest version
 //! strictly higher than the current one.
-//! For convenience, this library already provides two implementations of `Version`.
-//! The first one is `NumberVersion`, basically a newtype for `usize`.
-//! The second one is `SemanticVersion` that implements semantic versioning rules.
+//! For convenience, this library already provides
+//! two implementations of [Version](version::Version).
+//! The first one is [NumberVersion](version::NumberVersion), basically a newtype for [u32].
+//! The second one is [SemanticVersion](version::NumberVersion)
+//! that implements semantic versioning rules.
 //!
 //! # Basic example
 //!
@@ -44,66 +45,94 @@
 //! - `icons` has no dependency
 //!
 //! We can model that scenario with this library as follows
-//! ```ignore
-//! let mut solver = OfflineSolver::<&str, NumberVersion>::new();
-//! solver.add_dependencies(
+//! ```
+//! # use pubgrub::solver::{OfflineDependencyProvider, resolve};
+//! # use pubgrub::version::NumberVersion;
+//! # use pubgrub::range::Range;
+//! #
+//! let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//!
+//! dependency_provider.add_dependencies(
 //!     "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
 //! );
-//! solver.add_dependencies("menu", 1, vec![("dropdown", Range::any())]);
-//! solver.add_dependencies("dropdown", 1, vec![("icons", Range::any())]);
-//! solver.add_dependencies("icons", 1, vec![]);
+//! dependency_provider.add_dependencies("menu", 1, vec![("dropdown", Range::any())]);
+//! dependency_provider.add_dependencies("dropdown", 1, vec![("icons", Range::any())]);
+//! dependency_provider.add_dependencies("icons", 1, vec![]);
 //!
-//! // Run the solver.
-//! let _solution = solver.run("root", 1).unwrap();
+//! // Run the algorithm.
+//! let solution = resolve(&dependency_provider, "root", 1).unwrap();
 //! ```
 //!
-//! # Solver trait
+//! # DependencyProvider trait
 //!
-//! In our previous example we used the `OfflineSolver`,
-//! which is a basic implementation of the `Solver` trait.
+//! In our previous example we used the
+//! [OfflineDependencyProvider](solver::OfflineDependencyProvider),
+//! which is a basic implementation of the [DependencyProvider](solver::DependencyProvider) trait.
 //!
-//! But we might want to implement the `Solver` trait for our own type.
-//! Let's say that we will use `String` for packages,
-//! and `SemanticVersion` for versions.
+//! But we might want to implement the [DependencyProvider](solver::DependencyProvider)
+//! trait for our own type.
+//! Let's say that we will use [String] for packages,
+//! and [SemanticVersion](version::SemanticVersion) for versions.
 //! This may be done quite easily by implementing the two following functions.
-//! ```ignore
-//! impl Solver<String, SemanticVersion> for MySolver {
-//!     fn list_available_versions(
-//!         &mut self,
-//!         package: &String
-//!     ) -> Result<Vec<SemanticVersion>, Box<dyn Error>> {
-//!         ...
+//! ```
+//! # use pubgrub::solver::{DependencyProvider, Dependencies};
+//! # use pubgrub::version::SemanticVersion;
+//! # use pubgrub::range::Range;
+//! # use pubgrub::type_aliases::Map;
+//! # use std::error::Error;
+//! # use std::borrow::Borrow;
+//! #
+//! # struct MyDependencyProvider;
+//! #
+//! impl DependencyProvider<String, SemanticVersion> for MyDependencyProvider {
+//!     fn choose_package_version<T: Borrow<String>, U: Borrow<Range<SemanticVersion>>>(&self,packages: impl Iterator<Item=(T, U)>) -> Result<(T, Option<SemanticVersion>), Box<dyn Error>> {
+//!         unimplemented!()
 //!     }
 //!
 //!     fn get_dependencies(
-//!         &mut self,
+//!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Option<Map<String, Range<SemanticVersion>>>, Box<dyn Error>> {
-//!         ...
+//!     ) -> Result<Dependencies<String, SemanticVersion>, Box<dyn Error>> {
+//!         unimplemented!()
 //!     }
 //! }
 //! ```
-//! The first method `list_available_versions` should return all available
-//! versions of a package.
-//! The second method `get_dependencies` aims at retrieving the dependencies
-//! of a given package at a given version.
-//! Return `None` if dependencies are unknown.
 //!
-//! On a real scenario, these two methods may involve reading the file system
-//! or doing network request, so you may want to hold a cache in your `MySolver` type.
-//! You could use the `OfflineSolver` type provided by the crate as guidance,
-//! but you are free to use whatever approach
-//! makes sense in your situation.
+//! The first method
+//! [choose_package_version](crate::solver::DependencyProvider::choose_package_version)
+//! chooses a package and available version compatible with the provided options.
+//! A helper function
+//! [choose_package_with_fewest_versions](crate::solver::choose_package_with_fewest_versions)
+//! is provided for convenience
+//! in cases when lists of available versions for packages are easily obtained.
+//! The strategy of that helper function consists in choosing the package
+//! with the fewest number of compatible versions to speed up resolution.
+//! But in general you are free to employ whatever strategy suits you best
+//! to pick a package and a version.
+//!
+//! The second method [get_dependencies](crate::solver::DependencyProvider::get_dependencies)
+//! aims at retrieving the dependencies of a given package at a given version.
+//! Returns [None] if dependencies are unknown.
+//!
+//! In a real scenario, these two methods may involve reading the file system
+//! or doing network request, so you may want to hold a cache in your
+//! [DependencyProvider](solver::DependencyProvider) implementation.
+//! How exactly this could be achieved is shown in `CachingDependencyProvider`
+//! (see `examples/caching_dependency_provider.rs`).
+//! You could also use the [OfflineDependencyProvider](solver::OfflineDependencyProvider)
+//! type defined by the crate as guidance,
+//! but you are free to use whatever approach makes sense in your situation.
 //!
 //! # Solution and error reporting
 //!
-//! When everything goes well, the solver finds and returns the complete
+//! When everything goes well, the algorithm finds and returns the complete
 //! set of direct and indirect dependencies satisfying all the constraints.
-//! The packages and versions selected are returned in a `HashMap<P, V>`.
+//! The packages and versions selected are returned as
+//! [SelectedDepedencies<P, V>](type_aliases::SelectedDependencies).
 //! But sometimes there is no solution because dependencies are incompatible.
-//! In such cases, `solver.run(...)` returns a
-//! `PubGrubError::NoSolution(derivation_tree)`,
+//! In such cases, [resolve(...)](solver::resolve) returns a
+//! [PubGrubError::NoSolution(derivation_tree)](error::PubGrubError::NoSolution),
 //! where the provided derivation tree is a custom binary tree
 //! containing the full chain of reasons why there is no solution.
 //!
@@ -112,37 +141,57 @@
 //! Leaves of the tree are external incompatibilities,
 //! and nodes are derived.
 //! External incompatibilities have reasons that are independent
-//! of the way this solver is implemented such as
+//! of the way this algorithm is implemented such as
 //!  - dependencies: "package_a" at version 1 depends on "package_b" at version 4
 //!  - missing dependencies: dependencies of "package_a" are unknown
 //!  - absence of version: there is no version of "package_a" in the range [3.1.0  4.0.0[
 //!
-//! Derived incompatibilities are obtained by the solver by deduction,
+//! Derived incompatibilities are obtained during the algorithm execution by deduction,
 //! such as if "a" depends on "b" and "b" depends on "c", "a" depends on "c".
 //!
-//! This crate defines a `Reporter` trait, with an associated `Output` type
-//! and a single method
-//! ```ignore
-//! report(derivation_tree: &DerivationTree<P, V>) -> Output
+//! This crate defines a [Reporter](crate::report::Reporter) trait, with an associated
+//! [Output](crate::report::Reporter::Output) type and a single method.
 //! ```
-//! Implementing a `Reporter` may involve a lot of heuristics
+//! # use pubgrub::package::Package;
+//! # use pubgrub::version::Version;
+//! # use pubgrub::report::DerivationTree;
+//! #
+//! pub trait Reporter<P: Package, V: Version> {
+//!     type Output;
+//!
+//!     fn report(derivation_tree: &DerivationTree<P, V>) -> Self::Output;
+//! }
+//! ```
+//! Implementing a [Reporter](crate::report::Reporter) may involve a lot of heuristics
 //! to make the output human-readable and natural.
 //! For convenience, we provide a default implementation
-//! `DefaultStringReporter`, that output the report as a String.
+//! [DefaultStringReporter](crate::report::DefaultStringReporter)
+//! that outputs the report as a [String].
 //! You may use it as follows:
-//! ```ignore
-//! match solver.run(root_package, root_version) {
+//! ```
+//! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
+//! # use pubgrub::report::{DefaultStringReporter, Reporter};
+//! # use pubgrub::error::PubGrubError;
+//! # use pubgrub::version::NumberVersion;
+//! #
+//! # let dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//! # let root_package = "root";
+//! # let root_version = 1;
+//! #
+//! match resolve(&dependency_provider, root_package, root_version) {
 //!     Ok(solution) => println!("{:?}", solution),
 //!     Err(PubGrubError::NoSolution(mut derivation_tree)) => {
-//!         derivation_tree.collapse_noversion();
+//!         derivation_tree.collapse_no_versions();
 //!         eprintln!("{}", DefaultStringReporter::report(&derivation_tree));
 //!     }
 //!     Err(err) => panic!("{:?}", err),
 //! };
 //! ```
-//! Notice that we also used `collapse_noversion()` above.
-//! This method simplifies the derivation tree to get rid
-//! of the `NoVersion` external incompatibilities in the derivation tree.
+//! Notice that we also used
+//! [collapse_no_versions()](crate::report::DerivationTree::collapse_no_versions) above.
+//! This method simplifies the derivation tree to get rid of the
+//! [NoVersions](crate::report::External::NoVersions)
+//! external incompatibilities in the derivation tree.
 //! So instead of seeing things like this in the report:
 //! ```txt
 //! Because there is no version of foo in 1.0.1 <= v < 2.0.0
@@ -157,6 +206,7 @@
 //! with a cache, you may want to know that some versions
 //! do not exist in your cache.
 
+#![allow(clippy::rc_buffer)]
 #![warn(missing_docs)]
 
 pub mod error;
@@ -165,6 +215,7 @@ pub mod range;
 pub mod report;
 pub mod solver;
 pub mod term;
+pub mod type_aliases;
 pub mod version;
 
 mod internal;

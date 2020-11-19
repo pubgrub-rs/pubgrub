@@ -1,0 +1,26 @@
+extends:
+  - '@commitlint/config-conventional'
+
+# https://commitlint.js.org/#/reference-rules
+rules:
+  header-max-length: [ 2, 'always', 72 ]
+  body-max-line-length: [ 1, 'always', 72 ]
+  footer-max-line-length: [ 1, 'always', 72 ]
+  footer-leading-blank: [ 1, 'always' ]
+  type-enum: [
+      2,
+      'always',
+    [
+        'build',
+        'ci',
+        'docs',
+        'feat',
+        'fix',
+        'perf',
+        'refactor',
+        'release',
+        'revert',
+        'style',
+        'test',
+    ]
+  ]

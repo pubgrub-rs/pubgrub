@@ -1,6 +1,4 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// SPDX-License-Identifier: MPL-2.0
 
 //! Assignments are the building blocks of a PubGrub partial solution.
 //! (partial solution = the current state of the solution we are building in the algorithm).
@@ -26,8 +24,6 @@ pub enum Assignment<P: Package, V: Version> {
     Derivation {
         /// The package corresponding to the derivation.
         package: P,
-        /// Term of the derivation.
-        term: Term<V>,
         /// Incompatibility cause of the derivation.
         cause: Incompatibility<P, V>,
     },
@@ -42,13 +38,13 @@ impl<P: Package, V: Version> Assignment<P, V> {
         }
     }
 
-    /// Retrieve the current assignment as a `Term`.
+    /// Retrieve the current assignment as a [Term].
     /// If this is decision, it returns a positive term with that exact version.
     /// Otherwise, if this is a derivation, just returns its term.
     pub fn as_term(&self) -> Term<V> {
         match &self {
             Self::Decision { version, .. } => Term::exact(version.clone()),
-            Self::Derivation { term, .. } => term.clone(),
+            Self::Derivation { package, cause } => cause.get(&package).unwrap().negate(),
         }
     }
 }
