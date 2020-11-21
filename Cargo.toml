@@ -3,11 +3,15 @@
 [package]
 name = "pubgrub"
 version = "0.2.0"
-authors = ["Matthieu Pizenberg <matthieu.pizenberg@gmail.com>", "Alex Tokarev <aleksator@gmail.com>", "Jacob Finkelman <Eh2406@wayne.edu>"]
+authors = [
+    "Matthieu Pizenberg <matthieu.pizenberg@gmail.com>",
+    "Alex Tokarev <aleksator@gmail.com>",
+    "Jacob Finkelman <Eh2406@wayne.edu>",
+]
 edition = "2018"
 description = "PubGrub version solving algorithm"
 readme = "README.md"
-repository = "https://github.com/mpizenberg/pubgrub-rs"
+repository = "https://github.com/pubgrub-rs/pubgrub"
 license = "MPL-2.0"
 keywords = ["dependency", "pubgrub", "semver", "solver", "version"]
 categories = ["algorithms"]
@@ -22,8 +26,8 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
 proptest = "0.10.1"
-ron="0.6"
-varisat="0.2.2"
+ron = "0.6"
+varisat = "0.2.2"
 criterion = "0.3"
 
 [[bench]]
