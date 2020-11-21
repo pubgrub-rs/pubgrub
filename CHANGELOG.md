@@ -2,9 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased [(diff)][diff-unreleased]
+## Unreleased [(diff)][unreleased-diff]
 
-## [0.2.0] - 2020-11-19 - [(diff with 0.1.0)][diff-0.2.0]
+## [0.2.0] - 2020-11-19 - [(diff with 0.1.0)][0.1.0-diff]
 
 This release brings many important improvements to PubGrub.
 The gist of it is:
@@ -78,7 +78,9 @@ The gist of it is:
 
 #### Changed
 
-- CI workflow was improved (`./github/workflows/`), including a check for [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) and [Clippy ](https://github.com/rust-lang/rust-clippy) for source code linting.
+- CI workflow was improved (`./github/workflows/`), including a check for
+  [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) and
+  [Clippy](https://github.com/rust-lang/rust-clippy) for source code linting.
 - Using SPDX license identifiers instead of MPL-2.0 classic file headers.
 - `State.incompatibilities` is now wrapped inside a `Rc`.
 - `DecisionLevel(u32)` is used in place of `usize` for partial solution decision levels.
@@ -132,6 +134,6 @@ The gist of it is:
 - `.github/workflows/` CI to automatically build, test and document on push and pull requests.
 
 [0.2.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.2.0
+[0.1.0-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.1.0
-[diff-unreleased]: https://github.com/pubgrub-rs/pubgrub/compare/release...dev
-[diff-0.2.0]: https://github.com/mpizenberg/elm-pointer-events/compare/v0.1.0...v0.2.0
+[unreleased-diff]: https://github.com/pubgrub-rs/pubgrub/compare/release...dev
