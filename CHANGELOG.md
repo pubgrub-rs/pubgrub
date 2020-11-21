@@ -2,9 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased [(diff)][diff-unreleased]
+## Unreleased [(diff)][unreleased-diff]
 
-## [0.2.0] - 2020-11-19 - [(diff with 0.1.0)][diff-0.2.0]
+## [0.2.0] - 2020-11-19 - [(diff with 0.1.0)][0.2.0-diff]
 
 This release brings many important improvements to PubGrub.
 The gist of it is:
@@ -134,6 +134,6 @@ The gist of it is:
 - `.github/workflows/` CI to automatically build, test and document on push and pull requests.
 
 [0.2.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.2.0
-[diff-0.2.0]: https://github.com/pubgrub-rs/pubgrub/compare/v0.1.0...v0.2.0
+[0.2.0-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.1.0
-[diff-unreleased]: https://github.com/pubgrub-rs/pubgrub/compare/release...dev
+[unreleased-diff]: https://github.com/pubgrub-rs/pubgrub/compare/release...dev
