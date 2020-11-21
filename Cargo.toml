@@ -25,6 +25,14 @@ proptest = "0.10.1"
 ron="0.6"
 varisat="0.2.2"
 criterion = "0.3"
+# crates-index = "0.16.2"
+crates-index = { git = "https://github.com/frewsxcv/rust-crates-index.git", branch = "master" }
+# semver = "0.11"
+semver = { git = "https://github.com/mpizenberg/semver.git", branch = "export_requirement" }
+
+[[example]]
+name = "crates"
+required-features = ["serde"]
 
 [[bench]]
 name = "large_case"
