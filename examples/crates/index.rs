@@ -1,17 +1,19 @@
+use core::borrow::Borrow;
 use crates_index;
 use pubgrub::range::Range;
+use pubgrub::solver::{Dependencies, DependencyProvider};
 use pubgrub::type_aliases::Map;
 use pubgrub::version::SemanticVersion as V;
 use semver::{ReqParseError, SemVerError};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet as Set;
+use std::collections::{BTreeMap, BTreeSet as Set};
 use std::convert::TryFrom;
 use thiserror::Error;
 
 #[derive(Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Index {
-    pub crates: Map<Crate, Map<V, CrateDeps>>,
+    pub crates: Map<Crate, BTreeMap<V, CrateDeps>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -142,4 +144,64 @@ fn predicates_intersection(predicates: &[semver::Predicate]) -> Result<Range<V>,
         range = range.intersection(&r);
     }
     Ok(range)
+}
+
+impl Index {
+    pub fn available_versions(&self, package: &String) -> impl Iterator<Item = &V> {
+        self.crates
+            .get(package)
+            .map(|k| k.keys())
+            .into_iter()
+            .flatten()
+            .rev()
+    }
+}
+
+impl DependencyProvider<String, V> for Index {
+    fn choose_package_version<T: Borrow<String>, U: Borrow<Range<V>>>(
+        &self,
+        potential_packages: impl Iterator<Item = (T, U)>,
+    ) -> Result<(T, Option<V>), Box<dyn std::error::Error>> {
+        let mut potential_packages = potential_packages;
+        let (package, range) = potential_packages.next().unwrap();
+        let (package_name, features) = from_crate_id(package.borrow());
+        let version = self
+            .available_versions(&package_name.to_string())
+            .filter(|v| range.borrow().contains(v))
+            .next();
+        drop(features);
+        Ok((package, version.cloned()))
+    }
+
+    fn get_dependencies(
+        &self,
+        package: &String,
+        version: &V,
+    ) -> Result<Dependencies<String, V>, Box<dyn std::error::Error>> {
+        let (package_name, features) = from_crate_id(package.as_str());
+        match self.crates.get(package_name).and_then(|p| p.get(version)) {
+            None => Ok(Dependencies::Unknown),
+            Some(crate_deps) => {
+                let mut all_deps = Map::default();
+                // TODO: also add features dependencies.
+                for (dep_name, dep) in crate_deps.mandatory_deps.normal.iter() {
+                    let dep_id = to_crate_id(dep_name, &dep.features);
+                    all_deps.insert(dep_id, dep.range.clone());
+                }
+                Ok(Dependencies::Known(all_deps))
+            }
+        }
+    }
+}
+
+pub fn to_crate_id(pkg: &str, features: &Set<Feature>) -> String {
+    let features_str: Vec<&str> = features.iter().map(|f| f.as_str()).collect();
+    format!("{}:{}", pkg, features_str.join(","))
+}
+
+pub fn from_crate_id(id: &str) -> (&str, impl Iterator<Item = &str>) {
+    let mut parts = id.split(':');
+    let name = parts.next().unwrap();
+    let feats = parts.next().unwrap();
+    (name, feats.split(','))
 }

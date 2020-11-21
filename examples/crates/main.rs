@@ -5,6 +5,7 @@ use crates_index::Version;
 use pubgrub::type_aliases::Map;
 use pubgrub::version::SemanticVersion as V;
 use semver;
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
 mod index;
@@ -18,7 +19,7 @@ fn main() {
 
     // output_all_crates(&index);
     // output_all_requirements(&index);
-    convert_index(&index).unwrap();
+    // convert_index(&index).unwrap();
 
     // for crate_ in index.crates() {
     //     for v in crate_.versions().iter() {
@@ -29,6 +30,8 @@ fn main() {
     //         print_dep_default(v);
     //     }
     // }
+
+    solve_all_index().unwrap();
 }
 
 fn output_all_crates(index: &Index) {
@@ -50,7 +53,7 @@ fn output_all_requirements(index: &Index) {
 }
 
 fn convert_index(index: &Index) -> Result<index::Index, ConvertCrateError> {
-    let mut crates: Map<String, Map<V, CrateDeps>> = Map::default();
+    let mut crates: Map<String, BTreeMap<V, CrateDeps>> = Map::default();
     for crate_ in index.crates() {
         for v in crate_.versions().iter() {
             // Convert semver into SemanticVersion (V).
@@ -75,7 +78,9 @@ fn convert_index(index: &Index) -> Result<index::Index, ConvertCrateError> {
                     continue;
                 }
             };
-            let v_entry = crates.entry(v.name().to_string()).or_insert(Map::default());
+            let v_entry = crates
+                .entry(v.name().to_string())
+                .or_insert(BTreeMap::new());
             v_entry.insert(sem_ver, crate_deps);
         }
     }
@@ -92,6 +97,16 @@ fn convert_index(index: &Index) -> Result<index::Index, ConvertCrateError> {
     std::fs::write("temp/index.ron", &index_str).expect("woops ron write");
 
     Ok(registry)
+}
+
+fn solve_all_index() -> Result<(), Box<dyn std::error::Error>> {
+    eprintln!("Loading ron file");
+    let index_str = std::fs::read_to_string("temp/index.ron")?;
+    let deps_provider: index::Index = ron::de::from_str(&index_str)?;
+    eprintln!("Solving dependencies");
+    let solution = pubgrub::solver::resolve(&deps_provider, "emulator_6502:".into(), (0, 1, 0))?;
+    println!("{:?}", solution);
+    Ok(())
 }
 
 fn print_if_not_yanked(v: &Version) {
