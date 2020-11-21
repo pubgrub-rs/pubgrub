@@ -105,8 +105,8 @@ impl TryFrom<&crates_index::Dependency> for Dep {
         let range = req_to_range(&req).map_err(ConvertDepError::ContainsPreRealease)?;
         let mut features: Set<Feature> = dep.features().iter().cloned().collect();
         if dep.has_default_features() {
-            // Default features correspond to the empty string "" feature.
-            features.insert("".to_string());
+            // Default features correspond to the "_" feature.
+            features.insert("_".to_string());
         }
         Ok(Dep { range, features })
     }
