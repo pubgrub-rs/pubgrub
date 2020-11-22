@@ -25,6 +25,8 @@ proptest = "0.10.1"
 ron="0.6"
 varisat="0.2.2"
 criterion = "0.3"
+crates-index={git="https://github.com/frewsxcv/rust-crates-index"}
+semver = "0.11.0"
 
 [[bench]]
 name = "large_case"
