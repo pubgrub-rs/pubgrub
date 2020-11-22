@@ -6,6 +6,7 @@ use pubgrub::type_aliases::Map;
 use pubgrub::version::SemanticVersion as V;
 use semver::{ReqParseError, SemVerError};
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet as Set};
 use std::convert::TryFrom;
 use thiserror::Error;
@@ -157,7 +158,21 @@ impl Index {
     }
 }
 
-impl DependencyProvider<String, V> for Index {
+pub struct CrateProvider<'a> {
+    pub index: &'a Index,
+    pub start_time: RefCell<std::time::Instant>,
+}
+
+impl<'a> CrateProvider<'a> {
+    pub fn new(index: &'a Index) -> Self {
+        CrateProvider {
+            index,
+            start_time: RefCell::new(std::time::Instant::now()),
+        }
+    }
+}
+
+impl<'a> DependencyProvider<String, V> for CrateProvider<'a> {
     fn choose_package_version<T: Borrow<String>, U: Borrow<Range<V>>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
@@ -166,6 +181,7 @@ impl DependencyProvider<String, V> for Index {
         let (package, range) = potential_packages.next().unwrap();
         let (package_name, features) = from_crate_id(package.borrow());
         let version = self
+            .index
             .available_versions(&package_name.to_string())
             .filter(|v| range.borrow().contains(v))
             .next();
@@ -179,7 +195,12 @@ impl DependencyProvider<String, V> for Index {
         version: &V,
     ) -> Result<Dependencies<String, V>, Box<dyn std::error::Error>> {
         let (package_name, features) = from_crate_id(package.as_str());
-        match self.crates.get(package_name).and_then(|p| p.get(version)) {
+        match self
+            .index
+            .crates
+            .get(package_name)
+            .and_then(|p| p.get(version))
+        {
             None => Ok(Dependencies::Unknown),
             Some(crate_deps) => {
                 let mut all_deps = Map::default();
@@ -190,6 +211,14 @@ impl DependencyProvider<String, V> for Index {
                 }
                 Ok(Dependencies::Known(all_deps))
             }
+        }
+    }
+
+    fn should_cancel(&self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.start_time.borrow().elapsed().as_secs() > 10 {
+            Err("Too long".into())
+        } else {
+            Ok(())
         }
     }
 }

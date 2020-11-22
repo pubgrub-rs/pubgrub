@@ -29,6 +29,7 @@ criterion = "0.3"
 crates-index = { git = "https://github.com/frewsxcv/rust-crates-index.git", branch = "master" }
 # semver = "0.11"
 semver = { git = "https://github.com/mpizenberg/semver.git", branch = "export_requirement" }
+indicatif = "0.15.0"
 
 [[example]]
 name = "crates"

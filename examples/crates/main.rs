@@ -2,6 +2,7 @@
 
 use crates_index::Index;
 use crates_index::Version;
+use pubgrub::error::PubGrubError;
 use pubgrub::type_aliases::Map;
 use pubgrub::version::SemanticVersion as V;
 use semver;
@@ -102,10 +103,31 @@ fn convert_index(index: &Index) -> Result<index::Index, ConvertCrateError> {
 fn solve_all_index() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("Loading ron file");
     let index_str = std::fs::read_to_string("temp/index.ron")?;
-    let deps_provider: index::Index = ron::de::from_str(&index_str)?;
+    let deps_index: index::Index = ron::de::from_str(&index_str)?;
+    let mut deps_provider = index::CrateProvider::new(&deps_index);
     eprintln!("Solving dependencies");
-    let solution = pubgrub::solver::resolve(&deps_provider, "emulator_6502:".into(), (0, 1, 0))?;
-    println!("{:?}", solution);
+    let version_count: usize = deps_provider.index.crates.values().map(|p| p.len()).sum();
+    let mut solved_count = 0;
+    let pb = indicatif::ProgressBar::new(version_count as u64);
+    let to_root_id = |p| format!("{}:", p);
+    for (package, versions) in deps_provider.index.crates.iter() {
+        for v in versions.keys() {
+            let mut start_time = deps_provider.start_time.borrow_mut();
+            *start_time = std::time::Instant::now();
+            drop(start_time);
+            match pubgrub::solver::resolve(&deps_provider, to_root_id(package), v.clone()) {
+                Ok(_) => solved_count += 1,
+                // Err(_) => eprintln!("{} @ {}", package, v),
+                Err(PubGrubError::ErrorInShouldCancel(_)) => {
+                    eprintln!("\nshould cancel {} @ {}\n", package, v);
+                }
+                Err(_) => {}
+            }
+            pb.inc(1);
+        }
+    }
+    pb.finish();
+    println!("Found solutions for {} / {}", solved_count, version_count);
     Ok(())
 }
 
