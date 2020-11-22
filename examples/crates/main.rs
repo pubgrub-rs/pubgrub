@@ -20,7 +20,7 @@ fn main() {
 
     // output_all_crates(&index);
     // output_all_requirements(&index);
-    // convert_index(&index).unwrap();
+    // convert_index(&index).unwrap();             // DO THIS FIRST
 
     // for crate_ in index.crates() {
     //     for v in crate_.versions().iter() {
@@ -32,7 +32,7 @@ fn main() {
     //     }
     // }
 
-    solve_all_index().unwrap();
+    solve_all_index().unwrap(); // THEN DO THIS
 }
 
 fn output_all_crates(index: &Index) {
