@@ -17,6 +17,7 @@
 use std::cmp::Ordering;
 use std::fmt;
 
+use crate::internal::small_vec::SmallVec;
 use crate::version::Version;
 
 /// A Range is a set of versions.
@@ -24,7 +25,7 @@ use crate::version::Version;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Range<V: Version> {
-    segments: Vec<Interval<V>>,
+    segments: SmallVec<Interval<V>>,
 }
 
 type Interval<V> = (V, Option<V>);
@@ -34,7 +35,7 @@ impl<V: Version> Range<V> {
     /// Empty set of versions.
     pub fn none() -> Self {
         Self {
-            segments: Vec::new(),
+            segments: SmallVec::empty(),
         }
     }
 
@@ -47,14 +48,14 @@ impl<V: Version> Range<V> {
     pub fn exact(v: impl Into<V>) -> Self {
         let v = v.into();
         Self {
-            segments: vec![(v.clone(), Some(v.bump()))],
+            segments: SmallVec::one((v.clone(), Some(v.bump()))),
         }
     }
 
     /// Set of all versions higher or equal to some version.
     pub fn higher_than(v: impl Into<V>) -> Self {
         Self {
-            segments: vec![(v.into(), None)],
+            segments: SmallVec::one((v.into(), None)),
         }
     }
 
@@ -65,7 +66,7 @@ impl<V: Version> Range<V> {
             Self::none()
         } else {
             Self {
-                segments: vec![(V::lowest(), Some(v))],
+                segments: SmallVec::one((V::lowest(), Some(v))),
             }
         }
     }
@@ -78,7 +79,7 @@ impl<V: Version> Range<V> {
         let v2 = v2.into();
         if v1 < v2 {
             Self {
-                segments: vec![(v1, Some(v2))],
+                segments: SmallVec::one((v1, Some(v2))),
             }
         } else {
             Self::none()
@@ -109,13 +110,9 @@ impl<V: Version> Range<V> {
             // First high bound is not +∞
             Some((v1, Some(v2))) => {
                 if v1 == &V::lowest() {
-                    Self {
-                        segments: Self::negate_segments(v2.clone(), &self.segments[1..]),
-                    }
+                    Self::negate_segments(v2.clone(), &self.segments.as_slice()[1..])
                 } else {
-                    Self {
-                        segments: Self::negate_segments(V::lowest(), &self.segments),
-                    }
+                    Self::negate_segments(V::lowest(), &self.segments.as_slice())
                 }
             }
         }
@@ -125,8 +122,8 @@ impl<V: Version> Range<V> {
     /// For example:
     ///    [ (v1, None) ] => [ (start, Some(v1)) ]
     ///    [ (v1, Some(v2)) ] => [ (start, Some(v1)), (v2, None) ]
-    fn negate_segments(start: V, segments: &[Interval<V>]) -> Vec<Interval<V>> {
-        let mut complement_segments = Vec::with_capacity(1 + segments.len());
+    fn negate_segments(start: V, segments: &[Interval<V>]) -> Range<V> {
+        let mut complement_segments = SmallVec::empty();
         let mut start = Some(start);
         for (v1, some_v2) in segments.iter() {
             // start.unwrap() is fine because `segments` is not exposed,
@@ -137,7 +134,10 @@ impl<V: Version> Range<V> {
         if let Some(last) = start {
             complement_segments.push((last, None));
         }
-        complement_segments
+
+        Self {
+            segments: complement_segments,
+        }
     }
 
     // Union and intersection ##################################################
@@ -149,16 +149,9 @@ impl<V: Version> Range<V> {
 
     /// Compute the intersection of two sets of versions.
     pub fn intersection(&self, other: &Self) -> Self {
-        Self {
-            segments: Self::intersection_segments(&self.segments, &other.segments),
-        }
-    }
-
-    /// Helper function performing intersection of two interval segments.
-    fn intersection_segments(s1: &[Interval<V>], s2: &[Interval<V>]) -> Vec<Interval<V>> {
-        let mut segments = Vec::with_capacity(s1.len().min(s2.len()));
-        let mut left_iter = s1.iter();
-        let mut right_iter = s2.iter();
+        let mut segments = SmallVec::empty();
+        let mut left_iter = self.segments.iter();
+        let mut right_iter = other.segments.iter();
         let mut left = left_iter.next();
         let mut right = right_iter.next();
         loop {
@@ -190,13 +183,17 @@ impl<V: Version> Range<V> {
                         left = left_iter.next();
                     }
                     Ordering::Equal => {
-                        segments.extend(left_iter.cloned());
+                        for l in left_iter.cloned() {
+                            segments.push(l)
+                        }
                         break;
                     }
                     Ordering::Greater => {
                         let start = l1.max(r1).to_owned();
                         segments.push((start, Some(l2.to_owned())));
-                        segments.extend(left_iter.cloned());
+                        for l in left_iter.cloned() {
+                            segments.push(l)
+                        }
                         break;
                     }
                 },
@@ -207,13 +204,17 @@ impl<V: Version> Range<V> {
                         right = right_iter.next();
                     }
                     Ordering::Equal => {
-                        segments.extend(right_iter.cloned());
+                        for r in right_iter.cloned() {
+                            segments.push(r)
+                        }
                         break;
                     }
                     Ordering::Greater => {
                         let start = l1.max(r1).to_owned();
                         segments.push((start, Some(r2.to_owned())));
-                        segments.extend(right_iter.cloned());
+                        for r in right_iter.cloned() {
+                            segments.push(r)
+                        }
                         break;
                     }
                 },
@@ -231,7 +232,8 @@ impl<V: Version> Range<V> {
                 }
             }
         }
-        segments
+
+        Self { segments }
     }
 }
 
@@ -308,7 +310,7 @@ pub mod tests {
             vec.sort_unstable();
             vec.dedup();
             let mut pair_iter = vec.chunks_exact(2);
-            let mut segments = Vec::with_capacity(vec.len() / 2 + 1);
+            let mut segments = SmallVec::empty();
             while let Some([v1, v2]) = pair_iter.next() {
                 segments.push((NumberVersion(*v1), Some(NumberVersion(*v2))));
             }

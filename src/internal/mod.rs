@@ -7,3 +7,4 @@ pub mod core;
 pub mod incompatibility;
 pub mod memory;
 pub mod partial_solution;
+pub mod small_vec;
