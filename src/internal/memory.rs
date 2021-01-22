@@ -38,6 +38,11 @@ impl<P: Package, V: Version> Memory<P, V> {
         }
     }
 
+    /// Clears the memory.
+    pub fn clear(&mut self) {
+        self.assignments.clear();
+    }
+
     /// Retrieve intersection of terms in memory related to package.
     pub fn term_intersection_for_package(&mut self, package: &P) -> Option<&Term<V>> {
         self.assignments

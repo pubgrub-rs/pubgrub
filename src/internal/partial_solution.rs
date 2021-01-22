@@ -100,24 +100,26 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     /// Backtrack the partial solution to a given decision level.
     pub fn backtrack(&mut self, decision_level: DecisionLevel) {
-        // TODO: improve with dichotomic search.
         let pos = self
             .history
-            .iter()
-            .rposition(|dated_assignment| dated_assignment.decision_level == decision_level)
-            .unwrap_or(self.history.len() - 1);
-        *self = Self::from_assignments(
-            std::mem::take(&mut self.history)
-                .into_iter()
-                .take(pos + 1)
-                .map(|dated_assignment| dated_assignment.assignment),
-        );
-    }
+            .binary_search_by(|probe| {
+                probe
+                    .decision_level
+                    .cmp(&decision_level)
+                    // `binary_search_by` does not guarantee which element to return when more
+                    // then one match. By all ways claiming that it does not match we ensure we
+                    // get the last one.
+                    .then(std::cmp::Ordering::Less)
+            })
+            .unwrap_or_else(|x| x);
 
-    fn from_assignments(assignments: impl Iterator<Item = Assignment<P, V>>) -> Self {
-        let mut partial_solution = Self::empty();
-        assignments.for_each(|a| partial_solution.add_assignment(a));
-        partial_solution
+        self.history.truncate(pos);
+        self.decision_level = self.history.last().expect("no history left").decision_level;
+        self.memory.clear();
+        let mem = &mut self.memory;
+        self.history
+            .iter()
+            .for_each(|da| mem.add_assignment(&da.assignment));
     }
 
     /// Extract potential packages for the next iteration of unit propagation.
