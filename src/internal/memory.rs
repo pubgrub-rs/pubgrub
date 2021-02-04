@@ -3,12 +3,16 @@
 //! A Memory acts like a structured partial solution
 //! where terms are regrouped by package in a [Map](crate::type_aliases::Map).
 
+use id_arena::Arena;
+
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::package::Package;
 use crate::range::Range;
 use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
+
+use super::incompatibility::Incompatibility;
 
 /// A memory is the set of all assignments in the partial solution,
 /// organized by package instead of historically ordered.
@@ -51,12 +55,17 @@ impl<P: Package, V: Version> Memory<P, V> {
     }
 
     /// Building step of a Memory from a given assignment.
-    pub fn add_assignment(&mut self, assignment: &Assignment<P, V>) {
+    pub fn add_assignment(
+        &mut self,
+        assignment: &Assignment<P, V>,
+        store: &Arena<Incompatibility<P, V>>,
+    ) {
         match assignment {
             Decision { package, version } => self.add_decision(package.clone(), version.clone()),
-            Derivation { package, cause } => {
-                self.add_derivation(package.clone(), cause.get(&package).unwrap().negate())
-            }
+            Derivation { package, cause } => self.add_derivation(
+                package.clone(),
+                store[*cause].get(&package).unwrap().negate(),
+            ),
         }
     }
 

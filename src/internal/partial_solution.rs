@@ -3,6 +3,8 @@
 //! The partial solution is the current state
 //! of the solution being built by the algorithm.
 
+use id_arena::{Arena, Id};
+
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::memory::Memory;
@@ -64,12 +66,16 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         }
     }
 
-    fn add_assignment(&mut self, assignment: Assignment<P, V>) {
+    fn add_assignment(
+        &mut self,
+        assignment: Assignment<P, V>,
+        store: &Arena<Incompatibility<P, V>>,
+    ) {
         self.decision_level = match assignment {
             Decision { .. } => self.decision_level + DecisionLevel(1),
             Derivation { .. } => self.decision_level,
         };
-        self.memory.add_assignment(&assignment);
+        self.memory.add_assignment(&assignment, store);
         self.history.push(DatedAssignment {
             decision_level: self.decision_level,
             assignment,
@@ -77,13 +83,18 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Add a decision to the partial solution.
-    pub fn add_decision(&mut self, package: P, version: V) {
-        self.add_assignment(Decision { package, version });
+    pub fn add_decision(&mut self, package: P, version: V, store: &Arena<Incompatibility<P, V>>) {
+        self.add_assignment(Decision { package, version }, store);
     }
 
     /// Add a derivation to the partial solution.
-    pub fn add_derivation(&mut self, package: P, cause: Incompatibility<P, V>) {
-        self.add_assignment(Derivation { package, cause });
+    pub fn add_derivation(
+        &mut self,
+        package: P,
+        cause: Id<Incompatibility<P, V>>,
+        store: &Arena<Incompatibility<P, V>>,
+    ) {
+        self.add_assignment(Derivation { package, cause }, store);
     }
 
     /// If a partial solution has, for every positive derivation,
@@ -99,7 +110,11 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Backtrack the partial solution to a given decision level.
-    pub fn backtrack(&mut self, decision_level: DecisionLevel) {
+    pub fn backtrack(
+        &mut self,
+        decision_level: DecisionLevel,
+        store: &Arena<Incompatibility<P, V>>,
+    ) {
         let pos = self
             .history
             .binary_search_by(|probe| {
@@ -119,7 +134,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         let mem = &mut self.memory;
         self.history
             .iter()
-            .for_each(|da| mem.add_assignment(&da.assignment));
+            .for_each(|da| mem.add_assignment(&da.assignment, store));
     }
 
     /// Extract potential packages for the next iteration of unit propagation.
@@ -143,6 +158,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         package: P,
         version: V,
         new_incompatibilities: &[Incompatibility<P, V>],
+        store: &Arena<Incompatibility<P, V>>,
     ) {
         let not_satisfied = |incompat: &Incompatibility<P, V>| {
             incompat.relation(|p| {
@@ -157,7 +173,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         // Check none of the dependencies (new_incompatibilities)
         // would create a conflict (be satisfied).
         if new_incompatibilities.iter().all(not_satisfied) {
-            self.add_decision(package, version);
+            self.add_decision(package, version, store);
         }
     }
 
@@ -170,14 +186,15 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn find_satisfier_and_previous_satisfier_level(
         &self,
         incompat: &Incompatibility<P, V>,
+        store: &Arena<Incompatibility<P, V>>,
     ) -> (Assignment<P, V>, DecisionLevel, DecisionLevel) {
         let SatisfierAndPreviousHistory {
             satisfier,
             previous_history,
-        } = Self::find_satisfier(incompat, self.history.as_slice())
+        } = Self::find_satisfier(incompat, self.history.as_slice(), store)
             .expect("We should always find a satisfier if called in the right context.");
         let previous_satisfier_level =
-            Self::find_previous_satisfier(incompat, &satisfier.assignment, previous_history);
+            Self::find_previous_satisfier(incompat, &satisfier.assignment, previous_history, store);
         (
             satisfier.assignment,
             satisfier.decision_level,
@@ -191,8 +208,14 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     fn find_satisfier<'a>(
         incompat: &Incompatibility<P, V>,
         history: &'a [DatedAssignment<P, V>],
+        store: &Arena<Incompatibility<P, V>>,
     ) -> Option<SatisfierAndPreviousHistory<'a, P, V>> {
-        Self::find_satisfier_helper(incompat, Self::new_accum_satisfied_from(incompat), history)
+        Self::find_satisfier_helper(
+            incompat,
+            Self::new_accum_satisfied_from(incompat),
+            history,
+            store,
+        )
     }
 
     /// Earliest assignment in the partial solution before satisfier
@@ -202,15 +225,16 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         incompat: &Incompatibility<P, V>,
         satisfier: &Assignment<P, V>,
         previous_assignments: &'a [DatedAssignment<P, V>],
+        store: &Arena<Incompatibility<P, V>>,
     ) -> DecisionLevel {
         let package = satisfier.package().clone();
         let incompat_term = incompat.get(&package).expect("This should exist");
-        let satisfier_term = satisfier.as_term();
+        let satisfier_term = satisfier.as_term(store);
         let is_satisfied = satisfier_term.subset_of(incompat_term);
         let mut accum_satisfied = Self::new_accum_satisfied_from(incompat);
         accum_satisfied.insert(package, (is_satisfied, satisfier_term));
         // Search previous satisfier.
-        Self::find_satisfier_helper(incompat, accum_satisfied, previous_assignments).map_or(
+        Self::find_satisfier_helper(incompat, accum_satisfied, previous_assignments, store).map_or(
             DecisionLevel(1),
             |satisfier_and_previous_history| {
                 satisfier_and_previous_history
@@ -235,6 +259,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         incompat: &Incompatibility<P, V>,
         accum_satisfied: Map<P, (bool, Term<V>)>,
         all_assignments: &'a [DatedAssignment<P, V>],
+        store: &Arena<Incompatibility<P, V>>,
     ) -> Option<SatisfierAndPreviousHistory<'a, P, V>> {
         let mut accum_satisfied = accum_satisfied;
         for (idx, dated_assignment) in all_assignments.iter().enumerate() {
@@ -250,7 +275,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                 Some(x) => x,
             };
             // Check if that incompat term is satisfied by our accumulated terms intersection.
-            *accum_term = accum_term.intersection(&dated_assignment.assignment.as_term());
+            *accum_term = accum_term.intersection(&dated_assignment.assignment.as_term(store));
             *is_satisfied = accum_term.subset_of(incompat_term);
             // Check if we have found the satisfier
             // (all booleans in accum_satisfied are true).
