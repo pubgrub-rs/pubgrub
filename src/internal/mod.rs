@@ -2,6 +2,7 @@
 
 //! Non exposed modules.
 
+pub mod arena;
 pub mod assignment;
 pub mod core;
 pub mod incompatibility;

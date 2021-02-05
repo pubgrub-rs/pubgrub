@@ -6,6 +6,7 @@
 use std::collections::HashSet as Set;
 use std::fmt;
 
+use crate::internal::arena::{Arena, Id};
 use crate::internal::small_map::SmallMap;
 use crate::package::Package;
 use crate::range::Range;
@@ -13,8 +14,6 @@ use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
 use crate::solver::DependencyConstraints;
 use crate::term::{self, Term};
 use crate::version::Version;
-
-use id_arena::{Arena, Id};
 /// An incompatibility is a set of terms for different packages
 /// that should never be satisfied all together.
 /// An incompatibility usually originates from a package dependency.
@@ -36,6 +35,8 @@ pub struct Incompatibility<P: Package, V: Version> {
     kind: Kind<P, V>,
 }
 
+pub type IncompId<P, V> = Id<Incompatibility<P, V>>;
+
 #[derive(Debug, Clone)]
 enum Kind<P: Package, V: Version> {
     /// Initial incompatibility aiming at picking the root package for the first decision.
@@ -47,7 +48,7 @@ enum Kind<P: Package, V: Version> {
     /// Incompatibility coming from the dependencies of a given package.
     FromDependencyOf(P, Range<V>, P, Range<V>),
     /// Derived from two causes. Stores cause ids.
-    DerivedFrom(Id<Incompatibility<P, V>>, Id<Incompatibility<P, V>>),
+    DerivedFrom(IncompId<P, V>, IncompId<P, V>),
 }
 
 /// A type alias for a pair of [Package] and a corresponding [Term].
@@ -259,7 +260,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                 let cause2 = Self::build_derivation_tree(*id2, shared_ids, store);
                 let derived = Derived {
                     terms: store[self_id].package_terms.as_map(),
-                    shared_id: shared_ids.get(&self_id).map(|id| id.index()),
+                    shared_id: shared_ids.get(&self_id).map(|id| id.into_raw()),
                     cause1: Box::new(cause1),
                     cause2: Box::new(cause2),
                 };

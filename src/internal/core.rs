@@ -6,15 +6,14 @@
 use std::{collections::HashSet as Set, rc::Rc};
 
 use crate::error::PubGrubError;
+use crate::internal::arena::Arena;
 use crate::internal::assignment::Assignment::{Decision, Derivation};
+use crate::internal::incompatibility::IncompId;
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::package::Package;
 use crate::report::DerivationTree;
 use crate::version::Version;
-
-use id_arena::{Arena, Id};
-
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
 pub struct State<P: Package, V: Version> {
@@ -22,7 +21,7 @@ pub struct State<P: Package, V: Version> {
     root_version: V,
 
     /// TODO: remove pub.
-    pub incompatibilities: Rc<Vec<Id<Incompatibility<P, V>>>>,
+    pub incompatibilities: Rc<Vec<IncompId<P, V>>>,
 
     /// Partial solution.
     /// TODO: remove pub.
@@ -40,7 +39,7 @@ pub struct State<P: Package, V: Version> {
 impl<P: Package, V: Version> State<P, V> {
     /// Initialization of PubGrub state.
     pub fn init(root_package: P, root_version: V) -> Self {
-        let mut incompatibility_store = Arena::with_capacity(2);
+        let mut incompatibility_store = Arena::new();
         let not_root_id = incompatibility_store.alloc(Incompatibility::not_root(
             root_package.clone(),
             root_version.clone(),
@@ -118,8 +117,8 @@ impl<P: Package, V: Version> State<P, V> {
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     fn conflict_resolution(
         &mut self,
-        incompatibility: Id<Incompatibility<P, V>>,
-    ) -> Result<(P, Id<Incompatibility<P, V>>), PubGrubError<P, V>> {
+        incompatibility: IncompId<P, V>,
+    ) -> Result<(P, IncompId<P, V>), PubGrubError<P, V>> {
         let mut current_incompat = incompatibility;
         let mut current_incompat_changed = false;
         loop {
@@ -172,7 +171,7 @@ impl<P: Package, V: Version> State<P, V> {
     /// Backtracking.
     fn backtrack(
         &mut self,
-        incompat: Id<Incompatibility<P, V>>,
+        incompat: IncompId<P, V>,
         incompat_changed: bool,
         decision_level: DecisionLevel,
     ) {
@@ -185,15 +184,12 @@ impl<P: Package, V: Version> State<P, V> {
 
     // Error reporting #########################################################
 
-    fn build_derivation_tree(&self, incompat: Id<Incompatibility<P, V>>) -> DerivationTree<P, V> {
+    fn build_derivation_tree(&self, incompat: IncompId<P, V>) -> DerivationTree<P, V> {
         let shared_ids = self.find_shared_ids(incompat);
         Incompatibility::build_derivation_tree(incompat, &shared_ids, &self.incompatibility_store)
     }
 
-    fn find_shared_ids(
-        &self,
-        incompat: Id<Incompatibility<P, V>>,
-    ) -> Set<Id<Incompatibility<P, V>>> {
+    fn find_shared_ids(&self, incompat: IncompId<P, V>) -> Set<IncompId<P, V>> {
         let mut all_ids = Set::new();
         let mut shared_ids = Set::new();
         let mut stack = vec![incompat];

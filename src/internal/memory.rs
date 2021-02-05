@@ -3,16 +3,14 @@
 //! A Memory acts like a structured partial solution
 //! where terms are regrouped by package in a [Map](crate::type_aliases::Map).
 
-use id_arena::Arena;
-
+use crate::internal::arena::Arena;
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
+use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
 use crate::range::Range;
 use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
-
-use super::incompatibility::Incompatibility;
 
 /// A memory is the set of all assignments in the partial solution,
 /// organized by package instead of historically ordered.

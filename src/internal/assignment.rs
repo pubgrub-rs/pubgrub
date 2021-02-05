@@ -3,8 +3,8 @@
 //! Assignments are the building blocks of a PubGrub partial solution.
 //! (partial solution = the current state of the solution we are building in the algorithm).
 
-use id_arena::{Arena, Id};
-
+use crate::internal::arena::Arena;
+use crate::internal::incompatibility::IncompId;
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
 use crate::term::Term;
@@ -27,7 +27,7 @@ pub enum Assignment<P: Package, V: Version> {
         /// The package corresponding to the derivation.
         package: P,
         /// Incompatibility cause of the derivation.
-        cause: Id<Incompatibility<P, V>>,
+        cause: IncompId<P, V>,
     },
 }
 

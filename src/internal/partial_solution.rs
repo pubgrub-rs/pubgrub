@@ -3,9 +3,9 @@
 //! The partial solution is the current state
 //! of the solution being built by the algorithm.
 
-use id_arena::{Arena, Id};
-
+use crate::internal::arena::Arena;
 use crate::internal::assignment::Assignment::{self, Decision, Derivation};
+use crate::internal::incompatibility::IncompId;
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::memory::Memory;
 use crate::package::Package;
@@ -91,7 +91,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn add_derivation(
         &mut self,
         package: P,
-        cause: Id<Incompatibility<P, V>>,
+        cause: IncompId<P, V>,
         store: &Arena<Incompatibility<P, V>>,
     ) {
         self.add_assignment(Derivation { package, cause }, store);

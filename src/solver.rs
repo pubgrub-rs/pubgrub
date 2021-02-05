@@ -192,13 +192,18 @@ pub fn resolve<P: Package, V: Version>(
                     "Root package depends on itself at a different version?".into(),
                 ));
             }
-            state
-                .partial_solution
-                .add_version(p.clone(), v, &dep_incompats, &state.incompatibility_store);
+            state.partial_solution.add_version(
+                p.clone(),
+                v,
+                &dep_incompats,
+                &state.incompatibility_store,
+            );
         } else {
             // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
             // terms and can add the decision directly.
-            state.partial_solution.add_decision(next.clone(), v, &state.incompatibility_store);
+            state
+                .partial_solution
+                .add_decision(next.clone(), v, &state.incompatibility_store);
         }
     }
 }
