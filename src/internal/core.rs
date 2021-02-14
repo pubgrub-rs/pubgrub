@@ -32,6 +32,11 @@ pub struct State<P: Package, V: Version> {
     /// NOT the position in the [incompatibilities](State::incompatibilities) vec.
     /// TODO: remove pub.
     pub incompatibility_store: Vec<Incompatibility<P, V>>,
+
+    /// This is a stack of work to be done in `unit_propagation`.
+    /// It can definitely be a local variable to that method, but
+    /// this way we can reuse the same allocation for better performance.
+    unit_propagation_buffer: Vec<P>,
 }
 
 impl<P: Package, V: Version> State<P, V> {
@@ -45,6 +50,7 @@ impl<P: Package, V: Version> State<P, V> {
             incompatibilities: Rc::new(vec![not_root_incompat.clone()]),
             partial_solution: PartialSolution::empty(),
             incompatibility_store: vec![not_root_incompat],
+            unit_propagation_buffer: vec![],
         }
     }
 
@@ -63,9 +69,9 @@ impl<P: Package, V: Version> State<P, V> {
     /// Unit propagation is the core mechanism of the solving algorithm.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     pub fn unit_propagation(&mut self, package: P) -> Result<(), PubGrubError<P, V>> {
-        let mut current_package = package.clone();
-        let mut changed = vec![package];
-        loop {
+        self.unit_propagation_buffer.clear();
+        self.unit_propagation_buffer.push(package);
+        while let Some(current_package) = self.unit_propagation_buffer.pop() {
             // Iterate over incompatibilities in reverse order
             // to evaluate first the newest incompatibilities.
             for incompat in Rc::clone(&self.incompatibilities).iter().rev() {
@@ -78,13 +84,14 @@ impl<P: Package, V: Version> State<P, V> {
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
                         let (package_almost, root_cause) = self.conflict_resolution(&incompat)?;
-                        changed = vec![package_almost.clone()];
+                        self.unit_propagation_buffer.clear();
+                        self.unit_propagation_buffer.push(package_almost.clone());
                         // Add to the partial solution with incompat as cause.
                         self.partial_solution
                             .add_derivation(package_almost, root_cause);
                     }
                     Relation::AlmostSatisfied(package_almost) => {
-                        changed.push(package_almost.clone());
+                        self.unit_propagation_buffer.push(package_almost.clone());
                         // Add (not term) to the partial solution with incompat as cause.
                         self.partial_solution
                             .add_derivation(package_almost, incompat.clone());
@@ -92,12 +99,8 @@ impl<P: Package, V: Version> State<P, V> {
                     _ => {}
                 }
             }
-            // If there are no more changed packages, unit propagation is done.
-            match changed.pop() {
-                None => break,
-                Some(current) => current_package = current,
-            }
         }
+        // If there are no more changed packages, unit propagation is done.
         Ok(())
     }
 
