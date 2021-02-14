@@ -157,7 +157,7 @@ impl<P: Package, V: Version> State<P, V> {
                         &self.incompatibility_store[current_incompat_id],
                         &self.incompatibility_store,
                     );
-                match satisfier {
+                match satisfier.clone() {
                     Decision { package, .. } => {
                         self.backtrack(
                             current_incompat_id,

@@ -37,11 +37,6 @@ pub struct DatedAssignment<P: Package, V: Version> {
     assignment: Assignment<P, V>,
 }
 
-pub struct SatisfierAndPreviousHistory<'a, P: Package, V: Version> {
-    satisfier: DatedAssignment<P, V>,
-    previous_history: &'a [DatedAssignment<P, V>],
-}
-
 /// The partial solution is the current state
 /// of the solution being built by the algorithm.
 /// It is composed of a succession of assignments,
@@ -187,16 +182,21 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         &self,
         incompat: &Incompatibility<P, V>,
         store: &Arena<Incompatibility<P, V>>,
-    ) -> (Assignment<P, V>, DecisionLevel, DecisionLevel) {
-        let SatisfierAndPreviousHistory {
-            satisfier,
-            previous_history,
-        } = Self::find_satisfier(incompat, self.history.as_slice(), store)
-            .expect("We should always find a satisfier if called in the right context.");
-        let previous_satisfier_level =
-            Self::find_previous_satisfier(incompat, &satisfier.assignment, previous_history, store);
+    ) -> (&Assignment<P, V>, DecisionLevel, DecisionLevel) {
+        let satisfier_idx = Self::find_satisfier(incompat, self.history.as_slice(), store);
+        assert!(
+            satisfier_idx > 0,
+            "We should always find a satisfier if called in the right context."
+        );
+        let satisfier = &self.history[satisfier_idx];
+        let previous_satisfier_level = Self::find_previous_satisfier(
+            incompat,
+            &satisfier.assignment,
+            &self.history[0..satisfier_idx],
+            store,
+        );
         (
-            satisfier.assignment,
+            &satisfier.assignment,
             satisfier.decision_level,
             previous_satisfier_level,
         )
@@ -204,12 +204,11 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     /// A satisfier is the earliest assignment in partial solution such that the incompatibility
     /// is satisfied by the partial solution up to and including that assignment.
-    /// Also returns all assignments earlier than the satisfier.
     fn find_satisfier<'a>(
         incompat: &Incompatibility<P, V>,
         history: &'a [DatedAssignment<P, V>],
         store: &Arena<Incompatibility<P, V>>,
-    ) -> Option<SatisfierAndPreviousHistory<'a, P, V>> {
+    ) -> usize {
         Self::find_satisfier_helper(
             incompat,
             Self::new_accum_satisfied_from(incompat),
@@ -234,15 +233,10 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         let mut accum_satisfied = Self::new_accum_satisfied_from(incompat);
         accum_satisfied.insert(package, (is_satisfied, satisfier_term));
         // Search previous satisfier.
-        Self::find_satisfier_helper(incompat, accum_satisfied, previous_assignments, store).map_or(
-            DecisionLevel(1),
-            |satisfier_and_previous_history| {
-                satisfier_and_previous_history
-                    .satisfier
-                    .decision_level
-                    .max(DecisionLevel(1))
-            },
-        )
+        previous_assignments
+            [Self::find_satisfier_helper(incompat, accum_satisfied, previous_assignments, store)]
+        .decision_level
+        .max(DecisionLevel(1))
     }
 
     fn new_accum_satisfied_from(incompat: &Incompatibility<P, V>) -> Map<P, (bool, Term<V>)> {
@@ -257,11 +251,10 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// satisfies the given incompatibility.
     pub fn find_satisfier_helper<'a>(
         incompat: &Incompatibility<P, V>,
-        accum_satisfied: Map<P, (bool, Term<V>)>,
+        mut accum_satisfied: Map<P, (bool, Term<V>)>,
         all_assignments: &'a [DatedAssignment<P, V>],
         store: &Arena<Incompatibility<P, V>>,
-    ) -> Option<SatisfierAndPreviousHistory<'a, P, V>> {
-        let mut accum_satisfied = accum_satisfied;
+    ) -> usize {
         for (idx, dated_assignment) in all_assignments.iter().enumerate() {
             let package = dated_assignment.assignment.package();
             let incompat_term = match incompat.get(package) {
@@ -280,12 +273,9 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             // Check if we have found the satisfier
             // (all booleans in accum_satisfied are true).
             if *is_satisfied && accum_satisfied.iter().all(|(_, (satisfied, _))| *satisfied) {
-                return Some(SatisfierAndPreviousHistory {
-                    satisfier: dated_assignment.clone(),
-                    previous_history: &all_assignments[0..idx],
-                });
+                return idx;
             }
         }
-        None
+        0
     }
 }
