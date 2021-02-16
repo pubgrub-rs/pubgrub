@@ -61,25 +61,14 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         }
     }
 
-    fn add_assignment(
-        &mut self,
-        assignment: Assignment<P, V>,
-        store: &Arena<Incompatibility<P, V>>,
-    ) {
-        self.decision_level = match assignment {
-            Decision { .. } => self.decision_level + DecisionLevel(1),
-            Derivation { .. } => self.decision_level,
-        };
-        self.memory.add_assignment(&assignment, store);
+    /// Add a decision to the partial solution.
+    pub fn add_decision(&mut self, package: P, version: V) {
+        self.decision_level = self.decision_level + DecisionLevel(1);
+        self.memory.add_decision(package.clone(), version.clone());
         self.history.push(DatedAssignment {
             decision_level: self.decision_level,
-            assignment,
+            assignment: Decision { package, version },
         });
-    }
-
-    /// Add a decision to the partial solution.
-    pub fn add_decision(&mut self, package: P, version: V, store: &Arena<Incompatibility<P, V>>) {
-        self.add_assignment(Decision { package, version }, store);
     }
 
     /// Add a derivation to the partial solution.
@@ -89,7 +78,14 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         cause: IncompId<P, V>,
         store: &Arena<Incompatibility<P, V>>,
     ) {
-        self.add_assignment(Derivation { package, cause }, store);
+        self.memory.add_derivation(
+            package.clone(),
+            store[cause].get(&package).unwrap().negate(),
+        );
+        self.history.push(DatedAssignment {
+            decision_level: self.decision_level,
+            assignment: Derivation { package, cause },
+        });
     }
 
     /// If a partial solution has, for every positive derivation,
@@ -168,7 +164,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         // Check none of the dependencies (new_incompatibilities)
         // would create a conflict (be satisfied).
         if store[new_incompatibilities].iter().all(not_satisfied) {
-            self.add_decision(package, version, store);
+            self.add_decision(package, version);
         }
     }
 

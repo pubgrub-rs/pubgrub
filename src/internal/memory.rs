@@ -68,7 +68,7 @@ impl<P: Package, V: Version> Memory<P, V> {
     }
 
     /// Add a decision to a Memory.
-    fn add_decision(&mut self, package: P, version: V) {
+    pub fn add_decision(&mut self, package: P, version: V) {
         // Check that add_decision is never used in the wrong context.
         if cfg!(debug_assertions) {
             match self.assignments.get_mut(&package) {
@@ -87,7 +87,7 @@ impl<P: Package, V: Version> Memory<P, V> {
     }
 
     /// Add a derivation to a Memory.
-    fn add_derivation(&mut self, package: P, term: Term<V>) {
+    pub fn add_derivation(&mut self, package: P, term: Term<V>) {
         use std::collections::hash_map::Entry;
         match self.assignments.entry(package) {
             Entry::Occupied(mut o) => match o.get_mut() {
