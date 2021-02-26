@@ -6,6 +6,12 @@ use std::{
 };
 
 /// The index of a value allocated in an arena that holds `T`s.
+///
+/// The Clone, Copy and other traits are defined manually because
+/// deriving them adds some additional constraints on the `T` generic type
+/// that we actually don't need since it is phantom.
+///
+/// https://github.com/rust-lang/rust/issues/26925
 pub struct Id<T> {
     raw: u32,
     _ty: PhantomData<fn() -> T>,
