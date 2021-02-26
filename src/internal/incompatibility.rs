@@ -14,6 +14,7 @@ use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
 use crate::solver::DependencyConstraints;
 use crate::term::{self, Term};
 use crate::version::Version;
+
 /// An incompatibility is a set of terms for different packages
 /// that should never be satisfied all together.
 /// An incompatibility usually originates from a package dependency.
@@ -35,6 +36,7 @@ pub struct Incompatibility<P: Package, V: Version> {
     kind: Kind<P, V>,
 }
 
+/// Type alias of unique identifiers for incompatibilities.
 pub type IncompId<P, V> = Id<Incompatibility<P, V>>;
 
 #[derive(Debug, Clone)]
