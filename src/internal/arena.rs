@@ -56,6 +56,11 @@ impl<T> Id<T> {
 }
 
 /// Yet another index-based arena.
+///
+/// An arena is a kind of simple grow-only allocator, backed by a `Vec`
+/// where all items have the same lifetime, making it easier
+/// to have references between those items.
+/// They are all dropped at once when the arena is dropped.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Arena<T> {
     data: Vec<T>,
