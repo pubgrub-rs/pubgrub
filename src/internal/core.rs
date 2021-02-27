@@ -75,14 +75,12 @@ impl<P: Package, V: Version> State<P, V> {
             // Iterate over incompatibilities in reverse order
             // to evaluate first the newest incompatibilities.
             for &incompat_id in Rc::clone(&self.incompatibilities).iter().rev() {
+                let current_incompat = &self.incompatibility_store[incompat_id];
                 // We only care about that incompatibility if it contains the current package.
-                if self.incompatibility_store[incompat_id].get(&current_package) == None {
+                if current_incompat.get(&current_package).is_none() {
                     continue;
                 }
-                match self
-                    .partial_solution
-                    .relation(&self.incompatibility_store[incompat_id])
-                {
+                match self.partial_solution.relation(current_incompat) {
                     // If the partial solution satisfies the incompatibility
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
