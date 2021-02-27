@@ -15,7 +15,6 @@ use crate::package::Package;
 use crate::report::DerivationTree;
 use crate::solver::DependencyConstraints;
 use crate::version::Version;
-use std::ops::RangeFrom;
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
@@ -71,21 +70,19 @@ impl<P: Package, V: Version> State<P, V> {
         package: P,
         version: V,
         deps: &DependencyConstraints<P, V>,
-    ) -> RangeFrom<IncompId<P, V>> {
-        let out = self.incompatibility_store.next_id()..;
+    ) -> std::ops::Range<IncompId<P, V>> {
+        // Create incompatibilities and allocate them in the store.
+        let new_incompats_id_range = self
+            .incompatibility_store
+            .alloc_iter(deps.iter().map(|dep| {
+                Incompatibility::from_dependency(package.clone(), version.clone(), dep)
+            }));
+        // Merge the newly created incompatibilities with the older ones.
         let incompatibilities = Rc::make_mut(&mut self.incompatibilities);
-        for dep in deps {
-            Incompatibility::merge_into(
-                self.incompatibility_store
-                    .alloc(Incompatibility::from_dependency(
-                        package.clone(),
-                        version.clone(),
-                        dep,
-                    )),
-                incompatibilities,
-            );
+        for id in IncompId::range_to_iter(new_incompats_id_range.clone()) {
+            Incompatibility::merge_into(id, incompatibilities);
         }
-        out
+        new_incompats_id_range
     }
 
     /// Check if an incompatibility is terminal.

@@ -2,7 +2,7 @@ use std::{
     fmt,
     hash::{Hash, Hasher},
     marker::PhantomData,
-    ops::{Index, RangeFrom},
+    ops::{Index, Range},
 };
 
 /// The index of a value allocated in an arena that holds `T`s.
@@ -53,6 +53,17 @@ impl<T> Id<T> {
     pub fn into_raw(self) -> usize {
         self.raw as usize
     }
+    fn from(n: u32) -> Self {
+        Self {
+            raw: n as u32,
+            _ty: PhantomData,
+        }
+    }
+    pub fn range_to_iter(range: Range<Self>) -> impl Iterator<Item = Self> {
+        let start = range.start.raw;
+        let end = range.end.raw;
+        (start..end).map(Self::from)
+    }
 }
 
 /// Yet another index-based arena.
@@ -81,20 +92,18 @@ impl<T> Arena<T> {
     }
 
     pub fn alloc(&mut self, value: T) -> Id<T> {
-        let raw = self.data.len() as u32;
+        let raw = self.data.len();
         self.data.push(value);
-        Id {
-            raw,
-            _ty: PhantomData,
-        }
+        Id::from(raw as u32)
     }
 
-    pub fn next_id(&self) -> Id<T> {
-        let raw = self.data.len() as u32;
-        Id {
-            raw,
-            _ty: PhantomData,
-        }
+    pub fn alloc_iter<I: Iterator<Item = T>>(&mut self, values: I) -> Range<Id<T>> {
+        let start = Id::from(self.data.len() as u32);
+        values.for_each(|v| {
+            self.alloc(v);
+        });
+        let end = Id::from(self.data.len() as u32);
+        Range { start, end }
     }
 }
 
@@ -105,9 +114,9 @@ impl<T> Index<Id<T>> for Arena<T> {
     }
 }
 
-impl<T> Index<RangeFrom<Id<T>>> for Arena<T> {
+impl<T> Index<Range<Id<T>>> for Arena<T> {
     type Output = [T];
-    fn index(&self, id: RangeFrom<Id<T>>) -> &[T] {
-        &self.data[(id.start.raw as usize)..]
+    fn index(&self, id: Range<Id<T>>) -> &[T] {
+        &self.data[(id.start.raw as usize)..(id.end.raw as usize)]
     }
 }

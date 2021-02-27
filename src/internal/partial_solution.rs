@@ -13,7 +13,6 @@ use crate::range::Range;
 use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
-use std::ops::RangeFrom;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct DecisionLevel(u32);
@@ -158,7 +157,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         &mut self,
         package: P,
         version: V,
-        new_incompatibilities: RangeFrom<IncompId<P, V>>,
+        new_incompatibilities: std::ops::Range<IncompId<P, V>>,
         store: &Arena<Incompatibility<P, V>>,
     ) {
         let not_satisfied = |incompat: &Incompatibility<P, V>| {
