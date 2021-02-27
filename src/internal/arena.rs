@@ -11,7 +11,7 @@ use std::{
 /// deriving them adds some additional constraints on the `T` generic type
 /// that we actually don't need since it is phantom.
 ///
-/// https://github.com/rust-lang/rust/issues/26925
+/// <https://github.com/rust-lang/rust/issues/26925>
 pub struct Id<T> {
     raw: u32,
     _ty: PhantomData<fn() -> T>,
