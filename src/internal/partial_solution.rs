@@ -13,6 +13,7 @@ use crate::range::Range;
 use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
+use std::ops::RangeFrom;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct DecisionLevel(u32);
@@ -157,7 +158,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         &mut self,
         package: P,
         version: V,
-        new_incompatibilities: &[Incompatibility<P, V>],
+        new_incompatibilities: RangeFrom<IncompId<P, V>>,
         store: &Arena<Incompatibility<P, V>>,
     ) {
         let not_satisfied = |incompat: &Incompatibility<P, V>| {
@@ -172,7 +173,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
         // Check none of the dependencies (new_incompatibilities)
         // would create a conflict (be satisfied).
-        if new_incompatibilities.iter().all(not_satisfied) {
+        if store[new_incompatibilities].iter().all(not_satisfied) {
             self.add_decision(package, version, store);
         }
     }

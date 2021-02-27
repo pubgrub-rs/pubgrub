@@ -13,7 +13,10 @@ use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::package::Package;
 use crate::report::DerivationTree;
+use crate::solver::DependencyConstraints;
 use crate::version::Version;
+use std::ops::RangeFrom;
+
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
 pub struct State<P: Package, V: Version> {
@@ -61,6 +64,30 @@ impl<P: Package, V: Version> State<P, V> {
             Rc::make_mut(&mut self.incompatibilities),
         );
     }
+
+    /// Add an incompatibility to the state.
+    pub fn add_incompatibility_from_dependencies(
+        &mut self,
+        package: P,
+        version: V,
+        deps: &DependencyConstraints<P, V>,
+    ) -> RangeFrom<IncompId<P, V>> {
+        let out = self.incompatibility_store.next_id()..;
+        let incompatibilities = Rc::make_mut(&mut self.incompatibilities);
+        for dep in deps {
+            Incompatibility::merge_into(
+                self.incompatibility_store
+                    .alloc(Incompatibility::from_dependency(
+                        package.clone(),
+                        version.clone(),
+                        dep,
+                    )),
+                incompatibilities,
+            );
+        }
+        out
+    }
+
     /// Check if an incompatibility is terminal.
     pub fn is_terminal(&self, incompatibility: &Incompatibility<P, V>) -> bool {
         incompatibility.is_terminal(&self.root_package, &self.root_version)

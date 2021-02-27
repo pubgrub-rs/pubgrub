@@ -2,7 +2,7 @@ use std::{
     fmt,
     hash::{Hash, Hasher},
     marker::PhantomData,
-    ops::Index,
+    ops::{Index, RangeFrom},
 };
 
 /// The index of a value allocated in an arena that holds `T`s.
@@ -88,11 +88,26 @@ impl<T> Arena<T> {
             _ty: PhantomData,
         }
     }
+
+    pub fn next_id(&self) -> Id<T> {
+        let raw = self.data.len() as u32;
+        Id {
+            raw,
+            _ty: PhantomData,
+        }
+    }
 }
 
 impl<T> Index<Id<T>> for Arena<T> {
     type Output = T;
     fn index(&self, id: Id<T>) -> &T {
         &self.data[id.raw as usize]
+    }
+}
+
+impl<T> Index<RangeFrom<Id<T>>> for Arena<T> {
+    type Output = [T];
+    fn index(&self, id: RangeFrom<Id<T>>) -> &[T] {
+        &self.data[(id.start.raw as usize)..]
     }
 }

@@ -11,7 +11,6 @@ use crate::internal::small_map::SmallMap;
 use crate::package::Package;
 use crate::range::Range;
 use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
-use crate::solver::DependencyConstraints;
 use crate::term::{self, Term};
 use crate::version::Version;
 
@@ -109,19 +108,8 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         }
     }
 
-    /// Generate a list of incompatibilities from direct dependencies of a package.
-    pub fn from_dependencies(
-        package: P,
-        version: V,
-        deps: &DependencyConstraints<P, V>,
-    ) -> Vec<Self> {
-        deps.iter()
-            .map(|dep| Self::from_dependency(package.clone(), version.clone(), dep))
-            .collect()
-    }
-
     /// Build an incompatibility from a given dependency.
-    fn from_dependency(package: P, version: V, dep: (&P, &Range<V>)) -> Self {
+    pub fn from_dependency(package: P, version: V, dep: (&P, &Range<V>)) -> Self {
         let range1 = Range::exact(version);
         let (p2, range2) = dep;
         Self {

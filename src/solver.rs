@@ -177,12 +177,9 @@ pub fn resolve<P: Package, V: Version>(
 
             // Add that package and version if the dependencies are not problematic.
             let dep_incompats =
-                Incompatibility::from_dependencies(p.clone(), v.clone(), &dependencies);
+                state.add_incompatibility_from_dependencies(p.clone(), v.clone(), &dependencies);
 
-            for incompat in dep_incompats.iter() {
-                state.add_incompatibility(incompat.clone());
-            }
-            if dep_incompats
+            if state.incompatibility_store[dep_incompats.clone()]
                 .iter()
                 .any(|incompat| state.is_terminal(incompat))
             {
@@ -195,7 +192,7 @@ pub fn resolve<P: Package, V: Version>(
             state.partial_solution.add_version(
                 p.clone(),
                 v,
-                &dep_incompats,
+                dep_incompats,
                 &state.incompatibility_store,
             );
         } else {
