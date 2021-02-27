@@ -117,47 +117,47 @@ impl<P: Package, V: Version> State<P, V> {
         &mut self,
         incompatibility: IncompId<P, V>,
     ) -> Result<(P, IncompId<P, V>), PubGrubError<P, V>> {
-        let mut current_incompat = incompatibility;
+        let mut current_incompat_id = incompatibility;
         let mut current_incompat_changed = false;
         loop {
-            if self.incompatibility_store[current_incompat]
+            if self.incompatibility_store[current_incompat_id]
                 .is_terminal(&self.root_package, &self.root_version)
             {
                 return Err(PubGrubError::NoSolution(
-                    self.build_derivation_tree(current_incompat),
+                    self.build_derivation_tree(current_incompat_id),
                 ));
             } else {
                 let (satisfier, satisfier_level, previous_satisfier_level) = self
                     .partial_solution
                     .find_satisfier_and_previous_satisfier_level(
-                        &self.incompatibility_store[current_incompat],
+                        &self.incompatibility_store[current_incompat_id],
                         &self.incompatibility_store,
                     );
                 match satisfier {
                     Decision { package, .. } => {
                         self.backtrack(
-                            current_incompat,
+                            current_incompat_id,
                             current_incompat_changed,
                             previous_satisfier_level,
                         );
-                        return Ok((package, current_incompat));
+                        return Ok((package, current_incompat_id));
                     }
                     Derivation { cause, package } => {
                         if previous_satisfier_level != satisfier_level {
                             self.backtrack(
-                                current_incompat,
+                                current_incompat_id,
                                 current_incompat_changed,
                                 previous_satisfier_level,
                             );
-                            return Ok((package, current_incompat));
+                            return Ok((package, current_incompat_id));
                         } else {
                             let prior_cause = Incompatibility::prior_cause(
-                                current_incompat,
+                                current_incompat_id,
                                 cause,
                                 &package,
                                 &self.incompatibility_store,
                             );
-                            current_incompat = self.incompatibility_store.alloc(prior_cause);
+                            current_incompat_id = self.incompatibility_store.alloc(prior_cause);
                             current_incompat_changed = true;
                         }
                     }
