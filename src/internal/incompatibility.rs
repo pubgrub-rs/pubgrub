@@ -169,12 +169,12 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         let kind = Kind::DerivedFrom(incompat, satisfier_cause);
         let mut package_terms = incompatibility_store[incompat].package_terms.clone();
         let t1 = package_terms.remove(package).unwrap();
-        let statisfier_cause_terms = &incompatibility_store[satisfier_cause].package_terms;
+        let satisfier_cause_terms = &incompatibility_store[satisfier_cause].package_terms;
         package_terms.merge(
-            statisfier_cause_terms.iter().filter(|(p, _)| p != &package),
+            satisfier_cause_terms.iter().filter(|(p, _)| p != &package),
             |t1, t2| Some(t1.intersection(t2)),
         );
-        let term = t1.union(statisfier_cause_terms.get(package).unwrap());
+        let term = t1.union(satisfier_cause_terms.get(package).unwrap());
         if term != Term::any() {
             package_terms.insert(package.clone(), term);
         }
