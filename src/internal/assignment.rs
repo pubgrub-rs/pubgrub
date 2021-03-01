@@ -3,6 +3,8 @@
 //! Assignments are the building blocks of a PubGrub partial solution.
 //! (partial solution = the current state of the solution we are building in the algorithm).
 
+use crate::internal::arena::Arena;
+use crate::internal::incompatibility::IncompId;
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
 use crate::term::Term;
@@ -25,7 +27,7 @@ pub enum Assignment<P: Package, V: Version> {
         /// The package corresponding to the derivation.
         package: P,
         /// Incompatibility cause of the derivation.
-        cause: Incompatibility<P, V>,
+        cause: IncompId<P, V>,
     },
 }
 
@@ -41,10 +43,10 @@ impl<P: Package, V: Version> Assignment<P, V> {
     /// Retrieve the current assignment as a [Term].
     /// If this is decision, it returns a positive term with that exact version.
     /// Otherwise, if this is a derivation, just returns its term.
-    pub fn as_term(&self) -> Term<V> {
+    pub fn as_term(&self, store: &Arena<Incompatibility<P, V>>) -> Term<V> {
         match &self {
             Self::Decision { version, .. } => Term::exact(version.clone()),
-            Self::Derivation { package, cause } => cause.get(&package).unwrap().negate(),
+            Self::Derivation { package, cause } => store[*cause].get(&package).unwrap().negate(),
         }
     }
 }

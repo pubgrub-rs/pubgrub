@@ -119,9 +119,7 @@ pub fn resolve<P: Package, V: Version>(
                     .term_intersection_for_package(&next)
                     .expect("a package was chosen but we don't have a term.")
                     .clone();
-                state.add_incompatibility(|id| {
-                    Incompatibility::no_versions(id, next.clone(), term.clone())
-                });
+                state.add_incompatibility(Incompatibility::no_versions(next.clone(), term.clone()));
                 continue;
             }
             Some(x) => x,
@@ -153,9 +151,10 @@ pub fn resolve<P: Package, V: Version>(
                         source: err,
                     })? {
                     Dependencies::Unknown => {
-                        state.add_incompatibility(|id| {
-                            Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
-                        });
+                        state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                            p.clone(),
+                            v.clone(),
+                        ));
                         continue;
                     }
                     Dependencies::Known(x) => {
@@ -177,14 +176,10 @@ pub fn resolve<P: Package, V: Version>(
                 };
 
             // Add that package and version if the dependencies are not problematic.
-            let start_id = state.incompatibility_store.len();
             let dep_incompats =
-                Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
+                state.add_incompatibility_from_dependencies(p.clone(), v.clone(), &dependencies);
 
-            for incompat in dep_incompats.iter() {
-                state.add_incompatibility(|_| incompat.clone());
-            }
-            if dep_incompats
+            if state.incompatibility_store[dep_incompats.clone()]
                 .iter()
                 .any(|incompat| state.is_terminal(incompat))
             {
@@ -194,13 +189,18 @@ pub fn resolve<P: Package, V: Version>(
                     "Root package depends on itself at a different version?".into(),
                 ));
             }
-            state
-                .partial_solution
-                .add_version(p.clone(), v, &dep_incompats);
+            state.partial_solution.add_version(
+                p.clone(),
+                v,
+                dep_incompats,
+                &state.incompatibility_store,
+            );
         } else {
             // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
             // terms and can add the decision directly.
-            state.partial_solution.add_decision(next.clone(), v);
+            state
+                .partial_solution
+                .add_decision(next.clone(), v, &state.incompatibility_store);
         }
     }
 }
