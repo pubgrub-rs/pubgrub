@@ -203,6 +203,9 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     /// A satisfier is the earliest assignment in partial solution such that the incompatibility
     /// is satisfied by the partial solution up to and including that assignment.
+    ///
+    /// Returns a map indicating for each package term, when that was first satisfied in history.
+    /// If we effectively found a satisfier, the returned map must be the same size that incompat.
     fn find_satisfier<'a>(
         incompat: &Incompatibility<P, V>,
         history: &'a [DatedAssignment<P, V>],
