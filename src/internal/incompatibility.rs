@@ -221,6 +221,11 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         self.package_terms.iter()
     }
 
+    // The number of packages.
+    pub fn len(&self) -> usize {
+        self.package_terms.len()
+    }
+
     // Reporting ###############################################################
 
     /// Retrieve parent causes if of type DerivedFrom.

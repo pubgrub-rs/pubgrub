@@ -198,9 +198,7 @@ pub fn resolve<P: Package, V: Version>(
         } else {
             // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
             // terms and can add the decision directly.
-            state
-                .partial_solution
-                .add_decision(next.clone(), v, &state.incompatibility_store);
+            state.partial_solution.add_decision(next.clone(), v);
         }
     }
 }
