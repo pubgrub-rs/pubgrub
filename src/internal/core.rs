@@ -3,7 +3,7 @@
 //! Core model and functions
 //! to write a functional PubGrub algorithm.
 
-use std::{collections::HashSet as Set, rc::Rc};
+use std::collections::HashSet as Set;
 
 use crate::error::PubGrubError;
 use crate::internal::arena::Arena;
@@ -23,7 +23,7 @@ pub struct State<P: Package, V: Version> {
     root_version: V,
 
     /// TODO: remove pub.
-    pub incompatibilities: Rc<Vec<IncompId<P, V>>>,
+    pub incompatibilities: Vec<IncompId<P, V>>,
 
     /// Partial solution.
     /// TODO: remove pub.
@@ -49,7 +49,7 @@ impl<P: Package, V: Version> State<P, V> {
         Self {
             root_package,
             root_version,
-            incompatibilities: Rc::new(vec![not_root_id]),
+            incompatibilities: vec![not_root_id],
             partial_solution: PartialSolution::empty(),
             incompatibility_store,
             unit_propagation_buffer: vec![],
@@ -60,7 +60,7 @@ impl<P: Package, V: Version> State<P, V> {
     pub fn add_incompatibility(&mut self, incompat: Incompatibility<P, V>) {
         Incompatibility::merge_into(
             self.incompatibility_store.alloc(incompat),
-            Rc::make_mut(&mut self.incompatibilities),
+            &mut self.incompatibilities,
         );
     }
 
@@ -78,9 +78,8 @@ impl<P: Package, V: Version> State<P, V> {
                 Incompatibility::from_dependency(package.clone(), version.clone(), dep)
             }));
         // Merge the newly created incompatibilities with the older ones.
-        let incompatibilities = Rc::make_mut(&mut self.incompatibilities);
         for id in IncompId::range_to_iter(new_incompats_id_range.clone()) {
-            Incompatibility::merge_into(id, incompatibilities);
+            Incompatibility::merge_into(id, &mut self.incompatibilities);
         }
         new_incompats_id_range
     }
@@ -98,7 +97,8 @@ impl<P: Package, V: Version> State<P, V> {
         while let Some(current_package) = self.unit_propagation_buffer.pop() {
             // Iterate over incompatibilities in reverse order
             // to evaluate first the newest incompatibilities.
-            for &incompat_id in Rc::clone(&self.incompatibilities).iter().rev() {
+            let mut conflict_id = None;
+            for &incompat_id in self.incompatibilities.iter().rev() {
                 let current_incompat = &self.incompatibility_store[incompat_id];
                 // We only care about that incompatibility if it contains the current package.
                 if current_incompat.get(&current_package).is_none() {
@@ -108,15 +108,8 @@ impl<P: Package, V: Version> State<P, V> {
                     // If the partial solution satisfies the incompatibility
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
-                        let (package_almost, root_cause) = self.conflict_resolution(incompat_id)?;
-                        self.unit_propagation_buffer.clear();
-                        self.unit_propagation_buffer.push(package_almost.clone());
-                        // Add to the partial solution with incompat as cause.
-                        self.partial_solution.add_derivation(
-                            package_almost,
-                            root_cause,
-                            &self.incompatibility_store,
-                        );
+                        conflict_id = Some(incompat_id);
+                        break;
                     }
                     Relation::AlmostSatisfied(package_almost) => {
                         self.unit_propagation_buffer.push(package_almost.clone());
@@ -129,6 +122,17 @@ impl<P: Package, V: Version> State<P, V> {
                     }
                     _ => {}
                 }
+            }
+            if let Some(incompat_id) = conflict_id {
+                let (package_almost, root_cause) = self.conflict_resolution(incompat_id)?;
+                self.unit_propagation_buffer.clear();
+                self.unit_propagation_buffer.push(package_almost.clone());
+                // Add to the partial solution with incompat as cause.
+                self.partial_solution.add_derivation(
+                    package_almost,
+                    root_cause,
+                    &self.incompatibility_store,
+                );
             }
         }
         // If there are no more changed packages, unit propagation is done.
@@ -200,7 +204,7 @@ impl<P: Package, V: Version> State<P, V> {
         self.partial_solution
             .backtrack(decision_level, &self.incompatibility_store);
         if incompat_changed {
-            Incompatibility::merge_into(incompat, Rc::make_mut(&mut self.incompatibilities));
+            Incompatibility::merge_into(incompat, &mut self.incompatibilities);
         }
     }
 
