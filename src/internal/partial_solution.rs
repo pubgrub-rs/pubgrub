@@ -179,7 +179,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         incompat: &Incompatibility<P, V>,
         store: &Arena<Incompatibility<P, V>>,
     ) -> (&Assignment<P, V>, DecisionLevel, DecisionLevel) {
-        let satisfier_map = Self::find_satisfier(incompat, self.history.as_slice(), store);
+        let satisfier_map = Self::find_satisfier(incompat, &self.history, store);
         assert_eq!(
             satisfier_map.len(),
             incompat.len(),

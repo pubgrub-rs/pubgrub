@@ -3,7 +3,10 @@
 //! Build a report as clear as possible as to why
 //! dependency solving failed.
 
-use std::fmt;
+use std::{
+    fmt,
+    ops::{Deref, DerefMut},
+};
 
 use crate::package::Package;
 use crate::range::Range;
@@ -75,7 +78,7 @@ impl<P: Package, V: Version> DerivationTree<P, V> {
         match self {
             DerivationTree::External(_) => {}
             DerivationTree::Derived(derived) => {
-                match (&mut *derived.cause1, &mut *derived.cause2) {
+                match (derived.cause1.deref_mut(), derived.cause2.deref_mut()) {
                     (DerivationTree::External(External::NoVersions(p, r)), ref mut cause2) => {
                         cause2.collapse_no_versions();
                         *self = cause2
@@ -208,7 +211,7 @@ impl DefaultStringReporter {
     }
 
     fn build_recursive_helper<P: Package, V: Version>(&mut self, current: &Derived<P, V>) {
-        match (&*current.cause1, &*current.cause2) {
+        match (current.cause1.deref(), current.cause2.deref()) {
             (DerivationTree::External(external1), DerivationTree::External(external2)) => {
                 // Simplest case, we just combine two external incompatibilities.
                 self.lines.push(Self::explain_both_external(
@@ -309,7 +312,7 @@ impl DefaultStringReporter {
         external: &External<P, V>,
         current_terms: &Map<P, Term<V>>,
     ) {
-        match (&*derived.cause1, &*derived.cause2) {
+        match (derived.cause1.deref(), derived.cause2.deref()) {
             // If the derived cause has itself one external prior cause,
             // we can chain the external explanations.
             (DerivationTree::Derived(prior_derived), DerivationTree::External(prior_external)) => {
@@ -478,7 +481,7 @@ impl<P: Package, V: Version> Reporter<P, V> for DefaultStringReporter {
             DerivationTree::Derived(derived) => {
                 let mut reporter = Self::new();
                 reporter.build_recursive(derived);
-                reporter.lines[..].join("\n")
+                reporter.lines.join("\n")
             }
         }
     }

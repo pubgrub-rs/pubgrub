@@ -34,8 +34,8 @@ fn sat_at_most_one(solver: &mut impl varisat::ExtendFormula, vars: &[varisat::Va
     // https://www.it.uu.se/research/group/astra/ModRef10/papers/Alan%20M.%20Frisch%20and%20Paul%20A.%20Giannoros.%20SAT%20Encodings%20of%20the%20At-Most-k%20Constraint%20-%20ModRef%202010.pdf
     let bits: Vec<varisat::Var> = solver.new_var_iter(log_bits(vars.len())).collect();
     for (i, p) in vars.iter().enumerate() {
-        for b in 0..bits.len() {
-            solver.add_clause(&[p.negative(), bits[b].lit(((1 << b) & i) > 0)]);
+        for (j, &bit) in bits.iter().enumerate() {
+            solver.add_clause(&[p.negative(), bit.lit(((1 << j) & i) > 0)]);
         }
     }
 }
@@ -79,7 +79,7 @@ impl<P: Package, V: Version> SatResolve<P, V> {
                 Dependencies::Unknown => panic!(),
                 Dependencies::Known(d) => d,
             };
-            for (p1, range) in deps.iter() {
+            for (p1, range) in &deps {
                 let empty_vec = vec![];
                 let mut matches: Vec<varisat::Lit> = all_versions_by_p
                     .get(&p1)
