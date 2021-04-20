@@ -284,10 +284,11 @@ impl<V: Version> fmt::Display for Range<V> {
     }
 }
 
-fn interval_to_string<V: Version>((start, end): &Interval<V>) -> String {
-    end.as_ref()
-        .map(|end| format!("[ {}, {} [", start, end))
-        .unwrap_or_else(|| format!("[ {}, ∞ [", start))
+fn interval_to_string<V: Version>((start, maybe_end): &Interval<V>) -> String {
+    match maybe_end {
+        Some(end) => format!("[ {}, {} [", start, end),
+        None => format!("[ {}, ∞ [", start),
+    }
 }
 
 // TESTS #######################################################################

@@ -3,10 +3,8 @@
 //! Build a report as clear as possible as to why
 //! dependency solving failed.
 
-use std::{
-    fmt,
-    ops::{Deref, DerefMut},
-};
+use std::fmt;
+use std::ops::{Deref, DerefMut};
 
 use crate::package::Package;
 use crate::range::Range;
