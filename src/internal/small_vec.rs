@@ -1,4 +1,5 @@
-use std::{fmt, ops::Deref};
+use std::fmt;
+use std::ops::Deref;
 
 #[derive(Clone)]
 pub enum SmallVec<T> {
