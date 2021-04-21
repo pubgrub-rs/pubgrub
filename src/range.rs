@@ -125,11 +125,11 @@ impl<V: Version> Range<V> {
     fn negate_segments(start: V, segments: &[Interval<V>]) -> Range<V> {
         let mut complement_segments = SmallVec::empty();
         let mut start = Some(start);
-        for (v1, some_v2) in segments {
+        for (v1, maybe_v2) in segments {
             // start.unwrap() is fine because `segments` is not exposed,
             // and our usage guaranties that only the last segment may contain a None.
             complement_segments.push((start.unwrap(), Some(v1.to_owned())));
-            start = some_v2.to_owned();
+            start = maybe_v2.to_owned();
         }
         if let Some(last) = start {
             complement_segments.push((last, None));
@@ -241,8 +241,8 @@ impl<V: Version> Range<V> {
 impl<V: Version> Range<V> {
     /// Check if a range contains a given version.
     pub fn contains(&self, version: &V) -> bool {
-        for (v1, some_v2) in &self.segments {
-            match some_v2 {
+        for (v1, maybe_v2) in &self.segments {
+            match maybe_v2 {
                 None => return v1 <= version,
                 Some(v2) => {
                     if version < v1 {
