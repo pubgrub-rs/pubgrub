@@ -71,6 +71,14 @@ impl<V: Version> Term<V> {
             _ => panic!("Negative term cannot unwrap positive range"),
         }
     }
+
+    /// Unwrap the range contains in the term.
+    pub(crate) fn as_range(&self) -> &Range<V> {
+        match self {
+            Self::Positive(range) => range,
+            Self::Negative(range) => range,
+        }
+    }
 }
 
 /// Set operations with terms.

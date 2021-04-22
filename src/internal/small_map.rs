@@ -1,5 +1,5 @@
 use crate::type_aliases::Map;
-use std::hash::Hash;
+use std::{hash::Hash, ops::Index};
 
 #[derive(Debug, Clone)]
 pub enum SmallMap<K, V> {
@@ -143,6 +143,13 @@ impl<K, V> SmallMap<K, V> {
             Self::Two(_) => 2,
             Self::Flexible(data) => data.len(),
         }
+    }
+}
+
+impl<K: PartialEq + Eq + Hash, V> Index<&K> for SmallMap<K, V> {
+    type Output = V;
+    fn index(&self, key: &K) -> &V {
+        &self.get(key).unwrap()
     }
 }
 

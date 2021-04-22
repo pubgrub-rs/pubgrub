@@ -43,11 +43,11 @@ enum Kind<P: Package, V: Version> {
     /// Initial incompatibility aiming at picking the root package for the first decision.
     NotRoot(P, V),
     /// There are no versions in the given range for this package.
-    NoVersions(P, Range<V>),
+    NoVersions(P),
     /// Dependencies of the package are unavailable for versions in that range.
-    UnavailableDependencies(P, Range<V>),
+    UnavailableDependencies(P),
     /// Incompatibility coming from the dependencies of a given package.
-    FromDependencyOf(P, Range<V>, P, Range<V>),
+    FromDependencyOf(P, P),
     /// Derived from two causes. Stores cause ids.
     DerivedFrom(IncompId<P, V>, IncompId<P, V>),
 }
@@ -84,13 +84,10 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Create an incompatibility to remember
     /// that a given range does not contain any version.
     pub fn no_versions(package: P, term: Term<V>) -> Self {
-        let range = match &term {
-            Term::Positive(r) => r.clone(),
-            Term::Negative(_) => panic!("No version should have a positive term"),
-        };
+        assert!(term.is_positive(), "No version should have a positive term");
         Self {
             package_terms: SmallMap::One([(package.clone(), term)]),
-            kind: Kind::NoVersions(package, range),
+            kind: Kind::NoVersions(package),
         }
     }
 
@@ -98,23 +95,24 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// that a package version is not selectable
     /// because its list of dependencies is unavailable.
     pub fn unavailable_dependencies(package: P, version: V) -> Self {
-        let range = Range::exact(version);
         Self {
-            package_terms: SmallMap::One([(package.clone(), Term::Positive(range.clone()))]),
-            kind: Kind::UnavailableDependencies(package, range),
+            package_terms: SmallMap::One([(
+                package.clone(),
+                Term::Positive(Range::exact(version)),
+            )]),
+            kind: Kind::UnavailableDependencies(package),
         }
     }
 
     /// Build an incompatibility from a given dependency.
     pub fn from_dependency(package: P, version: V, dep: (&P, &Range<V>)) -> Self {
-        let range1 = Range::exact(version);
         let (p2, range2) = dep;
         Self {
             package_terms: SmallMap::Two([
-                (package.clone(), Term::Positive(range1.clone())),
+                (package.clone(), Term::Positive(Range::exact(version))),
                 (p2.clone(), Term::Negative(range2.clone())),
             ]),
-            kind: Kind::FromDependencyOf(package, range1, p2.clone(), range2.clone()),
+            kind: Kind::FromDependencyOf(package, p2.clone()),
         }
     }
 
@@ -239,7 +237,8 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         shared_ids: &Set<Id<Self>>,
         store: &Arena<Self>,
     ) -> DerivationTree<P, V> {
-        match &store[self_id].kind {
+        let val = &store[self_id];
+        match &val.kind {
             Kind::DerivedFrom(id1, id2) => {
                 let cause1 = Self::build_derivation_tree(*id1, shared_ids, store);
                 let cause2 = Self::build_derivation_tree(*id2, shared_ids, store);
@@ -254,18 +253,22 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             Kind::NotRoot(package, version) => {
                 DerivationTree::External(External::NotRoot(package.clone(), version.clone()))
             }
-            Kind::NoVersions(package, range) => {
-                DerivationTree::External(External::NoVersions(package.clone(), range.clone()))
+            Kind::NoVersions(package) => DerivationTree::External(External::NoVersions(
+                package.clone(),
+                val.package_terms[package].as_range().clone(),
+            )),
+            Kind::UnavailableDependencies(package) => {
+                DerivationTree::External(External::UnavailableDependencies(
+                    package.clone(),
+                    val.package_terms[package].as_range().clone(),
+                ))
             }
-            Kind::UnavailableDependencies(package, range) => DerivationTree::External(
-                External::UnavailableDependencies(package.clone(), range.clone()),
-            ),
-            Kind::FromDependencyOf(package, range, dep_package, dep_range) => {
+            Kind::FromDependencyOf(package, dep_package) => {
                 DerivationTree::External(External::FromDependencyOf(
                     package.clone(),
-                    range.clone(),
+                    val.package_terms[package].as_range().clone(),
                     dep_package.clone(),
-                    dep_range.clone(),
+                    val.package_terms[dep_package].as_range().clone(),
                 ))
             }
         }
@@ -305,12 +308,12 @@ pub mod tests {
             let mut store = Arena::new();
             let i1 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([("p1", t1.clone()), ("p2", t2.negate())]),
-                kind: Kind::UnavailableDependencies("0", Range::any())
+                kind: Kind::UnavailableDependencies("0")
             });
 
             let i2 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([("p2", t2), ("p3", t3.clone())]),
-                kind: Kind::UnavailableDependencies("0", Range::any())
+                kind: Kind::UnavailableDependencies("0")
             });
 
             let mut i3 = Map::default();
