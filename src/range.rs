@@ -93,7 +93,7 @@ impl<V: Version> Range<V> {
 
     /// Compute the complement set of versions.
     pub fn negate(&self) -> Self {
-        match self.segments.as_slice().first() {
+        match self.segments.first() {
             None => Self::any(), // Complement of ∅  is *
 
             // First high bound is +∞
@@ -110,9 +110,9 @@ impl<V: Version> Range<V> {
             // First high bound is not +∞
             Some((v1, Some(v2))) => {
                 if v1 == &V::lowest() {
-                    Self::negate_segments(v2.clone(), &self.segments.as_slice()[1..])
+                    Self::negate_segments(v2.clone(), &self.segments[1..])
                 } else {
-                    Self::negate_segments(V::lowest(), &self.segments.as_slice())
+                    Self::negate_segments(V::lowest(), &self.segments)
                 }
             }
         }
@@ -125,11 +125,11 @@ impl<V: Version> Range<V> {
     fn negate_segments(start: V, segments: &[Interval<V>]) -> Range<V> {
         let mut complement_segments = SmallVec::empty();
         let mut start = Some(start);
-        for (v1, some_v2) in segments.iter() {
+        for (v1, maybe_v2) in segments {
             // start.unwrap() is fine because `segments` is not exposed,
             // and our usage guaranties that only the last segment may contain a None.
             complement_segments.push((start.unwrap(), Some(v1.to_owned())));
-            start = some_v2.to_owned();
+            start = maybe_v2.to_owned();
         }
         if let Some(last) = start {
             complement_segments.push((last, None));
@@ -144,7 +144,7 @@ impl<V: Version> Range<V> {
 
     /// Compute the union of two sets of versions.
     pub fn union(&self, other: &Self) -> Self {
-        (self.negate().intersection(&other.negate())).negate()
+        self.negate().intersection(&other.negate()).negate()
     }
 
     /// Compute the intersection of two sets of versions.
@@ -241,8 +241,8 @@ impl<V: Version> Range<V> {
 impl<V: Version> Range<V> {
     /// Check if a range contains a given version.
     pub fn contains(&self, version: &V) -> bool {
-        for (v1, some_v2) in self.segments.iter() {
-            match some_v2 {
+        for (v1, maybe_v2) in &self.segments {
+            match maybe_v2 {
                 None => return v1 <= version,
                 Some(v2) => {
                     if version < v1 {
@@ -258,11 +258,7 @@ impl<V: Version> Range<V> {
 
     /// Return the lowest version in the range (if there is one).
     pub fn lowest_version(&self) -> Option<V> {
-        self.segments
-            .as_slice()
-            .first()
-            .map(|(start, _)| start)
-            .cloned()
+        self.segments.first().map(|(start, _)| start).cloned()
     }
 }
 
@@ -288,10 +284,10 @@ impl<V: Version> fmt::Display for Range<V> {
     }
 }
 
-fn interval_to_string<V: Version>(interval: &Interval<V>) -> String {
-    match interval {
-        (start, Some(end)) => format!("[ {}, {} [", start, end),
-        (start, None) => format!("[ {}, ∞ [", start),
+fn interval_to_string<V: Version>((start, maybe_end): &Interval<V>) -> String {
+    match maybe_end {
+        Some(end) => format!("[ {}, {} [", start, end),
+        None => format!("[ {}, ∞ [", start),
     }
 }
 

@@ -1,4 +1,5 @@
 use std::fmt;
+use std::ops::Deref;
 
 #[derive(Clone)]
 pub enum SmallVec<T> {
@@ -38,7 +39,7 @@ impl<T> SmallVec<T> {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
+    pub fn iter(&self) -> std::slice::Iter<'_, T> {
         self.as_slice().iter()
     }
 }
@@ -49,10 +50,28 @@ impl<T> Default for SmallVec<T> {
     }
 }
 
-impl<T: PartialEq> Eq for SmallVec<T> {}
+impl<T> Deref for SmallVec<T> {
+    type Target = [T];
 
-impl<T: PartialEq> PartialEq<SmallVec<T>> for SmallVec<T> {
-    fn eq(&self, other: &SmallVec<T>) -> bool {
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a SmallVec<T> {
+    type Item = &'a T;
+
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<T: Eq> Eq for SmallVec<T> {}
+
+impl<T: PartialEq> PartialEq for SmallVec<T> {
+    fn eq(&self, other: &Self) -> bool {
         self.as_slice() == other.as_slice()
     }
 }

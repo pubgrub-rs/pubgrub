@@ -149,7 +149,7 @@ impl<'a, V: 'a + Version> Term<V> {
     /// Check if a set of terms satisfies or contradicts a given term.
     /// Otherwise the relation is inconclusive.
     pub(crate) fn relation_with(&self, other_terms_intersection: &Term<V>) -> Relation {
-        let full_intersection = self.intersection(other_terms_intersection.as_ref());
+        let full_intersection = self.intersection(other_terms_intersection);
         if &full_intersection == other_terms_intersection {
             Relation::Satisfied
         } else if full_intersection == Self::empty() {
