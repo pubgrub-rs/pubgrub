@@ -61,7 +61,7 @@ impl<P: Package, V: Version> State<P, V> {
     /// Add an incompatibility to the state.
     pub fn add_incompatibility(&mut self, incompat: Incompatibility<P, V>) {
         let id = self.incompatibility_store.alloc(incompat);
-        self.merge_into(id);
+        self.merge_incompatibility(id);
     }
 
     /// Add an incompatibility to the state.
@@ -79,7 +79,7 @@ impl<P: Package, V: Version> State<P, V> {
             }));
         // Merge the newly created incompatibilities with the older ones.
         for id in IncompId::range_to_iter(new_incompats_id_range.clone()) {
-            self.merge_into(id);
+            self.merge_incompatibility(id);
         }
         new_incompats_id_range
     }
@@ -201,7 +201,7 @@ impl<P: Package, V: Version> State<P, V> {
         self.partial_solution
             .backtrack(decision_level, &self.incompatibility_store);
         if incompat_changed {
-            self.merge_into(incompat);
+            self.merge_incompatibility(incompat);
         }
     }
 
@@ -224,10 +224,10 @@ impl<P: Package, V: Version> State<P, V> {
     /// Here we do the simple stupid thing of just growing the Vec.
     /// It may not be trivial since those incompatibilities
     /// may already have derived others.
-    fn merge_into(&mut self, id: IncompId<P, V>) {
-        for (a, _) in self.incompatibility_store[id].iter() {
+    fn merge_incompatibility(&mut self, id: IncompId<P, V>) {
+        for (pkg, _term) in self.incompatibility_store[id].iter() {
             self.incompatibilities
-                .entry(a.clone())
+                .entry(pkg.clone())
                 .or_default()
                 .push(id);
         }
