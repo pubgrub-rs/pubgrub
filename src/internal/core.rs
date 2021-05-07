@@ -14,6 +14,7 @@ use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::package::Package;
 use crate::report::DerivationTree;
 use crate::solver::DependencyConstraints;
+use crate::type_aliases::Map;
 use crate::version::Version;
 
 /// Current state of the PubGrub algorithm.
@@ -22,8 +23,7 @@ pub struct State<P: Package, V: Version> {
     root_package: P,
     root_version: V,
 
-    /// TODO: remove pub.
-    pub incompatibilities: Vec<IncompId<P, V>>,
+    incompatibilities: Map<P, Vec<IncompId<P, V>>>,
 
     /// Partial solution.
     /// TODO: remove pub.
@@ -46,10 +46,12 @@ impl<P: Package, V: Version> State<P, V> {
             root_package.clone(),
             root_version.clone(),
         ));
+        let mut incompatibilities = Map::default();
+        incompatibilities.insert(root_package.clone(), vec![not_root_id]);
         Self {
             root_package,
             root_version,
-            incompatibilities: vec![not_root_id],
+            incompatibilities,
             partial_solution: PartialSolution::empty(),
             incompatibility_store,
             unit_propagation_buffer: vec![],
@@ -58,10 +60,8 @@ impl<P: Package, V: Version> State<P, V> {
 
     /// Add an incompatibility to the state.
     pub fn add_incompatibility(&mut self, incompat: Incompatibility<P, V>) {
-        Incompatibility::merge_into(
-            self.incompatibility_store.alloc(incompat),
-            &mut self.incompatibilities,
-        );
+        let id = self.incompatibility_store.alloc(incompat);
+        self.merge_incompatibility(id);
     }
 
     /// Add an incompatibility to the state.
@@ -79,7 +79,7 @@ impl<P: Package, V: Version> State<P, V> {
             }));
         // Merge the newly created incompatibilities with the older ones.
         for id in IncompId::range_to_iter(new_incompats_id_range.clone()) {
-            Incompatibility::merge_into(id, &mut self.incompatibilities);
+            self.merge_incompatibility(id);
         }
         new_incompats_id_range
     }
@@ -98,12 +98,9 @@ impl<P: Package, V: Version> State<P, V> {
             // Iterate over incompatibilities in reverse order
             // to evaluate first the newest incompatibilities.
             let mut conflict_id = None;
-            for &incompat_id in self.incompatibilities.iter().rev() {
+            // We only care about incompatibilities if it contains the current package.
+            for &incompat_id in self.incompatibilities[&current_package].iter().rev() {
                 let current_incompat = &self.incompatibility_store[incompat_id];
-                // We only care about that incompatibility if it contains the current package.
-                if current_incompat.get(&current_package).is_none() {
-                    continue;
-                }
                 match self.partial_solution.relation(current_incompat) {
                     // If the partial solution satisfies the incompatibility
                     // we must perform conflict resolution.
@@ -204,7 +201,35 @@ impl<P: Package, V: Version> State<P, V> {
         self.partial_solution
             .backtrack(decision_level, &self.incompatibility_store);
         if incompat_changed {
-            Incompatibility::merge_into(incompat, &mut self.incompatibilities);
+            self.merge_incompatibility(incompat);
+        }
+    }
+
+    /// Add this incompatibility into the set of all incompatibilities.
+    ///
+    /// Pub collapses identical dependencies from adjacent package versions
+    /// into individual incompatibilities.
+    /// This substantially reduces the total number of incompatibilities
+    /// and makes it much easier for Pub to reason about multiple versions of packages at once.
+    ///
+    /// For example, rather than representing
+    /// foo 1.0.0 depends on bar ^1.0.0 and
+    /// foo 1.1.0 depends on bar ^1.0.0
+    /// as two separate incompatibilities,
+    /// they are collapsed together into the single incompatibility {foo ^1.0.0, not bar ^1.0.0}
+    /// (provided that no other version of foo exists between 1.0.0 and 2.0.0).
+    /// We could collapse them into { foo (1.0.0 ∪ 1.1.0), not bar ^1.0.0 }
+    /// without having to check the existence of other versions though.
+    ///
+    /// Here we do the simple stupid thing of just growing the Vec.
+    /// It may not be trivial since those incompatibilities
+    /// may already have derived others.
+    fn merge_incompatibility(&mut self, id: IncompId<P, V>) {
+        for (pkg, _term) in self.incompatibility_store[id].iter() {
+            self.incompatibilities
+                .entry(pkg.clone())
+                .or_default()
+                .push(id);
         }
     }
 

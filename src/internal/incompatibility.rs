@@ -52,19 +52,16 @@ enum Kind<P: Package, V: Version> {
     DerivedFrom(IncompId<P, V>, IncompId<P, V>),
 }
 
-/// A type alias for a pair of [Package] and a corresponding [Term].
-pub type PackageTerm<P, V> = (P, Term<V>);
-
 /// A Relation describes how a set of terms can be compared to an incompatibility.
 /// Typically, the set of terms comes from the partial solution.
 #[derive(Eq, PartialEq)]
-pub enum Relation<P: Package, V: Version> {
+pub enum Relation<P: Package> {
     /// We say that a set of terms S satisfies an incompatibility I
     /// if S satisfies every term in I.
     Satisfied,
     /// We say that S contradicts I
     /// if S contradicts at least one term in I.
-    Contradicted(PackageTerm<P, V>),
+    Contradicted(P),
     /// If S satisfies all but one of I's terms and is inconclusive for the remaining term,
     /// we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
     AlmostSatisfied(P),
@@ -121,32 +118,6 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         }
     }
 
-    /// Add this incompatibility into the set of all incompatibilities.
-    ///
-    /// Pub collapses identical dependencies from adjacent package versions
-    /// into individual incompatibilities.
-    /// This substantially reduces the total number of incompatibilities
-    /// and makes it much easier for Pub to reason about multiple versions of packages at once.
-    ///
-    /// For example, rather than representing
-    /// foo 1.0.0 depends on bar ^1.0.0 and
-    /// foo 1.1.0 depends on bar ^1.0.0
-    /// as two separate incompatibilities,
-    /// they are collapsed together into the single incompatibility {foo ^1.0.0, not bar ^1.0.0}
-    /// (provided that no other version of foo exists between 1.0.0 and 2.0.0).
-    /// We could collapse them into { foo (1.0.0 ∪ 1.1.0), not bar ^1.0.0 }
-    /// without having to check the existence of other versions though.
-    /// And it would even keep the same [Kind]: [FromDependencyOf](Kind::FromDependencyOf) foo.
-    ///
-    /// Here we do the simple stupid thing of just growing the Vec.
-    /// TODO: improve this.
-    /// It may not be trivial since those incompatibilities
-    /// may already have derived others.
-    /// Maybe this should not be pursued.
-    pub fn merge_into(id: Id<Self>, incompatibilities: &mut Vec<Id<Self>>) {
-        incompatibilities.push(id);
-    }
-
     /// Prior cause of two incompatibilities using the rule of resolution.
     pub fn prior_cause(
         incompat: Id<Self>,
@@ -173,13 +144,13 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// CF definition of Relation enum.
-    pub fn relation(&self, mut terms: impl FnMut(&P) -> Option<Term<V>>) -> Relation<P, V> {
+    pub fn relation(&self, mut terms: impl FnMut(&P) -> Option<Term<V>>) -> Relation<P> {
         let mut relation = Relation::Satisfied;
         for (package, incompat_term) in self.package_terms.iter() {
             match terms(package).map(|term| incompat_term.relation_with(&term)) {
                 Some(term::Relation::Satisfied) => {}
                 Some(term::Relation::Contradicted) => {
-                    return Relation::Contradicted((package.clone(), incompat_term.clone()));
+                    return Relation::Contradicted(package.clone());
                 }
                 None | Some(term::Relation::Inconclusive) => {
                     // If a package is not present, the intersection is the same as [Term::any].
