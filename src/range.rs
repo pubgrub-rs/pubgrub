@@ -18,81 +18,90 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use crate::internal::small_vec::SmallVec;
-use crate::version::Version;
+
+pub trait RangeSet: fmt::Debug + fmt::Display + Clone + Eq {
+    type VERSION: Clone + Ord + fmt::Debug + fmt::Display;
+
+    /// The empty set.
+    fn none() -> Self;
+
+    /// Set of all possible versions.
+    fn any() -> Self;
+
+    /// Set containing exactly one version.
+    fn exact(v: impl Into<Self::VERSION>) -> Self;
+
+    /// Compute the complement set of versions.
+    fn negate(&self) -> Self;
+
+    /// Compute the intersection of two sets of versions.
+    fn intersection(&self, other: &Self) -> Self;
+
+    /// Check if a range contains a given version.
+    fn contains(&self, version: &Self::VERSION) -> bool {
+        let exact = Self::exact(version.clone());
+        self.intersection(&exact) == exact
+    }
+
+    /// Compute the union of two sets of versions.
+    fn union(&self, other: &Self) -> Self {
+        (self.negate().intersection(&other.negate())).negate()
+    }
+}
 
 /// A Range is a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct Range<V: Version> {
+pub struct Range<V: crate::version::RangeVersion> {
     segments: SmallVec<Interval<V>>,
 }
 
 type Interval<V> = (V, Option<V>);
 
 // Range building blocks.
-impl<V: Version> Range<V> {
+impl<V: crate::version::RangeVersion> RangeSet for Range<V> {
+    type VERSION = V;
+
     /// Empty set of versions.
-    pub fn none() -> Self {
+    fn none() -> Self {
         Self {
             segments: SmallVec::empty(),
         }
     }
 
     /// Set of all possible versions.
-    pub fn any() -> Self {
+    fn any() -> Self {
         Self::higher_than(V::lowest())
     }
 
     /// Set containing exactly one version.
-    pub fn exact(v: impl Into<V>) -> Self {
+    fn exact(v: impl Into<V>) -> Self {
         let v = v.into();
         Self {
             segments: SmallVec::one((v.clone(), Some(v.bump()))),
         }
     }
 
-    /// Set of all versions higher or equal to some version.
-    pub fn higher_than(v: impl Into<V>) -> Self {
-        Self {
-            segments: SmallVec::one((v.into(), None)),
-        }
-    }
-
-    /// Set of all versions strictly lower than some version.
-    pub fn strictly_lower_than(v: impl Into<V>) -> Self {
-        let v = v.into();
-        if v == V::lowest() {
-            Self::none()
-        } else {
-            Self {
-                segments: SmallVec::one((V::lowest(), Some(v))),
+    /// Check if a range contains a given version.
+    fn contains(&self, version: &V) -> bool {
+        for (v1, maybe_v2) in &self.segments {
+            match maybe_v2 {
+                None => return v1 <= version,
+                Some(v2) => {
+                    if version < v1 {
+                        return false;
+                    } else if version < v2 {
+                        return true;
+                    }
+                }
             }
         }
+        false
     }
-
-    /// Set of all versions comprised between two given versions.
-    /// The lower bound is included and the higher bound excluded.
-    /// `v1 <= v < v2`.
-    pub fn between(v1: impl Into<V>, v2: impl Into<V>) -> Self {
-        let v1 = v1.into();
-        let v2 = v2.into();
-        if v1 < v2 {
-            Self {
-                segments: SmallVec::one((v1, Some(v2))),
-            }
-        } else {
-            Self::none()
-        }
-    }
-}
-
-// Set operations.
-impl<V: Version> Range<V> {
-    // Negate ##################################################################
 
     /// Compute the complement set of versions.
-    pub fn negate(&self) -> Self {
+    fn negate(&self) -> Self {
         match self.segments.first() {
             None => Self::any(), // Complement of ∅  is *
 
@@ -118,37 +127,8 @@ impl<V: Version> Range<V> {
         }
     }
 
-    /// Helper function performing the negation of intervals in segments.
-    /// For example:
-    ///    [ (v1, None) ] => [ (start, Some(v1)) ]
-    ///    [ (v1, Some(v2)) ] => [ (start, Some(v1)), (v2, None) ]
-    fn negate_segments(start: V, segments: &[Interval<V>]) -> Range<V> {
-        let mut complement_segments = SmallVec::empty();
-        let mut start = Some(start);
-        for (v1, maybe_v2) in segments {
-            // start.unwrap() is fine because `segments` is not exposed,
-            // and our usage guaranties that only the last segment may contain a None.
-            complement_segments.push((start.unwrap(), Some(v1.to_owned())));
-            start = maybe_v2.to_owned();
-        }
-        if let Some(last) = start {
-            complement_segments.push((last, None));
-        }
-
-        Self {
-            segments: complement_segments,
-        }
-    }
-
-    // Union and intersection ##################################################
-
-    /// Compute the union of two sets of versions.
-    pub fn union(&self, other: &Self) -> Self {
-        self.negate().intersection(&other.negate()).negate()
-    }
-
     /// Compute the intersection of two sets of versions.
-    pub fn intersection(&self, other: &Self) -> Self {
+    fn intersection(&self, other: &Self) -> Self {
         let mut segments = SmallVec::empty();
         let mut left_iter = self.segments.iter();
         let mut right_iter = other.segments.iter();
@@ -237,25 +217,67 @@ impl<V: Version> Range<V> {
     }
 }
 
-// Other useful functions.
-impl<V: Version> Range<V> {
-    /// Check if a range contains a given version.
-    pub fn contains(&self, version: &V) -> bool {
-        for (v1, maybe_v2) in &self.segments {
-            match maybe_v2 {
-                None => return v1 <= version,
-                Some(v2) => {
-                    if version < v1 {
-                        return false;
-                    } else if version < v2 {
-                        return true;
-                    }
-                }
-            }
+// Set operations.
+impl<V: crate::version::RangeVersion> Range<V> {
+    /// Set of all versions higher or equal to some version.
+    pub fn higher_than(v: impl Into<V>) -> Self {
+        Self {
+            segments: SmallVec::one((v.into(), None)),
         }
-        false
     }
 
+    /// Set of all versions strictly lower than some version.
+    pub fn strictly_lower_than(v: impl Into<V>) -> Self {
+        let v = v.into();
+        if v == V::lowest() {
+            Self::none()
+        } else {
+            Self {
+                segments: SmallVec::one((V::lowest(), Some(v))),
+            }
+        }
+    }
+
+    /// Set of all versions comprised between two given versions.
+    /// The lower bound is included and the higher bound excluded.
+    /// `v1 <= v < v2`.
+    pub fn between(v1: impl Into<V>, v2: impl Into<V>) -> Self {
+        let v1 = v1.into();
+        let v2 = v2.into();
+        if v1 < v2 {
+            Self {
+                segments: SmallVec::one((v1, Some(v2))),
+            }
+        } else {
+            Self::none()
+        }
+    }
+
+    /// Helper function performing the negation of intervals in segments.
+    /// For example:
+    ///    [ (v1, None) ] => [ (start, Some(v1)) ]
+    ///    [ (v1, Some(v2)) ] => [ (start, Some(v1)), (v2, None) ]
+    fn negate_segments(start: V, segments: &[Interval<V>]) -> Range<V> {
+        let mut complement_segments = SmallVec::empty();
+        let mut start = Some(start);
+        for (v1, maybe_v2) in segments {
+            // start.unwrap() is fine because `segments` is not exposed,
+            // and our usage guaranties that only the last segment may contain a None.
+            complement_segments.push((start.unwrap(), Some(v1.to_owned())));
+            start = maybe_v2.to_owned();
+        }
+        if let Some(last) = start {
+            complement_segments.push((last, None));
+        }
+
+        Self {
+            segments: complement_segments,
+        }
+    }
+}
+
+// Other useful functions.
+impl<V: crate::version::RangeVersion> Range<V> {
     /// Return the lowest version in the range (if there is one).
     pub fn lowest_version(&self) -> Option<V> {
         self.segments.first().map(|(start, _)| start).cloned()
@@ -264,7 +286,7 @@ impl<V: Version> Range<V> {
 
 // REPORT ######################################################################
 
-impl<V: Version> fmt::Display for Range<V> {
+impl<V: crate::version::RangeVersion> fmt::Display for Range<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.segments.as_slice() {
             [] => write!(f, "∅"),
@@ -284,7 +306,7 @@ impl<V: Version> fmt::Display for Range<V> {
     }
 }
 
-fn interval_to_string<V: Version>((start, maybe_end): &Interval<V>) -> String {
+fn interval_to_string<V: crate::version::RangeVersion>((start, maybe_end): &Interval<V>) -> String {
     match maybe_end {
         Some(end) => format!("[ {}, {} [", start, end),
         None => format!("[ {}, ∞ [", start),

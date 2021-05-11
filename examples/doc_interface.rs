@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::range::Range;
+use pubgrub::range::RangeSet;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::NumberVersion;
 
@@ -10,7 +11,7 @@ use pubgrub::version::NumberVersion;
 // `icons` has no dependency
 #[rustfmt::skip]
 fn main() {
-    let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, Range<NumberVersion>>::new();
     dependency_provider.add_dependencies(
         "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
     );

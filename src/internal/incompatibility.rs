@@ -9,10 +9,9 @@ use std::fmt;
 use crate::internal::arena::{Arena, Id};
 use crate::internal::small_map::SmallMap;
 use crate::package::Package;
-use crate::range::Range;
+use crate::range::RangeSet;
 use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
 use crate::term::{self, Term};
-use crate::version::Version;
 
 /// An incompatibility is a set of terms for different packages
 /// that should never be satisfied all together.
@@ -30,26 +29,26 @@ use crate::version::Version;
 /// during conflict resolution. More about all this in
 /// [PubGrub documentation](https://github.com/dart-lang/pub/blob/master/doc/solver.md#incompatibility).
 #[derive(Debug, Clone)]
-pub struct Incompatibility<P: Package, V: Version> {
-    package_terms: SmallMap<P, Term<V>>,
-    kind: Kind<P, V>,
+pub struct Incompatibility<P: Package, R: RangeSet> {
+    package_terms: SmallMap<P, Term<R>>,
+    kind: Kind<P, R>,
 }
 
 /// Type alias of unique identifiers for incompatibilities.
-pub type IncompId<P, V> = Id<Incompatibility<P, V>>;
+pub type IncompId<P, R> = Id<Incompatibility<P, R>>;
 
 #[derive(Debug, Clone)]
-enum Kind<P: Package, V: Version> {
+enum Kind<P: Package, R: RangeSet> {
     /// Initial incompatibility aiming at picking the root package for the first decision.
-    NotRoot(P, V),
+    NotRoot(P, R::VERSION),
     /// There are no versions in the given range for this package.
-    NoVersions(P, Range<V>),
+    NoVersions(P, R),
     /// Dependencies of the package are unavailable for versions in that range.
-    UnavailableDependencies(P, Range<V>),
+    UnavailableDependencies(P, R),
     /// Incompatibility coming from the dependencies of a given package.
-    FromDependencyOf(P, Range<V>, P, Range<V>),
+    FromDependencyOf(P, R, P, R),
     /// Derived from two causes. Stores cause ids.
-    DerivedFrom(IncompId<P, V>, IncompId<P, V>),
+    DerivedFrom(IncompId<P, R>, IncompId<P, R>),
 }
 
 /// A Relation describes how a set of terms can be compared to an incompatibility.
@@ -69,13 +68,13 @@ pub enum Relation<P: Package> {
     Inconclusive,
 }
 
-impl<P: Package, V: Version> Incompatibility<P, V> {
+impl<P: Package, R: RangeSet> Incompatibility<P, R> {
     /// Create the initial "not Root" incompatibility.
-    pub fn not_root(package: P, version: V) -> Self {
+    pub fn not_root(package: P, version: R::VERSION) -> Self {
         Self {
             package_terms: SmallMap::One([(
                 package.clone(),
-                Term::Negative(Range::exact(version.clone())),
+                Term::Negative(R::exact(version.clone())),
             )]),
             kind: Kind::NotRoot(package, version),
         }
@@ -83,7 +82,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Create an incompatibility to remember
     /// that a given range does not contain any version.
-    pub fn no_versions(package: P, term: Term<V>) -> Self {
+    pub fn no_versions(package: P, term: Term<R>) -> Self {
         let range = match &term {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
@@ -97,8 +96,8 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     /// Create an incompatibility to remember
     /// that a package version is not selectable
     /// because its list of dependencies is unavailable.
-    pub fn unavailable_dependencies(package: P, version: V) -> Self {
-        let range = Range::exact(version);
+    pub fn unavailable_dependencies(package: P, version: R::VERSION) -> Self {
+        let range = R::exact(version);
         Self {
             package_terms: SmallMap::One([(package.clone(), Term::Positive(range.clone()))]),
             kind: Kind::UnavailableDependencies(package, range),
@@ -106,8 +105,8 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// Build an incompatibility from a given dependency.
-    pub fn from_dependency(package: P, version: V, dep: (&P, &Range<V>)) -> Self {
-        let range1 = Range::exact(version);
+    pub fn from_dependency(package: P, version: R::VERSION, dep: (&P, &R)) -> Self {
+        let range1 = R::exact(version);
         let (p2, range2) = dep;
         Self {
             package_terms: SmallMap::Two([
@@ -145,7 +144,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
 
     /// Check if an incompatibility should mark the end of the algorithm
     /// because it satisfies the root package.
-    pub fn is_terminal(&self, root_package: &P, root_version: &V) -> bool {
+    pub fn is_terminal(&self, root_package: &P, root_version: &R::VERSION) -> bool {
         if self.package_terms.len() == 0 {
             true
         } else if self.package_terms.len() > 1 {
@@ -157,12 +156,12 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 
     /// Get the term related to a given package (if it exists).
-    pub fn get(&self, package: &P) -> Option<&Term<V>> {
+    pub fn get(&self, package: &P) -> Option<&Term<R>> {
         self.package_terms.get(package)
     }
 
     /// Iterate over packages.
-    pub fn iter(&self) -> impl Iterator<Item = (&P, &Term<V>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&P, &Term<R>)> {
         self.package_terms.iter()
     }
 
@@ -186,7 +185,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         self_id: Id<Self>,
         shared_ids: &Set<Id<Self>>,
         store: &Arena<Self>,
-    ) -> DerivationTree<P, V> {
+    ) -> DerivationTree<P, R> {
         match &store[self_id].kind {
             Kind::DerivedFrom(id1, id2) => {
                 let cause1 = Self::build_derivation_tree(*id1, shared_ids, store);
@@ -220,9 +219,9 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
     }
 }
 
-impl<'a, P: Package, V: Version + 'a> Incompatibility<P, V> {
+impl<'a, P: Package, R: RangeSet + 'a> Incompatibility<P, R> {
     /// CF definition of Relation enum.
-    pub fn relation(&self, terms: impl Fn(&P) -> Option<&'a Term<V>>) -> Relation<P> {
+    pub fn relation(&self, terms: impl Fn(&P) -> Option<&'a Term<R>>) -> Relation<P> {
         let mut relation = Relation::Satisfied;
         for (package, incompat_term) in self.package_terms.iter() {
             match terms(package).map(|term| incompat_term.relation_with(&term)) {
@@ -248,7 +247,7 @@ impl<'a, P: Package, V: Version + 'a> Incompatibility<P, V> {
     }
 }
 
-impl<P: Package, V: Version> fmt::Display for Incompatibility<P, V> {
+impl<P: Package, R: RangeSet> fmt::Display for Incompatibility<P, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -263,6 +262,7 @@ impl<P: Package, V: Version> fmt::Display for Incompatibility<P, V> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::range::Range;
     use crate::term::tests::strategy as term_strat;
     use crate::type_aliases::Map;
     use proptest::prelude::*;

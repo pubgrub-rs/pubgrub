@@ -9,10 +9,9 @@ use crate::internal::incompatibility::IncompId;
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::memory::Memory;
 use crate::package::Package;
-use crate::range::Range;
+use crate::range::RangeSet;
 use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
-use crate::version::Version;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct DecisionLevel(u32);
@@ -32,9 +31,9 @@ impl std::ops::SubAssign<DecisionLevel> for DecisionLevel {
 }
 
 #[derive(Clone)]
-pub struct DatedAssignment<P: Package, V: Version> {
+pub struct DatedAssignment<P: Package, R: RangeSet> {
     decision_level: DecisionLevel,
-    assignment: Assignment<P, V>,
+    assignment: Assignment<P, R>,
 }
 
 /// The partial solution is the current state
@@ -42,16 +41,16 @@ pub struct DatedAssignment<P: Package, V: Version> {
 /// It is composed of a succession of assignments,
 /// defined as either decisions or derivations.
 #[derive(Clone)]
-pub struct PartialSolution<P: Package, V: Version> {
+pub struct PartialSolution<P: Package, R: RangeSet> {
     decision_level: DecisionLevel,
     /// Each assignment is stored with its decision level in the history.
     /// The order in which assignments where added in the vec is kept,
     /// so the oldest assignments are at the beginning of the vec.
-    history: Vec<DatedAssignment<P, V>>,
-    memory: Memory<P, V>,
+    history: Vec<DatedAssignment<P, R>>,
+    memory: Memory<P, R>,
 }
 
-impl<P: Package, V: Version> PartialSolution<P, V> {
+impl<P: Package, R: RangeSet> PartialSolution<P, R> {
     /// Initialize an empty partial solution.
     pub fn empty() -> Self {
         Self {
@@ -62,7 +61,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Add a decision to the partial solution.
-    pub fn add_decision(&mut self, package: P, version: V) {
+    pub fn add_decision(&mut self, package: P, version: R::VERSION) {
         self.decision_level = self.decision_level + DecisionLevel(1);
         self.memory.add_decision(package.clone(), version.clone());
         self.history.push(DatedAssignment {
@@ -75,8 +74,8 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn add_derivation(
         &mut self,
         package: P,
-        cause: IncompId<P, V>,
-        store: &Arena<Incompatibility<P, V>>,
+        cause: IncompId<P, R>,
+        store: &Arena<Incompatibility<P, R>>,
     ) {
         self.memory.add_derivation(
             package.clone(),
@@ -91,12 +90,12 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// If a partial solution has, for every positive derivation,
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
-    pub fn extract_solution(&self) -> Option<SelectedDependencies<P, V>> {
+    pub fn extract_solution(&self) -> Option<SelectedDependencies<P, R::VERSION>> {
         self.memory.extract_solution()
     }
 
     /// Compute, cache and retrieve the intersection of all terms for this package.
-    pub fn term_intersection_for_package(&self, package: &P) -> Option<&Term<V>> {
+    pub fn term_intersection_for_package(&self, package: &P) -> Option<&Term<R>> {
         self.memory.term_intersection_for_package(package)
     }
 
@@ -104,7 +103,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn backtrack(
         &mut self,
         decision_level: DecisionLevel,
-        store: &Arena<Incompatibility<P, V>>,
+        store: &Arena<Incompatibility<P, R>>,
     ) {
         let pos = self
             .history
@@ -130,7 +129,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     /// Extract potential packages for the next iteration of unit propagation.
     /// Return `None` if there is no suitable package anymore, which stops the algorithm.
-    pub fn potential_packages(&self) -> Option<impl Iterator<Item = (&P, &Range<V>)>> {
+    pub fn potential_packages(&self) -> Option<impl Iterator<Item = (&P, &R)>> {
         let mut iter = self.memory.potential_packages().peekable();
         if iter.peek().is_some() {
             Some(iter)
@@ -147,12 +146,12 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn add_version(
         &mut self,
         package: P,
-        version: V,
-        new_incompatibilities: std::ops::Range<IncompId<P, V>>,
-        store: &Arena<Incompatibility<P, V>>,
+        version: R::VERSION,
+        new_incompatibilities: std::ops::Range<IncompId<P, R>>,
+        store: &Arena<Incompatibility<P, R>>,
     ) {
         let exact = &Term::exact(version.clone());
-        let not_satisfied = |incompat: &Incompatibility<P, V>| {
+        let not_satisfied = |incompat: &Incompatibility<P, R>| {
             incompat.relation(|p| {
                 if p == &package {
                     Some(exact)
@@ -170,16 +169,16 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Check if the terms in the partial solution satisfy the incompatibility.
-    pub fn relation(&self, incompat: &Incompatibility<P, V>) -> Relation<P> {
+    pub fn relation(&self, incompat: &Incompatibility<P, R>) -> Relation<P> {
         incompat.relation(|package| self.memory.term_intersection_for_package(package))
     }
 
     /// Find satisfier and previous satisfier decision level.
     pub fn find_satisfier_and_previous_satisfier_level(
         &self,
-        incompat: &Incompatibility<P, V>,
-        store: &Arena<Incompatibility<P, V>>,
-    ) -> (&Assignment<P, V>, DecisionLevel, DecisionLevel) {
+        incompat: &Incompatibility<P, R>,
+        store: &Arena<Incompatibility<P, R>>,
+    ) -> (&Assignment<P, R>, DecisionLevel, DecisionLevel) {
         let satisfier_map = Self::find_satisfier(incompat, &self.history, store);
         assert_eq!(
             satisfier_map.len(),
@@ -208,11 +207,11 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// Returns a map indicating for each package term, when that was first satisfied in history.
     /// If we effectively found a satisfier, the returned map must be the same size that incompat.
     fn find_satisfier<'a>(
-        incompat: &Incompatibility<P, V>,
-        history: &'a [DatedAssignment<P, V>],
-        store: &Arena<Incompatibility<P, V>>,
+        incompat: &Incompatibility<P, R>,
+        history: &'a [DatedAssignment<P, R>],
+        store: &Arena<Incompatibility<P, R>>,
     ) -> Map<P, usize> {
-        let mut accum_satisfied: Map<P, Term<V>> = incompat
+        let mut accum_satisfied: Map<P, Term<R>> = incompat
             .iter()
             .map(|(p, _)| (p.clone(), Term::any()))
             .collect();
@@ -251,11 +250,11 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     /// such that incompatibility is satisfied by the partial solution up to
     /// and including that assignment plus satisfier.
     fn find_previous_satisfier<'a>(
-        incompat: &Incompatibility<P, V>,
-        satisfier: &Assignment<P, V>,
+        incompat: &Incompatibility<P, R>,
+        satisfier: &Assignment<P, R>,
         mut satisfier_map: Map<P, usize>,
-        previous_assignments: &'a [DatedAssignment<P, V>],
-        store: &Arena<Incompatibility<P, V>>,
+        previous_assignments: &'a [DatedAssignment<P, R>],
+        store: &Arena<Incompatibility<P, R>>,
     ) -> DecisionLevel {
         let package = satisfier.package().clone();
         let mut accum_term = satisfier.as_term(store);

@@ -8,7 +8,7 @@ use pubgrub::version::SemanticVersion;
 
 // https://github.com/dart-lang/pub/blob/master/doc/solver.md#branching-error-reporting
 fn main() {
-    let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, Range<SemanticVersion>>::new();
     #[rustfmt::skip]
     // root 1.0.0 depends on foo ^1.0.0
         dependency_provider.add_dependencies(

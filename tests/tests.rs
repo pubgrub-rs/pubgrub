@@ -2,12 +2,13 @@
 
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
+use pubgrub::range::RangeSet;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::NumberVersion;
 
 #[test]
 fn same_result_on_repeated_runs() {
-    let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<_, Range<NumberVersion>>::new();
 
     dependency_provider.add_dependencies("c", 0, vec![]);
     dependency_provider.add_dependencies("c", 2, vec![]);
@@ -29,7 +30,7 @@ fn same_result_on_repeated_runs() {
 
 #[test]
 fn should_always_find_a_satisfier() {
-    let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<_, Range<NumberVersion>>::new();
     dependency_provider.add_dependencies("a", 0, vec![("b", Range::none())]);
     assert!(matches!(
         resolve(&dependency_provider, "a", 0),
@@ -45,7 +46,7 @@ fn should_always_find_a_satisfier() {
 
 #[test]
 fn cannot_depend_on_self() {
-    let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<_, Range<NumberVersion>>::new();
     dependency_provider.add_dependencies("a", 0, vec![("a", Range::any())]);
     assert!(matches!(
         resolve(&dependency_provider, "a", 0),

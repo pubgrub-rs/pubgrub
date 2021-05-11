@@ -8,7 +8,7 @@ use thiserror::Error;
 
 /// Versions have a minimal version (a "0" version)
 /// and are ordered such that every version has a next one.
-pub trait Version: Clone + Ord + Debug + Display {
+pub trait RangeVersion: Clone + Ord + Debug + Display {
     /// Returns the lowest version.
     fn lowest() -> Self;
     /// Returns the next version, the smallest strictly higher version.
@@ -215,7 +215,7 @@ impl Display for SemanticVersion {
 }
 
 // Implement Version for SemanticVersion.
-impl Version for SemanticVersion {
+impl RangeVersion for SemanticVersion {
     fn lowest() -> Self {
         Self::zero()
     }
@@ -250,7 +250,7 @@ impl Display for NumberVersion {
     }
 }
 
-impl Version for NumberVersion {
+impl RangeVersion for NumberVersion {
     fn lowest() -> Self {
         Self(0)
     }
