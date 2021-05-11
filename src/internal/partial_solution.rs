@@ -96,7 +96,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Compute, cache and retrieve the intersection of all terms for this package.
-    pub fn term_intersection_for_package(&mut self, package: &P) -> Option<&Term<V>> {
+    pub fn term_intersection_for_package(&self, package: &P) -> Option<&Term<V>> {
         self.memory.term_intersection_for_package(package)
     }
 
@@ -130,7 +130,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     /// Extract potential packages for the next iteration of unit propagation.
     /// Return `None` if there is no suitable package anymore, which stops the algorithm.
-    pub fn potential_packages(&mut self) -> Option<impl Iterator<Item = (&P, &Range<V>)>> {
+    pub fn potential_packages(&self) -> Option<impl Iterator<Item = (&P, &Range<V>)>> {
         let mut iter = self.memory.potential_packages().peekable();
         if iter.peek().is_some() {
             Some(iter)
@@ -151,12 +151,13 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         new_incompatibilities: std::ops::Range<IncompId<P, V>>,
         store: &Arena<Incompatibility<P, V>>,
     ) {
+        let exact = &Term::exact(version.clone());
         let not_satisfied = |incompat: &Incompatibility<P, V>| {
             incompat.relation(|p| {
                 if p == &package {
-                    Some(Term::exact(version.clone()))
+                    Some(exact)
                 } else {
-                    self.memory.term_intersection_for_package(p).cloned()
+                    self.memory.term_intersection_for_package(p)
                 }
             }) != Relation::Satisfied
         };
@@ -169,8 +170,8 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     }
 
     /// Check if the terms in the partial solution satisfy the incompatibility.
-    pub fn relation(&mut self, incompat: &Incompatibility<P, V>) -> Relation<P> {
-        incompat.relation(|package| self.memory.term_intersection_for_package(package).cloned())
+    pub fn relation(&self, incompat: &Incompatibility<P, V>) -> Relation<P> {
+        incompat.relation(|package| self.memory.term_intersection_for_package(package))
     }
 
     /// Find satisfier and previous satisfier decision level.

@@ -26,10 +26,7 @@ pub struct Memory<P: Package, V: Version> {
 #[derive(Clone)]
 enum PackageAssignments<V: Version> {
     Decision((V, Term<V>)),
-    Derivations {
-        intersected: Term<V>,
-        not_intersected_yet: Vec<Term<V>>,
-    },
+    Derivations(Term<V>),
 }
 
 impl<P: Package, V: Version> Memory<P, V> {
@@ -46,9 +43,9 @@ impl<P: Package, V: Version> Memory<P, V> {
     }
 
     /// Retrieve intersection of terms in memory related to package.
-    pub fn term_intersection_for_package(&mut self, package: &P) -> Option<&Term<V>> {
+    pub fn term_intersection_for_package(&self, package: &P) -> Option<&Term<V>> {
         self.assignments
-            .get_mut(package)
+            .get(package)
             .map(|pa| pa.assignment_intersection())
     }
 
@@ -93,18 +90,12 @@ impl<P: Package, V: Version> Memory<P, V> {
             Entry::Occupied(mut o) => match o.get_mut() {
                 // Check that add_derivation is never called in the wrong context.
                 PackageAssignments::Decision(_) => debug_assert!(false),
-                PackageAssignments::Derivations {
-                    intersected: _,
-                    not_intersected_yet,
-                } => {
-                    not_intersected_yet.push(term);
+                PackageAssignments::Derivations(t) => {
+                    *t = t.intersection(&term);
                 }
             },
             Entry::Vacant(v) => {
-                v.insert(PackageAssignments::Derivations {
-                    intersected: term,
-                    not_intersected_yet: Vec::new(),
-                });
+                v.insert(PackageAssignments::Derivations(term));
             }
         }
     }
@@ -115,9 +106,9 @@ impl<P: Package, V: Version> Memory<P, V> {
     /// selected version (no "decision")
     /// and if it contains at least one positive derivation term
     /// in the partial solution.
-    pub fn potential_packages(&mut self) -> impl Iterator<Item = (&P, &Range<V>)> {
+    pub fn potential_packages(&self) -> impl Iterator<Item = (&P, &Range<V>)> {
         self.assignments
-            .iter_mut()
+            .iter()
             .filter_map(|(p, pa)| pa.potential_package_filter(p))
     }
 
@@ -131,13 +122,8 @@ impl<P: Package, V: Version> Memory<P, V> {
                 PackageAssignments::Decision((v, _)) => {
                     solution.insert(p.clone(), v.clone());
                 }
-                PackageAssignments::Derivations {
-                    intersected,
-                    not_intersected_yet,
-                } => {
-                    if intersected.is_positive()
-                        || not_intersected_yet.iter().any(|t| t.is_positive())
-                    {
+                PackageAssignments::Derivations(intersected) => {
+                    if intersected.is_positive() {
                         return None;
                     }
                 }
@@ -149,20 +135,10 @@ impl<P: Package, V: Version> Memory<P, V> {
 
 impl<V: Version> PackageAssignments<V> {
     /// Returns intersection of all assignments (decision included).
-    /// Mutates itself to store the intersection result.
-    fn assignment_intersection(&mut self) -> &Term<V> {
+    fn assignment_intersection(&self) -> &Term<V> {
         match self {
             PackageAssignments::Decision((_, term)) => term,
-            PackageAssignments::Derivations {
-                intersected,
-                not_intersected_yet,
-            } => {
-                for derivation in not_intersected_yet.iter() {
-                    *intersected = intersected.intersection(&derivation);
-                }
-                not_intersected_yet.clear();
-                intersected
-            }
+            PackageAssignments::Derivations(term) => term,
         }
     }
 
@@ -171,17 +147,13 @@ impl<V: Version> PackageAssignments<V> {
     /// and if it contains at least one positive derivation term
     /// in the partial solution.
     fn potential_package_filter<'a, P: Package>(
-        &'a mut self,
+        &'a self,
         package: &'a P,
     ) -> Option<(&'a P, &'a Range<V>)> {
         match self {
             PackageAssignments::Decision(_) => None,
-            PackageAssignments::Derivations {
-                intersected,
-                not_intersected_yet,
-            } => {
-                if intersected.is_positive() || not_intersected_yet.iter().any(|t| t.is_positive())
-                {
+            PackageAssignments::Derivations(intersected) => {
+                if intersected.is_positive() {
                     Some((package, self.assignment_intersection().unwrap_positive()))
                 } else {
                     None

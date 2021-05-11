@@ -143,32 +143,6 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
         }
     }
 
-    /// CF definition of Relation enum.
-    pub fn relation(&self, mut terms: impl FnMut(&P) -> Option<Term<V>>) -> Relation<P> {
-        let mut relation = Relation::Satisfied;
-        for (package, incompat_term) in self.package_terms.iter() {
-            match terms(package).map(|term| incompat_term.relation_with(&term)) {
-                Some(term::Relation::Satisfied) => {}
-                Some(term::Relation::Contradicted) => {
-                    return Relation::Contradicted(package.clone());
-                }
-                None | Some(term::Relation::Inconclusive) => {
-                    // If a package is not present, the intersection is the same as [Term::any].
-                    // According to the rules of satisfactions, the relation would be inconclusive.
-                    // It could also be satisfied if the incompatibility term was also [Term::any],
-                    // but we systematically remove those from incompatibilities
-                    // so we're safe on that front.
-                    if relation == Relation::Satisfied {
-                        relation = Relation::AlmostSatisfied(package.clone());
-                    } else {
-                        relation = Relation::Inconclusive;
-                    }
-                }
-            }
-        }
-        relation
-    }
-
     /// Check if an incompatibility should mark the end of the algorithm
     /// because it satisfies the root package.
     pub fn is_terminal(&self, root_package: &P, root_version: &V) -> bool {
@@ -243,6 +217,34 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
                 ))
             }
         }
+    }
+}
+
+impl<'a, P: Package, V: Version + 'a> Incompatibility<P, V> {
+    /// CF definition of Relation enum.
+    pub fn relation(&self, terms: impl Fn(&P) -> Option<&'a Term<V>>) -> Relation<P> {
+        let mut relation = Relation::Satisfied;
+        for (package, incompat_term) in self.package_terms.iter() {
+            match terms(package).map(|term| incompat_term.relation_with(&term)) {
+                Some(term::Relation::Satisfied) => {}
+                Some(term::Relation::Contradicted) => {
+                    return Relation::Contradicted(package.clone());
+                }
+                None | Some(term::Relation::Inconclusive) => {
+                    // If a package is not present, the intersection is the same as [Term::any].
+                    // According to the rules of satisfactions, the relation would be inconclusive.
+                    // It could also be satisfied if the incompatibility term was also [Term::any],
+                    // but we systematically remove those from incompatibilities
+                    // so we're safe on that front.
+                    if relation == Relation::Satisfied {
+                        relation = Relation::AlmostSatisfied(package.clone());
+                    } else {
+                        relation = Relation::Inconclusive;
+                    }
+                }
+            }
+        }
+        relation
     }
 }
 
