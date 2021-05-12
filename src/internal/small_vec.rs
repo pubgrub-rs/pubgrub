@@ -39,6 +39,21 @@ impl<T> SmallVec<T> {
         }
     }
 
+    pub fn pop(&mut self) -> Option<T> {
+        match std::mem::take(self) {
+            Self::Empty => None,
+            Self::One([v1]) => {
+                *self = Self::Empty;
+                Some(v1)
+            }
+            Self::Two([v1, v2]) => {
+                *self = Self::One([v1]);
+                Some(v2)
+            }
+            Self::Flexible(mut v) => v.pop(),
+        }
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, T> {
         self.as_slice().iter()
     }
