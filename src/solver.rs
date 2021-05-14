@@ -344,7 +344,7 @@ impl<P: Package, V: Version> OfflineDependencyProvider<P, V> {
             .or_default() = package_deps;
     }
 
-    /// Lists packages that have bean saved.
+    /// Lists packages that have been saved.
     pub fn packages(&self) -> impl Iterator<Item = &P> {
         self.dependencies.keys()
     }
