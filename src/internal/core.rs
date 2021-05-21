@@ -24,7 +24,10 @@ pub struct State<P: Package, V: Version> {
     root_version: V,
 
     incompatibilities: Map<P, Vec<IncompId<P, V>>>,
-    used_incompatibilities: rustc_hash::FxHashSet<IncompId<P, V>>,
+
+    /// Store the ids of incompatibilities that are already contradicted
+    /// and will stay that way until the next conflict and backtrack is operated.
+    contradicted_incompatibilities: rustc_hash::FxHashSet<IncompId<P, V>>,
 
     /// Partial solution.
     /// TODO: remove pub.
@@ -53,7 +56,7 @@ impl<P: Package, V: Version> State<P, V> {
             root_package,
             root_version,
             incompatibilities,
-            used_incompatibilities: rustc_hash::FxHashSet::default(),
+            contradicted_incompatibilities: rustc_hash::FxHashSet::default(),
             partial_solution: PartialSolution::empty(),
             incompatibility_store,
             unit_propagation_buffer: vec![],
@@ -102,7 +105,7 @@ impl<P: Package, V: Version> State<P, V> {
             let mut conflict_id = None;
             // We only care about incompatibilities if it contains the current package.
             for &incompat_id in self.incompatibilities[&current_package].iter().rev() {
-                if self.used_incompatibilities.contains(&incompat_id) {
+                if self.contradicted_incompatibilities.contains(&incompat_id) {
                     continue;
                 }
                 let current_incompat = &self.incompatibility_store[incompat_id];
@@ -115,16 +118,17 @@ impl<P: Package, V: Version> State<P, V> {
                     }
                     Relation::AlmostSatisfied(package_almost) => {
                         self.unit_propagation_buffer.push(package_almost.clone());
-                        self.used_incompatibilities.insert(incompat_id);
                         // Add (not term) to the partial solution with incompat as cause.
                         self.partial_solution.add_derivation(
                             package_almost,
                             incompat_id,
                             &self.incompatibility_store,
                         );
+                        // With the partial solution updated, the incompatibility is now contradicted.
+                        self.contradicted_incompatibilities.insert(incompat_id);
                     }
                     Relation::Contradicted(_) => {
-                        self.used_incompatibilities.insert(incompat_id);
+                        self.contradicted_incompatibilities.insert(incompat_id);
                     }
                     _ => {}
                 }
@@ -133,13 +137,15 @@ impl<P: Package, V: Version> State<P, V> {
                 let (package_almost, root_cause) = self.conflict_resolution(incompat_id)?;
                 self.unit_propagation_buffer.clear();
                 self.unit_propagation_buffer.push(package_almost.clone());
-                self.used_incompatibilities.insert(root_cause);
                 // Add to the partial solution with incompat as cause.
                 self.partial_solution.add_derivation(
                     package_almost,
                     root_cause,
                     &self.incompatibility_store,
                 );
+                // After conflict resolution and the partial solution update,
+                // the root cause incompatibility is now contradicted.
+                self.contradicted_incompatibilities.insert(root_cause);
             }
         }
         // If there are no more changed packages, unit propagation is done.
@@ -210,7 +216,7 @@ impl<P: Package, V: Version> State<P, V> {
     ) {
         self.partial_solution
             .backtrack(decision_level, &self.incompatibility_store);
-        self.used_incompatibilities.clear();
+        self.contradicted_incompatibilities.clear();
         if incompat_changed {
             self.merge_incompatibility(incompat);
         }
