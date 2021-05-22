@@ -58,6 +58,13 @@ impl<T> SmallVec<T> {
         }
     }
 
+    pub fn clear(&mut self) {
+        if let Self::Flexible(mut v) = std::mem::take(self) {
+            v.clear();
+            *self = Self::Flexible(v);
+        } // else: self already eq Empty from the take
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, T> {
         self.as_slice().iter()
     }

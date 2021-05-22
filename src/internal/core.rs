@@ -93,7 +93,7 @@ impl<P: Package, V: Version> State<P, V> {
     /// Unit propagation is the core mechanism of the solving algorithm.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     pub fn unit_propagation(&mut self, package: P) -> Result<(), PubGrubError<P, V>> {
-        self.unit_propagation_buffer = SmallVec::Empty;
+        self.unit_propagation_buffer.clear();
         self.unit_propagation_buffer.push(package);
         while let Some(current_package) = self.unit_propagation_buffer.pop() {
             // Iterate over incompatibilities in reverse order
@@ -123,7 +123,7 @@ impl<P: Package, V: Version> State<P, V> {
             }
             if let Some(incompat_id) = conflict_id {
                 let (package_almost, root_cause) = self.conflict_resolution(incompat_id)?;
-                self.unit_propagation_buffer = SmallVec::Empty;
+                self.unit_propagation_buffer.clear();
                 self.unit_propagation_buffer.push(package_almost.clone());
                 // Add to the partial solution with incompat as cause.
                 self.partial_solution.add_derivation(
