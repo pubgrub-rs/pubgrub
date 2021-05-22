@@ -17,17 +17,9 @@ use crate::version::Version;
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct DecisionLevel(u32);
 
-impl std::ops::Add<DecisionLevel> for DecisionLevel {
-    type Output = DecisionLevel;
-
-    fn add(self, other: DecisionLevel) -> DecisionLevel {
-        DecisionLevel(self.0 + other.0)
-    }
-}
-
-impl std::ops::SubAssign<DecisionLevel> for DecisionLevel {
-    fn sub_assign(&mut self, other: DecisionLevel) {
-        self.0 -= other.0
+impl DecisionLevel {
+    fn increment(self) -> Self {
+        Self(self.0 + 1)
     }
 }
 
@@ -63,7 +55,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     /// Add a decision to the partial solution.
     pub fn add_decision(&mut self, package: P, version: V) {
-        self.decision_level = self.decision_level + DecisionLevel(1);
+        self.decision_level = self.decision_level.increment();
         self.memory.add_decision(package.clone(), version.clone());
         self.history.push(DatedAssignment {
             decision_level: self.decision_level,
@@ -274,6 +266,9 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                 break;
             }
         }
+        // TODO: there is a bug here? What happens if there no previous dated_assignment for
+        // package? satisfier_map should be left unchanged and the max index is the one of the
+        // satisfier, which should be outside the range of the previous_assignments slice?
         previous_assignments[*satisfier_map.values().max().unwrap()]
             .decision_level
             .max(DecisionLevel(1))

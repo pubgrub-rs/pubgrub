@@ -7,10 +7,9 @@ use std::collections::HashSet as Set;
 
 use crate::error::PubGrubError;
 use crate::internal::arena::Arena;
-use crate::internal::assignment::Assignment::{Decision, Derivation};
-use crate::internal::incompatibility::IncompId;
-use crate::internal::incompatibility::{Incompatibility, Relation};
-use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
+use crate::internal::incompatibility::{IncompId, Incompatibility, Relation};
+use crate::internal::partial_solution_bis::Assignment::{Decision, Derivation};
+use crate::internal::partial_solution_bis::{DecisionLevel, PartialSolution};
 use crate::internal::small_vec::SmallVec;
 use crate::package::Package;
 use crate::report::DerivationTree;
@@ -159,7 +158,7 @@ impl<P: Package, V: Version> State<P, V> {
                         &self.incompatibility_store[current_incompat_id],
                         &self.incompatibility_store,
                     );
-                match satisfier.clone() {
+                match satisfier {
                     Decision { package, .. } => {
                         self.backtrack(
                             current_incompat_id,
