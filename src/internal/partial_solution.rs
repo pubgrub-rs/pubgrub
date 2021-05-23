@@ -4,7 +4,6 @@
 //! of the solution being built by the algorithm.
 
 use crate::internal::arena::Arena;
-use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::incompatibility::IncompId;
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::memory::Memory;
@@ -14,14 +13,8 @@ use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
 
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct DecisionLevel(u32);
-
-impl DecisionLevel {
-    fn increment(self) -> Self {
-        Self(self.0 + 1)
-    }
-}
+use super::partial_solution_bis::Assignment::{self, Decision, Derivation};
+use super::partial_solution_bis::DecisionLevel;
 
 #[derive(Clone)]
 pub struct DatedAssignment<P: Package, V: Version> {
@@ -172,6 +165,10 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         incompat: &Incompatibility<P, V>,
         store: &Arena<Incompatibility<P, V>>,
     ) -> (&Assignment<P, V>, DecisionLevel, DecisionLevel) {
+        debug_assert!(matches!(
+            self.relation(incompat),
+            crate::internal::incompatibility::Relation::Satisfied
+        ));
         let satisfier_map = Self::find_satisfier(incompat, &self.history, store);
         assert_eq!(
             satisfier_map.len(),

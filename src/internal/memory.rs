@@ -4,13 +4,14 @@
 //! where terms are regrouped by package in a [Map](crate::type_aliases::Map).
 
 use crate::internal::arena::Arena;
-use crate::internal::assignment::Assignment::{self, Decision, Derivation};
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
 use crate::range::Range;
 use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
+
+use super::partial_solution_bis::Assignment::{self, Decision, Derivation};
 
 /// A memory is the set of all assignments in the partial solution,
 /// organized by package instead of historically ordered.

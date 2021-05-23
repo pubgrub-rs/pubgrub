@@ -54,7 +54,7 @@ enum Kind<P: Package, V: Version> {
 
 /// A Relation describes how a set of terms can be compared to an incompatibility.
 /// Typically, the set of terms comes from the partial solution.
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Debug)]
 pub enum Relation<P: Package> {
     /// We say that a set of terms S satisfies an incompatibility I
     /// if S satisfies every term in I.

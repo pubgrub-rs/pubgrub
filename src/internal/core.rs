@@ -8,8 +8,8 @@ use std::collections::HashSet as Set;
 use crate::error::PubGrubError;
 use crate::internal::arena::Arena;
 use crate::internal::incompatibility::{IncompId, Incompatibility, Relation};
-use crate::internal::partial_solution_bis::Assignment::{Decision, Derivation};
-use crate::internal::partial_solution_bis::{DecisionLevel, PartialSolution};
+use crate::internal::partial_solution_both::Assignment::{Decision, Derivation};
+use crate::internal::partial_solution_both::{DecisionLevel, PartialSolution};
 use crate::internal::small_vec::SmallVec;
 use crate::package::Package;
 use crate::report::DerivationTree;
@@ -122,6 +122,11 @@ impl<P: Package, V: Version> State<P, V> {
             }
             if let Some(incompat_id) = conflict_id {
                 let (package_almost, root_cause) = self.conflict_resolution(incompat_id)?;
+                debug_assert!(matches!(
+                    self.partial_solution
+                        .relation(&self.incompatibility_store[root_cause]),
+                    crate::internal::incompatibility::Relation::AlmostSatisfied(_)
+                ));
                 self.unit_propagation_buffer.clear();
                 self.unit_propagation_buffer.push(package_almost.clone());
                 // Add to the partial solution with incompat as cause.

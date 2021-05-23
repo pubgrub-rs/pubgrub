@@ -12,10 +12,10 @@ use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct DecisionLevel(u32);
+pub struct DecisionLevel(pub u32);
 
 impl DecisionLevel {
-    fn increment(self) -> Self {
+    pub fn increment(self) -> Self {
         Self(self.0 + 1)
     }
 }
@@ -56,7 +56,7 @@ enum AssignmentsIntersection<V: Version> {
 /// An assignment is either a decision: a chosen version for a package,
 /// or a derivation : a term specifying compatible versions for a package.
 /// We also record the incompatibility at the origin of a derivation, called its cause.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Assignment<P: Package, V: Version> {
     /// The decision.
     Decision {
@@ -72,6 +72,26 @@ pub enum Assignment<P: Package, V: Version> {
         /// Incompatibility cause of the derivation.
         cause: IncompId<P, V>,
     },
+}
+
+impl<P: Package, V: Version> Assignment<P, V> {
+    /// Return the package for this assignment
+    pub fn package(&self) -> &P {
+        match self {
+            Self::Decision { package, .. } => package,
+            Self::Derivation { package, .. } => package,
+        }
+    }
+
+    /// Retrieve the current assignment as a [Term].
+    /// If this is decision, it returns a positive term with that exact version.
+    /// Otherwise, if this is a derivation, just returns its term.
+    pub fn as_term(&self, store: &Arena<Incompatibility<P, V>>) -> Term<V> {
+        match &self {
+            Self::Decision { version, .. } => Term::exact(version.clone()),
+            Self::Derivation { package, cause } => store[*cause].get(&package).unwrap().negate(),
+        }
+    }
 }
 
 impl<P: Package, V: Version> PartialSolution<P, V> {
@@ -204,6 +224,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         store: &Arena<Incompatibility<P, V>>,
     ) {
         self.current_decision_level = decision_level;
+        // TODO: use the just stabilized self.package_assignments.retain(...)
         self.package_assignments = std::mem::take(&mut self.package_assignments)
             .into_iter()
             .filter_map(|(p, mut pa)| {
@@ -305,6 +326,10 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         incompat: &Incompatibility<P, V>,
         store: &Arena<Incompatibility<P, V>>,
     ) -> (Assignment<P, V>, DecisionLevel, DecisionLevel) {
+        debug_assert!(matches!(
+            self.relation(incompat),
+            crate::internal::incompatibility::Relation::Satisfied
+        ));
         let satisfied_map = Self::find_satisfier(incompat, &self.package_assignments, store);
         let (satisfier_package, &(satisfier_index, _, satisfier_decision_level)) = satisfied_map
             .iter()
