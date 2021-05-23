@@ -30,6 +30,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
 
     /// Add a decision to the partial solution.
     pub fn add_decision(&mut self, package: P, version: V) {
+        println!("add_decision(p: {}, v: {})", &package, &version);
         self.old.add_decision(package.clone(), version.clone());
         self.bis.add_decision(package.clone(), version);
         self.term_intersection_for_package(&package); // for the asserts
@@ -42,6 +43,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         cause: IncompId<P, V>,
         store: &Arena<Incompatibility<P, V>>,
     ) {
+        println!("add_derivation(p: {}, cause: {:?})", &package, &cause);
         self.old.add_derivation(package.clone(), cause, store);
         self.bis.add_derivation(package.clone(), cause, store);
         self.term_intersection_for_package(&package); // for the asserts
@@ -71,8 +73,11 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         decision_level: DecisionLevel,
         store: &Arena<Incompatibility<P, V>>,
     ) {
+        println!("backtrack({:?})", &decision_level);
         self.old.backtrack(decision_level, store);
         self.bis.backtrack(decision_level, store);
+        println!("old: {:#?}", &self.old);
+        println!("bis: {:#?}", &self.bis);
     }
 
     /// Extract potential packages for the next iteration of unit propagation.
@@ -96,6 +101,10 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         new_incompatibilities: std::ops::Range<IncompId<P, V>>,
         store: &Arena<Incompatibility<P, V>>,
     ) {
+        println!(
+            "add_version(p: {}, version: {}, new_incompatibilities: {:?})",
+            &package, &version, &new_incompatibilities
+        );
         self.old.add_version(
             package.clone(),
             version.clone(),

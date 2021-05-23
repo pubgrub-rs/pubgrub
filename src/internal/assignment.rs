@@ -13,7 +13,7 @@ use crate::version::Version;
 /// An assignment is either a decision: a chosen version for a package,
 /// or a derivation : a term specifying compatible versions for a package.
 /// We also record the incompatibility at the origin of a derivation, called its cause.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Assignment<P: Package, V: Version> {
     /// The decision.
     Decision {

@@ -16,7 +16,7 @@ use crate::version::Version;
 use super::partial_solution_bis::Assignment::{self, Decision, Derivation};
 use super::partial_solution_bis::DecisionLevel;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DatedAssignment<P: Package, V: Version> {
     decision_level: DecisionLevel,
     assignment: Assignment<P, V>,
@@ -26,7 +26,7 @@ pub struct DatedAssignment<P: Package, V: Version> {
 /// of the solution being built by the algorithm.
 /// It is composed of a succession of assignments,
 /// defined as either decisions or derivations.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PartialSolution<P: Package, V: Version> {
     decision_level: DecisionLevel,
     /// Each assignment is stored with its decision level in the history.
@@ -181,7 +181,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             incompat,
             &satisfier.assignment,
             satisfier_map,
-            &self.history[0..=satisfier_idx],
+            &self.history[0..satisfier_idx],
             store,
         );
         (
@@ -266,8 +266,10 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         // TODO: there is a bug here? What happens if there no previous dated_assignment for
         // package? satisfier_map should be left unchanged and the max index is the one of the
         // satisfier, which should be outside the range of the previous_assignments slice?
-        previous_assignments[*satisfier_map.values().max().unwrap()]
-            .decision_level
+        previous_assignments
+            .get(*satisfier_map.values().max().unwrap())
+            .map(|a| a.decision_level)
+            .unwrap_or(DecisionLevel(1))
             .max(DecisionLevel(1))
     }
 }

@@ -17,14 +17,14 @@ use super::partial_solution_bis::Assignment::{self, Decision, Derivation};
 /// organized by package instead of historically ordered.
 ///
 /// Contrary to PartialSolution, Memory does not store derivations causes, only the terms.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Memory<P: Package, V: Version> {
     assignments: Map<P, PackageAssignments<V>>,
 }
 
 /// A package memory contains the potential decision and derivations
 /// that have already been made for a given package.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum PackageAssignments<V: Version> {
     Decision((V, Term<V>)),
     Derivations(Term<V>),

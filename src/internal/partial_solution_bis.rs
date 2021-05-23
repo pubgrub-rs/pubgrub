@@ -22,7 +22,7 @@ impl DecisionLevel {
 
 /// The partial solution contains all package assignments,
 /// organized by package and historically ordered.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PartialSolution<P: Package, V: Version> {
     next_global_index: u32,
     current_decision_level: DecisionLevel,
@@ -32,7 +32,7 @@ pub struct PartialSolution<P: Package, V: Version> {
 /// Package assignments contain the potential decision and derivations
 /// that have already been made for a given package,
 /// as well as the intersection of terms by all of these.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct PackageAssignments<P: Package, V: Version> {
     smallest_decision_level: DecisionLevel,
     highest_decision_level: DecisionLevel,
@@ -40,14 +40,14 @@ struct PackageAssignments<P: Package, V: Version> {
     assignments_intersection: AssignmentsIntersection<V>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DatedDerivation<P: Package, V: Version> {
     global_index: u32,
     decision_level: DecisionLevel,
     cause: IncompId<P, V>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum AssignmentsIntersection<V: Version> {
     Decision((u32, V, Term<V>)),
     Derivations(Term<V>),
@@ -261,6 +261,9 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                     // Truncate the history.
                     pa.dated_derivations.truncate(pos);
                     assert!(!pa.dated_derivations.is_empty());
+
+                    // Update highest_decision_level.
+                    pa.highest_decision_level = pa.dated_derivations[pos - 1].decision_level;
 
                     // Recompute the assignments intersection.
                     pa.assignments_intersection = AssignmentsIntersection::Derivations(
