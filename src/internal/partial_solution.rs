@@ -249,12 +249,13 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         let mut accum_term = satisfier.as_term(store);
         let incompat_term = incompat.get(&package).expect("package not in satisfier");
         // Search previous satisfier.
-        satisfier_map.remove(&package);
+        let mut there_is_no_previous_assignment = true;
         for (idx, dated_assignment) in previous_assignments.iter().enumerate() {
             if dated_assignment.assignment.package() != &package {
                 // We only care about packages related to the incompatibility.
                 continue;
             }
+            there_is_no_previous_assignment = false;
             // Check if that incompat term is satisfied by our accumulated terms intersection.
             accum_term = accum_term.intersection(&dated_assignment.assignment.as_term(store));
             // Check if we have found the satisfier
@@ -269,8 +270,14 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         // So the only way there could be no previous satisfier is if:
         //  - There is only one package (the satisfier one) in incompat
         //  - There is no derivation prior to the satisfier for that package
-        if satisfier_map.is_empty() {
+        if satisfier_map.len() == 1 && there_is_no_previous_assignment {
             DecisionLevel(1)
+        } else if there_is_no_previous_assignment {
+            let satisfier_idx = previous_assignments.len();
+            let map_without_satisfier = satisfier_map.values().filter(|v| **v < satisfier_idx);
+            previous_assignments[*map_without_satisfier.max().unwrap()]
+                .decision_level
+                .max(DecisionLevel(1))
         } else {
             previous_assignments[*satisfier_map.values().max().unwrap()]
                 .decision_level
