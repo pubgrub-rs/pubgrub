@@ -440,7 +440,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     ) -> DecisionLevel {
         // First, let's retrieve the previous derivations and the initial accum_term.
         let satisfier_pa = package_assignments.get(satisfier_package).unwrap();
-        let &(satisfier_index, _, _) = satisfied_map.get(satisfier_package).unwrap();
+        let (satisfier_index, _, _) = satisfied_map.remove(satisfier_package).unwrap();
         let (previous_derivations, mut accum_term) =
             if satisfier_index == satisfier_pa.dated_derivations.len() {
                 match &satisfier_pa.assignments_intersection {
@@ -461,10 +461,6 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             .get(satisfier_package)
             .expect("satisfier package not in incompat");
 
-        // Now let's find out if there exists a previous satisfier.
-        // This is the case if we found a previous satisfier for the satisfier package.
-        // Then, the actual global previous satisfier may be one of the incompat packages.
-        let mut has_previous_satisfier = false;
         for (idx, dated_derivation) in previous_derivations.iter().enumerate() {
             // Check if that incompat term is satisfied by our accumulated terms intersection.
             let this_term = store[dated_derivation.cause]
@@ -474,7 +470,6 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             accum_term = accum_term.intersection(&this_term);
             // Check if we have found the satisfier
             if accum_term.subset_of(incompat_term) {
-                has_previous_satisfier = true;
                 satisfied_map.insert(
                     satisfier_package.clone(),
                     (
@@ -488,14 +483,20 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         }
 
         // Finally, let's identify the decision level of that previous satisfier.
-        if has_previous_satisfier {
+        // If there exists at least one assignment related to the incompatibility
+        // prior to the satisfier, whether or not it is the same package than the satisfier,
+        // we are guaranted to have a previous satisfier.
+        // So the only way there could be no previous satisfier is if both:
+        //  - There is only one package (the satisfier one) in incompat
+        //  - There is no derivation prior to the satisfier for that package
+        if satisfied_map.is_empty() {
+            DecisionLevel(1)
+        } else {
             let (_, &(_, _, decision_level)) = satisfied_map
                 .iter()
                 .max_by_key(|(_p, (_, global_index, _))| global_index)
                 .unwrap();
             decision_level.max(DecisionLevel(1))
-        } else {
-            DecisionLevel(1)
         }
     }
 }
