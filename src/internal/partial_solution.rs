@@ -170,6 +170,8 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             crate::internal::incompatibility::Relation::Satisfied
         ));
         let satisfier_map = Self::find_satisfier(incompat, &self.history, store);
+        // println!("incompat: {}", incompat);
+        // println!("satisfier_map: {:?}", satisfier_map);
         assert_eq!(
             satisfier_map.len(),
             incompat.len(),
@@ -250,6 +252,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         let mut accum_term = satisfier.as_term(store);
         let incompat_term = incompat.get(&package).expect("package not in satisfier");
         // Search previous satisfier.
+        satisfier_map.remove(&package);
         for (idx, dated_assignment) in previous_assignments.iter().enumerate() {
             if dated_assignment.assignment.package() != &package {
                 // We only care about packages related to the incompatibility.
@@ -263,13 +266,18 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                 break;
             }
         }
-        // TODO: there is a bug here? What happens if there no previous dated_assignment for
-        // package? satisfier_map should be left unchanged and the max index is the one of the
-        // satisfier, which should be outside the range of the previous_assignments slice?
-        previous_assignments
-            .get(*satisfier_map.values().max().unwrap())
-            .map(|a| a.decision_level)
-            .unwrap_or(DecisionLevel(1))
-            .max(DecisionLevel(1))
+        // If there exists at least one assignment related to the incompatibility
+        // prior to the satisfier, whether or not it is the same package than the satisfier,
+        // we are guaranted to have a previous satisfier.
+        // So the only way there could be no previous satisfier is if:
+        //  - There is only one package (the satisfier one) in incompat
+        //  - There is no derivation prior to the satisfier for that package
+        if satisfier_map.is_empty() {
+            DecisionLevel(1)
+        } else {
+            previous_assignments[*satisfier_map.values().max().unwrap()]
+                .decision_level
+                .max(DecisionLevel(1))
+        }
     }
 }
