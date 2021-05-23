@@ -271,8 +271,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                             .iter()
                             .fold(Term::any(), |acc, dated_derivation| {
                                 let term = store[dated_derivation.cause].get(&p).unwrap().negate();
-                                acc.intersection(&term);
-                                acc
+                                acc.intersection(&term)
                             }),
                     );
                     Some((p, pa))
