@@ -4,8 +4,7 @@
 //! of the solution being built by the algorithm.
 
 use crate::internal::arena::Arena;
-use crate::internal::incompatibility::IncompId;
-use crate::internal::incompatibility::{Incompatibility, Relation};
+use crate::internal::incompatibility::{IncompId, Incompatibility, Relation};
 use crate::internal::memory::Memory;
 use crate::package::Package;
 use crate::range::Range;
@@ -170,8 +169,6 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             crate::internal::incompatibility::Relation::Satisfied
         ));
         let satisfier_map = Self::find_satisfier(incompat, &self.history, store);
-        // println!("incompat: {}", incompat);
-        // println!("satisfier_map: {:?}", satisfier_map);
         assert_eq!(
             satisfier_map.len(),
             incompat.len(),
