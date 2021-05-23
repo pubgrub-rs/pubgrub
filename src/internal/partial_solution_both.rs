@@ -86,7 +86,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         let old = self.old.potential_packages().map(|i| i.collect::<Vec<_>>());
         let bis = self.bis.potential_packages().map(|i| i.collect::<Vec<_>>());
         assert_eq!(old, bis);
-        self.bis.potential_packages()
+        self.old.potential_packages()
     }
 
     /// We can add the version to the partial solution as a decision
@@ -136,7 +136,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         let bis = self
             .bis
             .find_satisfier_and_previous_satisfier_level(incompat, store);
-        assert_eq!(old.0, &bis.0);
+        assert_eq!(old.0, bis.0);
         assert_eq!(old.1, bis.1);
         assert_eq!(old.2, bis.2);
         bis

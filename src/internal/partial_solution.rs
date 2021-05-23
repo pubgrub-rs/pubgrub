@@ -164,7 +164,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         &self,
         incompat: &Incompatibility<P, V>,
         store: &Arena<Incompatibility<P, V>>,
-    ) -> (&Assignment<P, V>, DecisionLevel, DecisionLevel) {
+    ) -> (Assignment<P, V>, DecisionLevel, DecisionLevel) {
         debug_assert!(matches!(
             self.relation(incompat),
             crate::internal::incompatibility::Relation::Satisfied
@@ -185,7 +185,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             store,
         );
         (
-            &satisfier.assignment,
+            satisfier.assignment.clone(),
             satisfier.decision_level,
             previous_satisfier_level,
         )
