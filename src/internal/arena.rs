@@ -91,6 +91,10 @@ impl<T> Arena<T> {
         Arena { data: Vec::new() }
     }
 
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
     pub fn alloc(&mut self, value: T) -> Id<T> {
         let raw = self.data.len();
         self.data.push(value);

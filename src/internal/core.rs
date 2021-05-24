@@ -214,6 +214,14 @@ impl<P: Package, V: Version> State<P, V> {
         incompat_changed: bool,
         decision_level: DecisionLevel,
     ) {
+        println!(
+            "Contradicted incompat count: {}",
+            self.contradicted_incompatibilities.len()
+        );
+        println!(
+            "Saved incompat count:        {}",
+            self.incompatibility_store.len()
+        );
         self.partial_solution
             .backtrack(decision_level, &self.incompatibility_store);
         self.contradicted_incompatibilities.clear();
