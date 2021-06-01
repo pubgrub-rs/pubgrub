@@ -39,6 +39,32 @@ impl<T> SmallVec<T> {
         }
     }
 
+    pub fn pop(&mut self) -> Option<T> {
+        match std::mem::take(self) {
+            Self::Empty => None,
+            Self::One([v1]) => {
+                *self = Self::Empty;
+                Some(v1)
+            }
+            Self::Two([v1, v2]) => {
+                *self = Self::One([v1]);
+                Some(v2)
+            }
+            Self::Flexible(mut v) => {
+                let out = v.pop();
+                *self = Self::Flexible(v);
+                out
+            }
+        }
+    }
+
+    pub fn clear(&mut self) {
+        if let Self::Flexible(mut v) = std::mem::take(self) {
+            v.clear();
+            *self = Self::Flexible(v);
+        } // else: self already eq Empty from the take
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, T> {
         self.as_slice().iter()
     }
@@ -99,5 +125,33 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for SmallVec<T> {
             v.push(item);
         }
         Ok(v)
+    }
+}
+
+// TESTS #######################################################################
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn push_and_pop(comands: Vec<Option<u8>>) {
+            let mut v = vec![];
+            let mut sv = SmallVec::Empty;
+            for comand in comands {
+                match comand {
+                    Some(i) => {
+                        v.push(i);
+                        sv.push(i);
+                    }
+                    None => {
+                        assert_eq!(v.pop(), sv.pop());
+                    }
+                }
+                assert_eq!(v.as_slice(), sv.as_slice());
+            }
+        }
     }
 }

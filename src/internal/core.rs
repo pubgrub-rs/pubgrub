@@ -11,6 +11,7 @@ use crate::internal::assignment::Assignment::{Decision, Derivation};
 use crate::internal::incompatibility::IncompId;
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
+use crate::internal::small_vec::SmallVec;
 use crate::package::Package;
 use crate::report::DerivationTree;
 use crate::solver::DependencyConstraints;
@@ -39,7 +40,7 @@ pub struct State<P: Package, V: Version> {
     /// This is a stack of work to be done in `unit_propagation`.
     /// It can definitely be a local variable to that method, but
     /// this way we can reuse the same allocation for better performance.
-    unit_propagation_buffer: Vec<P>,
+    unit_propagation_buffer: SmallVec<P>,
 }
 
 impl<P: Package, V: Version> State<P, V> {
@@ -59,7 +60,7 @@ impl<P: Package, V: Version> State<P, V> {
             contradicted_incompatibilities: rustc_hash::FxHashSet::default(),
             partial_solution: PartialSolution::empty(),
             incompatibility_store,
-            unit_propagation_buffer: vec![],
+            unit_propagation_buffer: SmallVec::Empty,
         }
     }
 
