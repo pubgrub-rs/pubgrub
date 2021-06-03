@@ -203,56 +203,52 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         store: &Arena<Incompatibility<P, V>>,
     ) {
         self.current_decision_level = decision_level;
-        // TODO: use the just stabilized self.package_assignments.retain(...)
-        self.package_assignments = std::mem::take(&mut self.package_assignments)
-            .into_iter()
-            .filter_map(|(p, mut pa)| {
-                if pa.smallest_decision_level > decision_level {
-                    // Remove all entries that have a smallest decision level higher than the backtrack target.
-                    None
-                } else if pa.highest_decision_level <= decision_level {
-                    // Do not change entries older than the backtrack decision level target.
-                    Some((p, pa))
-                } else {
-                    // smallest_decision_level <= decision_level < highest_decision_level
-                    //
-                    // Since decision_level < highest_decision_level,
-                    // We can be certain that there will be no decision in this package assignments
-                    // after backtracking, because such decision would have been the last
-                    // assignment and it would have the "highest_decision_level".
-                    let pos = pa
-                        .dated_derivations
-                        .binary_search_by(|probe| {
-                            probe
-                                .decision_level
-                                .cmp(&decision_level)
-                                // `binary_search_by` does not guarantee which element to return when more
-                                // then one match. By all ways claiming that it does not match we ensure we
-                                // get the last one.
-                                .then(std::cmp::Ordering::Less)
-                        })
-                        .unwrap_or_else(|x| x);
+        self.package_assignments.retain(|p, pa| {
+            if pa.smallest_decision_level > decision_level {
+                // Remove all entries that have a smallest decision level higher than the backtrack target.
+                false
+            } else if pa.highest_decision_level <= decision_level {
+                // Do not change entries older than the backtrack decision level target.
+                true
+            } else {
+                // smallest_decision_level <= decision_level < highest_decision_level
+                //
+                // Since decision_level < highest_decision_level,
+                // We can be certain that there will be no decision in this package assignments
+                // after backtracking, because such decision would have been the last
+                // assignment and it would have the "highest_decision_level".
+                let pos = pa
+                    .dated_derivations
+                    .binary_search_by(|probe| {
+                        probe
+                            .decision_level
+                            .cmp(&decision_level)
+                            // `binary_search_by` does not guarantee which element to return when more
+                            // then one match. By all ways claiming that it does not match we ensure we
+                            // get the last one.
+                            .then(std::cmp::Ordering::Less)
+                    })
+                    .unwrap_or_else(|x| x);
 
-                    // Truncate the history.
-                    pa.dated_derivations.truncate(pos);
-                    debug_assert!(!pa.dated_derivations.is_empty());
+                // Truncate the history.
+                pa.dated_derivations.truncate(pos);
+                debug_assert!(!pa.dated_derivations.is_empty());
 
-                    // Update highest_decision_level.
-                    pa.highest_decision_level = pa.dated_derivations[pos - 1].decision_level;
+                // Update highest_decision_level.
+                pa.highest_decision_level = pa.dated_derivations[pos - 1].decision_level;
 
-                    // Recompute the assignments intersection.
-                    pa.assignments_intersection = AssignmentsIntersection::Derivations(
-                        pa.dated_derivations
-                            .iter()
-                            .fold(Term::any(), |acc, dated_derivation| {
-                                let term = store[dated_derivation.cause].get(&p).unwrap().negate();
-                                acc.intersection(&term)
-                            }),
-                    );
-                    Some((p, pa))
-                }
-            })
-            .collect();
+                // Recompute the assignments intersection.
+                pa.assignments_intersection = AssignmentsIntersection::Derivations(
+                    pa.dated_derivations
+                        .iter()
+                        .fold(Term::any(), |acc, dated_derivation| {
+                            let term = store[dated_derivation.cause].get(&p).unwrap().negate();
+                            acc.intersection(&term)
+                        }),
+                );
+                true
+            }
+        });
     }
 
     /// We can add the version to the partial solution as a decision
