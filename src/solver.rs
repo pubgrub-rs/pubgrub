@@ -112,24 +112,19 @@ pub fn resolve<P: Package, V: Version>(
         next = decision.0.clone();
 
         // Pick the next compatible version.
+        let term_intersection = state
+            .partial_solution
+            .term_intersection_for_package(&next)
+            .expect("a package was chosen but we don't have a term.");
         let v = match decision.1 {
             None => {
-                let term = state
-                    .partial_solution
-                    .term_intersection_for_package(&next)
-                    .expect("a package was chosen but we don't have a term.")
-                    .clone();
-                state.add_incompatibility(Incompatibility::no_versions(next.clone(), term.clone()));
+                let inc = Incompatibility::no_versions(next.clone(), term_intersection.clone());
+                state.add_incompatibility(inc);
                 continue;
             }
             Some(x) => x,
         };
-        if !state
-            .partial_solution
-            .term_intersection_for_package(&next)
-            .expect("a package was chosen but we don't have a term.")
-            .contains(&v)
-        {
+        if !term_intersection.contains(&v) {
             return Err(PubGrubError::ErrorChoosingPackageVersion(
                 "choose_package_version picked an incompatible version".into(),
             ));
@@ -179,6 +174,8 @@ pub fn resolve<P: Package, V: Version>(
             let dep_incompats =
                 state.add_incompatibility_from_dependencies(p.clone(), v.clone(), &dependencies);
 
+            // TODO: I don't think this check can actually happen.
+            // We might want to put it under #[cfg(debug_assertions)].
             if state.incompatibility_store[dep_incompats.clone()]
                 .iter()
                 .any(|incompat| state.is_terminal(incompat))
