@@ -219,16 +219,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                 // assignment and it would have the "highest_decision_level".
                 let pos = pa
                     .dated_derivations
-                    .binary_search_by(|probe| {
-                        probe
-                            .decision_level
-                            .cmp(&decision_level)
-                            // `binary_search_by` does not guarantee which element to return when more
-                            // then one match. By all ways claiming that it does not match we ensure we
-                            // get the last one.
-                            .then(std::cmp::Ordering::Less)
-                    })
-                    .unwrap_or_else(|x| x);
+                    .partition_point(|dd| dd.decision_level <= decision_level);
 
                 // Truncate the history.
                 pa.dated_derivations.truncate(pos);
