@@ -177,6 +177,8 @@ pub fn resolve<P: Package, V: Version>(
             let dep_incompats =
                 state.add_incompatibility_from_dependencies(p.clone(), v.clone(), &dependencies);
 
+            // TODO: I don't think this check can actually happen.
+            // We might want to put it under #[cfg(debug_assertions)].
             if state.incompatibility_store[dep_incompats.clone()]
                 .iter()
                 .any(|incompat| state.is_terminal(incompat))
