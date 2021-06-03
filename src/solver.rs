@@ -112,24 +112,22 @@ pub fn resolve<P: Package, V: Version>(
         next = decision.0.clone();
 
         // Pick the next compatible version.
+        let term_intersection = state
+            .partial_solution
+            .term_intersection_for_package(&next)
+            .expect("a package was chosen but we don't have a term.")
+            .clone();
         let v = match decision.1 {
             None => {
-                let term = state
-                    .partial_solution
-                    .term_intersection_for_package(&next)
-                    .expect("a package was chosen but we don't have a term.")
-                    .clone();
-                state.add_incompatibility(Incompatibility::no_versions(next.clone(), term.clone()));
+                state.add_incompatibility(Incompatibility::no_versions(
+                    next.clone(),
+                    term_intersection.clone(),
+                ));
                 continue;
             }
             Some(x) => x,
         };
-        if !state
-            .partial_solution
-            .term_intersection_for_package(&next)
-            .expect("a package was chosen but we don't have a term.")
-            .contains(&v)
-        {
+        if !term_intersection.contains(&v) {
             return Err(PubGrubError::ErrorChoosingPackageVersion(
                 "choose_package_version picked an incompatible version".into(),
             ));
