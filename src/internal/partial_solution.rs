@@ -12,6 +12,8 @@ use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
 
+use super::small_vec::SmallVec;
+
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct DecisionLevel(pub u32);
 
@@ -37,7 +39,7 @@ pub struct PartialSolution<P: Package, V: Version> {
 struct PackageAssignments<P: Package, V: Version> {
     smallest_decision_level: DecisionLevel,
     highest_decision_level: DecisionLevel,
-    dated_derivations: Vec<DatedDerivation<P, V>>,
+    dated_derivations: SmallVec<DatedDerivation<P, V>>,
     assignments_intersection: AssignmentsIntersection<V>,
 }
 
@@ -150,7 +152,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                 v.insert(PackageAssignments {
                     smallest_decision_level: self.current_decision_level,
                     highest_decision_level: self.current_decision_level,
-                    dated_derivations: vec![dated_derivation],
+                    dated_derivations: SmallVec::One([dated_derivation]),
                     assignments_intersection: AssignmentsIntersection::Derivations(term),
                 });
             }
@@ -217,16 +219,16 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                 // We can be certain that there will be no decision in this package assignments
                 // after backtracking, because such decision would have been the last
                 // assignment and it would have the "highest_decision_level".
-                let pos = pa
-                    .dated_derivations
-                    .partition_point(|dd| dd.decision_level <= decision_level);
 
                 // Truncate the history.
-                pa.dated_derivations.truncate(pos);
+                while pa.dated_derivations.last().map(|dd| dd.decision_level) > Some(decision_level)
+                {
+                    pa.dated_derivations.pop();
+                }
                 debug_assert!(!pa.dated_derivations.is_empty());
 
                 // Update highest_decision_level.
-                pa.highest_decision_level = pa.dated_derivations[pos - 1].decision_level;
+                pa.highest_decision_level = pa.dated_derivations.last().unwrap().decision_level;
 
                 // Recompute the assignments intersection.
                 pa.assignments_intersection = AssignmentsIntersection::Derivations(
