@@ -8,7 +8,9 @@ use std::collections::HashSet as Set;
 use crate::error::PubGrubError;
 use crate::internal::arena::Arena;
 use crate::internal::incompatibility::{IncompId, Incompatibility, Relation};
-use crate::internal::partial_solution::Assignment::{Decision, Derivation};
+use crate::internal::partial_solution::SatisfierSearch::{
+    DifferentDecisionLevels, SameDecisionLevels,
+};
 use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::internal::small_vec::SmallVec;
 use crate::package::Package;
@@ -168,14 +170,14 @@ impl<P: Package, V: Version> State<P, V> {
                     self.build_derivation_tree(current_incompat_id),
                 ));
             } else {
-                let (satisfier, satisfier_level, previous_satisfier_level) = self
-                    .partial_solution
-                    .find_satisfier_and_previous_satisfier_level(
-                        &self.incompatibility_store[current_incompat_id],
-                        &self.incompatibility_store,
-                    );
-                match satisfier {
-                    Decision { package, .. } => {
+                let (package, satisfier_search_result) = self.partial_solution.satisfier_search(
+                    &self.incompatibility_store[current_incompat_id],
+                    &self.incompatibility_store,
+                );
+                match satisfier_search_result {
+                    DifferentDecisionLevels {
+                        previous_satisfier_level,
+                    } => {
                         self.backtrack(
                             current_incompat_id,
                             current_incompat_changed,
@@ -183,24 +185,15 @@ impl<P: Package, V: Version> State<P, V> {
                         );
                         return Ok((package, current_incompat_id));
                     }
-                    Derivation { cause, package } => {
-                        if previous_satisfier_level != satisfier_level {
-                            self.backtrack(
-                                current_incompat_id,
-                                current_incompat_changed,
-                                previous_satisfier_level,
-                            );
-                            return Ok((package, current_incompat_id));
-                        } else {
-                            let prior_cause = Incompatibility::prior_cause(
-                                current_incompat_id,
-                                cause,
-                                &package,
-                                &self.incompatibility_store,
-                            );
-                            current_incompat_id = self.incompatibility_store.alloc(prior_cause);
-                            current_incompat_changed = true;
-                        }
+                    SameDecisionLevels { satisfier_cause } => {
+                        let prior_cause = Incompatibility::prior_cause(
+                            current_incompat_id,
+                            satisfier_cause,
+                            &package,
+                            &self.incompatibility_store,
+                        );
+                        current_incompat_id = self.incompatibility_store.alloc(prior_cause);
+                        current_incompat_changed = true;
                     }
                 }
             }

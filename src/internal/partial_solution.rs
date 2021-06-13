@@ -56,25 +56,13 @@ enum AssignmentsIntersection<V: Version> {
     Derivations(Term<V>),
 }
 
-/// An assignment is either a decision: a chosen version for a package,
-/// or a derivation : a term specifying compatible versions for a package.
-/// We also record the incompatibility at the origin of a derivation, called its cause.
-/// TODO: Remove. I only added that to not change the code in core.rs (except reference &).
-#[derive(Clone, PartialEq, Debug)]
-pub enum Assignment<P: Package, V: Version> {
-    /// The decision.
-    Decision {
-        /// The package corresponding to the decision.
-        package: P,
-        /// The decided version.
-        version: V,
+#[derive(Clone, Debug)]
+pub enum SatisfierSearch<P: Package, V: Version> {
+    DifferentDecisionLevels {
+        previous_satisfier_level: DecisionLevel,
     },
-    /// The derivation.
-    Derivation {
-        /// The package corresponding to the derivation.
-        package: P,
-        /// Incompatibility cause of the derivation.
-        cause: IncompId<P, V>,
+    SameDecisionLevels {
+        satisfier_cause: IncompId<P, V>,
     },
 }
 
@@ -286,12 +274,12 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             .map(|pa| pa.assignments_intersection.term())
     }
 
-    /// Find satisfier and previous satisfier decision level.
-    pub fn find_satisfier_and_previous_satisfier_level(
+    /// Figure out if the satisfier and previous satisfier are of different decision levels.
+    pub fn satisfier_search(
         &self,
         incompat: &Incompatibility<P, V>,
         store: &Arena<Incompatibility<P, V>>,
-    ) -> (Assignment<P, V>, DecisionLevel, DecisionLevel) {
+    ) -> (P, SatisfierSearch<P, V>) {
         let satisfied_map = Self::find_satisfier(incompat, &self.package_assignments, store);
         let (satisfier_package, &(satisfier_index, _, satisfier_decision_level)) = satisfied_map
             .iter()
@@ -305,27 +293,19 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             &self.package_assignments,
             store,
         );
-        let satisfier_pa = self.package_assignments.get(&satisfier_package).unwrap();
-        let satisfier_assignment = if satisfier_index == satisfier_pa.dated_derivations.len() {
-            match &satisfier_pa.assignments_intersection {
-                AssignmentsIntersection::Decision((_, version, _)) => Assignment::Decision {
-                    package: satisfier_package,
-                    version: version.clone(),
-                },
-                AssignmentsIntersection::Derivations(_) => panic!("Must be a decision"),
-            }
+        if previous_satisfier_level < satisfier_decision_level {
+            let search_result = SatisfierSearch::DifferentDecisionLevels {
+                previous_satisfier_level,
+            };
+            (satisfier_package, search_result)
         } else {
+            let satisfier_pa = self.package_assignments.get(&satisfier_package).unwrap();
             let dd = &satisfier_pa.dated_derivations[satisfier_index];
-            Assignment::Derivation {
-                package: satisfier_package,
-                cause: dd.cause,
-            }
-        };
-        (
-            satisfier_assignment,
-            satisfier_decision_level,
-            previous_satisfier_level,
-        )
+            let search_result = SatisfierSearch::SameDecisionLevels {
+                satisfier_cause: dd.cause,
+            };
+            (satisfier_package, search_result)
+        }
     }
 
     /// A satisfier is the earliest assignment in partial solution such that the incompatibility
