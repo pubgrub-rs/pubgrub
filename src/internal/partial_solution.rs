@@ -325,45 +325,10 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         let mut satisfied = SmallMap::Empty;
         for (package, incompat_term) in incompat.iter() {
             let pa = package_assignments.get(package).expect("Must exist");
-            // Term where we accumulate intersections until incompat_term is satisfied.
-            let mut accum_term = Term::any();
-            // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
-            let mut derivation_satisfier_index = None;
-            for (idx, dated_derivation) in pa.dated_derivations.iter().enumerate() {
-                let this_term = store[dated_derivation.cause].get(package).unwrap().negate();
-                accum_term = accum_term.intersection(&this_term);
-                if accum_term.subset_of(incompat_term) {
-                    // We found the derivation causing satisfaction.
-                    derivation_satisfier_index = Some((
-                        idx,
-                        dated_derivation.global_index,
-                        dated_derivation.decision_level,
-                    ));
-                    break;
-                }
-            }
-            match derivation_satisfier_index {
-                Some(indices) => {
-                    satisfied.insert(package.clone(), indices);
-                }
-                // If it wasn't found in the derivations,
-                // it must be the decision which is last (if called in the right context).
-                None => match pa.assignments_intersection {
-                    AssignmentsIntersection::Decision((global_index, _, _)) => {
-                        satisfied.insert(
-                            package.clone(),
-                            (
-                                pa.dated_derivations.len(),
-                                global_index,
-                                pa.highest_decision_level,
-                            ),
-                        );
-                    }
-                    AssignmentsIntersection::Derivations(_) => {
-                        panic!("This must be a decision")
-                    }
-                },
-            };
+            satisfied.insert(
+                package.clone(),
+                pa.satisfier(package, incompat_term, Term::any(), store),
+            );
         }
         satisfied
     }
@@ -380,51 +345,26 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     ) -> DecisionLevel {
         // First, let's retrieve the previous derivations and the initial accum_term.
         let satisfier_pa = package_assignments.get(satisfier_package).unwrap();
-        let (satisfier_index, ref mut _satisfier_global_idx, ref mut _satisfier_decision_level) =
-            satisfied_map.get_mut(satisfier_package).unwrap();
-        // *satisfier_global_idx = 0; // Changes behavior
-        // *satisfier_decision_level = DecisionLevel(0); // Changes behavior
+        let (satisfier_index, _gidx, _dl) = satisfied_map.get_mut(satisfier_package).unwrap();
 
-        let (previous_derivations, mut accum_term) =
-            if *satisfier_index == satisfier_pa.dated_derivations.len() {
-                match &satisfier_pa.assignments_intersection {
-                    AssignmentsIntersection::Derivations(_) => panic!("must be a decision"),
-                    AssignmentsIntersection::Decision((_, _, term)) => {
-                        (satisfier_pa.dated_derivations.as_slice(), term.clone())
-                    }
-                }
-            } else {
-                let dd = &satisfier_pa.dated_derivations[*satisfier_index];
-                (
-                    &satisfier_pa.dated_derivations[..=*satisfier_index], // [..satisfier_idx] to change behavior
-                    store[dd.cause].get(satisfier_package).unwrap().negate(),
-                )
-            };
+        let accum_term = if *satisfier_index == satisfier_pa.dated_derivations.len() {
+            match &satisfier_pa.assignments_intersection {
+                AssignmentsIntersection::Derivations(_) => panic!("must be a decision"),
+                AssignmentsIntersection::Decision((_, _, term)) => term.clone(),
+            }
+        } else {
+            let dd = &satisfier_pa.dated_derivations[*satisfier_index];
+            store[dd.cause].get(satisfier_package).unwrap().negate()
+        };
 
         let incompat_term = incompat
             .get(satisfier_package)
             .expect("satisfier package not in incompat");
 
-        for (idx, dated_derivation) in previous_derivations.iter().enumerate() {
-            // Check if that incompat term is satisfied by our accumulated terms intersection.
-            let this_term = store[dated_derivation.cause]
-                .get(satisfier_package)
-                .unwrap()
-                .negate();
-            accum_term = accum_term.intersection(&this_term);
-            // Check if we have found the satisfier
-            if accum_term.subset_of(incompat_term) {
-                satisfied_map.insert(
-                    satisfier_package.clone(),
-                    (
-                        idx,
-                        dated_derivation.global_index,
-                        dated_derivation.decision_level,
-                    ),
-                );
-                break;
-            }
-        }
+        satisfied_map.insert(
+            satisfier_package.clone(),
+            satisfier_pa.satisfier(satisfier_package, incompat_term, accum_term, store),
+        );
 
         // Finally, let's identify the decision level of that previous satisfier.
         let (_, &(_, _, decision_level)) = satisfied_map
@@ -432,6 +372,44 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
             .max_by_key(|(_p, (_, global_index, _))| global_index)
             .unwrap();
         decision_level.max(DecisionLevel(1))
+    }
+}
+
+impl<P: Package, V: Version> PackageAssignments<P, V> {
+    fn satisfier(
+        &self,
+        package: &P,
+        incompat_term: &Term<V>,
+        start_term: Term<V>,
+        store: &Arena<Incompatibility<P, V>>,
+    ) -> (usize, u32, DecisionLevel) {
+        // Term where we accumulate intersections until incompat_term is satisfied.
+        let mut accum_term = start_term;
+        // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
+        for (idx, dated_derivation) in self.dated_derivations.iter().enumerate() {
+            let this_term = store[dated_derivation.cause].get(package).unwrap().negate();
+            accum_term = accum_term.intersection(&this_term);
+            if accum_term.subset_of(incompat_term) {
+                // We found the derivation causing satisfaction.
+                return (
+                    idx,
+                    dated_derivation.global_index,
+                    dated_derivation.decision_level,
+                );
+            }
+        }
+        // If it wasn't found in the derivations,
+        // it must be the decision which is last (if called in the right context).
+        match self.assignments_intersection {
+            AssignmentsIntersection::Decision((global_index, _, _)) => (
+                self.dated_derivations.len(),
+                global_index,
+                self.highest_decision_level,
+            ),
+            AssignmentsIntersection::Derivations(_) => {
+                panic!("This must be a decision")
+            }
+        }
     }
 }
 
