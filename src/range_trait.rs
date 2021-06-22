@@ -25,8 +25,10 @@ use crate::version_trait::{Interval, NumberInterval, NumberVersion, Version};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Range<I, V> {
     segments: SmallVec<I>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing))]
     phantom: PhantomData<V>,
 }
 

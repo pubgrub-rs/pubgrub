@@ -17,7 +17,7 @@ pub trait Version: Clone + Ord + Debug + Display {
 
 /// An interval is a bounded domain containing all values
 /// between its starting and ending bounds.
-pub trait Interval<V>: RangeBounds<V> {
+pub trait Interval<V>: RangeBounds<V> + Debug + Clone + Eq + PartialEq {
     /// Create an interval from its starting and ending bounds.
     /// It's the caller responsability to order them correctly.
     fn new(start_bound: Bound<V>, end_bound: Bound<V>) -> Self;
