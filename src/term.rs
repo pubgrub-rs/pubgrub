@@ -182,13 +182,13 @@ impl<I: Interval<V>, V: Version + fmt::Display> fmt::Display for Term<I, V> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::version::NumberVersion;
+    use crate::version_trait::{NumberInterval, NumberVersion};
     use proptest::prelude::*;
 
-    pub fn strategy() -> impl Strategy<Value = Term<NumberVersion>> {
+    pub fn strategy() -> impl Strategy<Value = Term<NumberInterval, NumberVersion>> {
         prop_oneof![
-            crate::range::tests::strategy().prop_map(Term::Positive),
-            crate::range::tests::strategy().prop_map(Term::Negative),
+            crate::range_trait::tests::strategy().prop_map(Term::Positive),
+            crate::range_trait::tests::strategy().prop_map(Term::Negative),
         ]
     }
 
