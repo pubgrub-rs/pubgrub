@@ -18,20 +18,15 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Bound;
-use std::ops::RangeBounds;
 
 use crate::internal::small_vec::SmallVec;
-use crate::version_trait;
+use crate::version_trait::{Interval, NumberInterval, NumberVersion, Version};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ranges<I, V> {
     segments: SmallVec<I>,
     phantom: PhantomData<V>,
-}
-
-pub trait Interval<V>: RangeBounds<V> {
-    fn new(start_bound: Bound<V>, end_bound: Bound<V>) -> Self;
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -108,7 +103,7 @@ impl<V: Ord> SidedBound<&V> {
 }
 
 // Ranges building blocks.
-impl<I: Interval<V>, V: version_trait::Version> Ranges<I, V> {
+impl<I: Interval<V>, V: Version> Ranges<I, V> {
     /// Empty set of versions.
     pub fn empty() -> Self {
         Self {
@@ -166,7 +161,7 @@ impl<I: Interval<V>, V: version_trait::Version> Ranges<I, V> {
 }
 
 // Set operations.
-impl<I: Interval<V>, V: version_trait::Version> Ranges<I, V> {
+impl<I: Interval<V>, V: Version> Ranges<I, V> {
     // Negate ##################################################################
 
     /// Compute the complement set of versions.
@@ -376,17 +371,9 @@ fn owned_bound<V: Clone>(bound: Bound<&V>) -> Bound<V> {
     }
 }
 
-// /// A Range is a set of versions.
-// #[derive(Debug, Clone, Eq, PartialEq)]
-// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-// #[cfg_attr(feature = "serde", serde(transparent))]
-// pub struct Range<V: Version> {
-//     segments: SmallVec<Interval<V>>,
-// }
-
 // REPORT ######################################################################
 
-impl<I: Interval<V>, V: version_trait::Version> fmt::Display for Ranges<I, V> {
+impl<I: Interval<V>, V: Version> fmt::Display for Ranges<I, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.segments.as_slice() {
             [] => write!(f, "∅"),
@@ -404,7 +391,7 @@ impl<I: Interval<V>, V: version_trait::Version> fmt::Display for Ranges<I, V> {
     }
 }
 
-fn interval_to_string<I: Interval<V>, V: version_trait::Version>(seg: &I) -> String {
+fn interval_to_string<I: Interval<V>, V: Version>(seg: &I) -> String {
     let start = seg.start_bound();
     let end = seg.end_bound();
     if start == ref_bound(&V::minimum()) {
@@ -416,7 +403,7 @@ fn interval_to_string<I: Interval<V>, V: version_trait::Version>(seg: &I) -> Str
     }
 }
 
-fn display_start_bound<V: version_trait::Version>(start: Bound<&V>) -> String {
+fn display_start_bound<V: Version>(start: Bound<&V>) -> String {
     match start {
         Bound::Unbounded => "∗".to_string(),
         Bound::Excluded(v) => format!("> {}", v),
@@ -424,50 +411,11 @@ fn display_start_bound<V: version_trait::Version>(start: Bound<&V>) -> String {
     }
 }
 
-fn display_end_bound<V: version_trait::Version>(end: Bound<&V>) -> String {
+fn display_end_bound<V: Version>(end: Bound<&V>) -> String {
     match end {
         Bound::Unbounded => "∗".to_string(),
         Bound::Excluded(v) => format!("< {}", v),
         Bound::Included(v) => format!("<= {}", v),
-    }
-}
-
-// NumberInterval ##############################################################
-
-use crate::version_trait::NumberVersion;
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct NumberInterval {
-    start: NumberVersion,
-    end: Option<NumberVersion>,
-}
-
-impl RangeBounds<NumberVersion> for NumberInterval {
-    fn start_bound(&self) -> Bound<&NumberVersion> {
-        Bound::Included(&self.start)
-    }
-    fn end_bound(&self) -> Bound<&NumberVersion> {
-        match &self.end {
-            None => Bound::Unbounded,
-            Some(v) => Bound::Excluded(v),
-        }
-    }
-}
-
-impl Interval<NumberVersion> for NumberInterval {
-    fn new(start_bound: Bound<NumberVersion>, end_bound: Bound<NumberVersion>) -> Self {
-        let start = match start_bound {
-            Bound::Unbounded => NumberVersion(0),
-            Bound::Excluded(v) => v.bump(),
-            Bound::Included(v) => v,
-        };
-        let end = match end_bound {
-            Bound::Unbounded => None,
-            Bound::Excluded(v) => Some(v),
-            Bound::Included(v) => Some(v.bump()),
-        };
-        Self { start, end }
     }
 }
 
@@ -519,16 +467,16 @@ pub mod tests {
             let mut pair_iter = vec.chunks_exact(2);
             let mut segments = SmallVec::empty();
             while let Some([v1, v2]) = pair_iter.next() {
-                segments.push(NumberInterval {
-                    start: NumberVersion(*v1),
-                    end: Some(NumberVersion(*v2)),
-                });
+                segments.push(NumberInterval::new(
+                    Bound::Included(NumberVersion(*v1)),
+                    Bound::Excluded(NumberVersion(*v2)),
+                ));
             }
             if let [v] = pair_iter.remainder() {
-                segments.push(NumberInterval {
-                    start: NumberVersion(*v),
-                    end: None,
-                });
+                segments.push(NumberInterval::new(
+                    Bound::Included(NumberVersion(*v)),
+                    Bound::Unbounded,
+                ));
             }
             Ranges {
                 segments,

@@ -3,7 +3,7 @@
 //! Traits and implementations to create and compare versions.
 
 use std::fmt::{self, Debug, Display};
-use std::ops::Bound;
+use std::ops::{Bound, RangeBounds};
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -14,6 +14,16 @@ pub trait Version: Clone + Ord + Debug + Display {
     /// Returns the maximum version.
     fn maximum() -> Bound<Self>;
 }
+
+/// An interval is a bounded domain containing all values
+/// between its starting and ending bounds.
+pub trait Interval<V>: RangeBounds<V> {
+    /// Create an interval from its starting and ending bounds.
+    /// It's the caller responsability to order them correctly.
+    fn new(start_bound: Bound<V>, end_bound: Bound<V>) -> Self;
+}
+
+// SemanticVersion #############################################################
 
 /// Type for semantic versions: major.minor.patch.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -224,6 +234,8 @@ impl Version for SemanticVersion {
     }
 }
 
+// NumberVersion ###############################################################
+
 /// Simplest versions possible, just a positive number.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize,))]
@@ -260,7 +272,44 @@ impl Version for NumberVersion {
 }
 
 impl NumberVersion {
-    pub fn bump(&self) -> Self {
+    fn bump(&self) -> Self {
         NumberVersion(self.0 + 1)
+    }
+}
+
+// NumberInterval ##############################################################
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct NumberInterval {
+    start: NumberVersion,
+    end: Option<NumberVersion>,
+}
+
+impl RangeBounds<NumberVersion> for NumberInterval {
+    fn start_bound(&self) -> Bound<&NumberVersion> {
+        Bound::Included(&self.start)
+    }
+    fn end_bound(&self) -> Bound<&NumberVersion> {
+        match &self.end {
+            None => Bound::Unbounded,
+            Some(v) => Bound::Excluded(v),
+        }
+    }
+}
+
+impl Interval<NumberVersion> for NumberInterval {
+    fn new(start_bound: Bound<NumberVersion>, end_bound: Bound<NumberVersion>) -> Self {
+        let start = match start_bound {
+            Bound::Unbounded => NumberVersion(0),
+            Bound::Excluded(v) => v.bump(),
+            Bound::Included(v) => v,
+        };
+        let end = match end_bound {
+            Bound::Unbounded => None,
+            Bound::Excluded(v) => Some(v),
+            Bound::Included(v) => Some(v.bump()),
+        };
+        Self { start, end }
     }
 }
