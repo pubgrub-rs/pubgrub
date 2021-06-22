@@ -34,9 +34,17 @@ pub trait IntervalB<V>: RangeBounds<V> {
     fn new(start_bound: Bound<V>, end_bound: Bound<V>) -> Self;
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum SidedBound<V> {
     Left(Bound<V>),
     Right(Bound<V>),
+}
+
+fn ref_sided_bound<V>(sb: &SidedBound<V>) -> SidedBound<&V> {
+    match sb {
+        SidedBound::Left(bound) => SidedBound::Left(ref_bound(bound)),
+        SidedBound::Right(bound) => SidedBound::Right(ref_bound(bound)),
+    }
 }
 
 impl<V: Ord> SidedBound<&V> {
@@ -71,11 +79,14 @@ impl<V: Ord> SidedBound<&V> {
                 // An open Right bound is smaller than a closed Right bound.
                 r1.cmp(r2).then(Ordering::Less)
             }
+            (SidedBound::Right(Bound::Included(r1)), SidedBound::Right(Bound::Included(r2))) => {
+                r1.cmp(r2)
+            }
             (SidedBound::Right(_), SidedBound::Right(_)) => other.compare(&self).reverse(),
 
             // Handling of left and right bounds.
             (SidedBound::Left(Bound::Unbounded), SidedBound::Right(_)) => Ordering::Less,
-            (SidedBound::Left(_), SidedBound::Right(Bound::Unbounded)) => Ordering::Greater,
+            (SidedBound::Left(_), SidedBound::Right(Bound::Unbounded)) => Ordering::Less,
             (SidedBound::Left(Bound::Excluded(l)), SidedBound::Right(Bound::Excluded(r))) => {
                 // An open left bound is after an open right bound.
                 l.cmp(r).then(Ordering::Greater)
@@ -163,9 +174,9 @@ impl<I: IntervalB<V>, V: version_trait::Version> Ranges<I, V> {
         match self.segments.first() {
             None => Self::full(), // Complement of ∅  is *
             Some(seg) => {
-                if seg.start_bound() == Self::ref_bound(&V::minimum()) {
+                if seg.start_bound() == ref_bound(&V::minimum()) {
                     Self::complement_segments(
-                        Self::owned_bound(seg.end_bound()),
+                        owned_bound(flip_bound(seg.end_bound())),
                         &self.segments[1..],
                     )
                 } else {
@@ -183,8 +194,8 @@ impl<I: IntervalB<V>, V: version_trait::Version> Ranges<I, V> {
         let mut complemented_segments = SmallVec::empty();
         let mut start = start;
         for seg in segments {
-            complemented_segments.push(I::new(start, Self::owned_bound(seg.start_bound())));
-            start = Self::owned_bound(seg.end_bound());
+            complemented_segments.push(I::new(start, owned_bound(flip_bound(seg.start_bound()))));
+            start = owned_bound(flip_bound(seg.end_bound()));
         }
         if start != V::maximum() {
             complemented_segments.push(I::new(start, V::maximum()));
@@ -239,25 +250,19 @@ impl<I: IntervalB<V>, V: version_trait::Version> Ranges<I, V> {
                                     };
                                     match SidedBound::Right(l2).compare(&SidedBound::Right(r2)) {
                                         Ordering::Less => {
-                                            segments.push(I::new(
-                                                Self::owned_bound(start),
-                                                Self::owned_bound(l2),
-                                            ));
+                                            segments
+                                                .push(I::new(owned_bound(start), owned_bound(l2)));
                                             left = left_iter.next();
                                         }
                                         Ordering::Equal => {
-                                            segments.push(I::new(
-                                                Self::owned_bound(start),
-                                                Self::owned_bound(l2),
-                                            ));
+                                            segments
+                                                .push(I::new(owned_bound(start), owned_bound(l2)));
                                             left = left_iter.next();
                                             right = right_iter.next();
                                         }
                                         Ordering::Greater => {
-                                            segments.push(I::new(
-                                                Self::owned_bound(start),
-                                                Self::owned_bound(r2),
-                                            ));
+                                            segments
+                                                .push(I::new(owned_bound(start), owned_bound(r2)));
                                             right = right_iter.next();
                                         }
                                     }
@@ -341,25 +346,33 @@ impl<I: IntervalB<V>, V: version_trait::Version> Ranges<I, V> {
         }
         false
     }
+}
 
-    // Helper ##################################################################
+// Helper ##################################################################
 
-    /// Will be obsolete when .as_ref() hits stable.
-    fn ref_bound(bound: &Bound<V>) -> Bound<&V> {
-        match *bound {
-            Bound::Included(ref x) => Bound::Included(x),
-            Bound::Excluded(ref x) => Bound::Excluded(x),
-            Bound::Unbounded => Bound::Unbounded,
-        }
+fn flip_bound<V>(bound: Bound<V>) -> Bound<V> {
+    match bound {
+        Bound::Unbounded => Bound::Unbounded,
+        Bound::Excluded(b) => Bound::Included(b),
+        Bound::Included(b) => Bound::Excluded(b),
     }
+}
 
-    /// Will be obsolete when .cloned() hits stable.
-    fn owned_bound(bound: Bound<&V>) -> Bound<V> {
-        match bound {
-            Bound::Unbounded => Bound::Unbounded,
-            Bound::Included(x) => Bound::Included(x.clone()),
-            Bound::Excluded(x) => Bound::Excluded(x.clone()),
-        }
+/// Will be obsolete when .as_ref() hits stable.
+fn ref_bound<V>(bound: &Bound<V>) -> Bound<&V> {
+    match *bound {
+        Bound::Included(ref x) => Bound::Included(x),
+        Bound::Excluded(ref x) => Bound::Excluded(x),
+        Bound::Unbounded => Bound::Unbounded,
+    }
+}
+
+/// Will be obsolete when .cloned() hits stable.
+fn owned_bound<V: Clone>(bound: Bound<&V>) -> Bound<V> {
+    match bound {
+        Bound::Unbounded => Bound::Unbounded,
+        Bound::Included(x) => Bound::Included(x.clone()),
+        Bound::Excluded(x) => Bound::Excluded(x.clone()),
     }
 }
 
@@ -394,9 +407,9 @@ impl<I: IntervalB<V>, V: version_trait::Version> fmt::Display for Ranges<I, V> {
 fn interval_to_string<I: IntervalB<V>, V: version_trait::Version>(seg: &I) -> String {
     let start = seg.start_bound();
     let end = seg.end_bound();
-    if start == Ranges::<I, V>::ref_bound(&V::minimum()) {
+    if start == ref_bound(&V::minimum()) {
         display_end_bound(end)
-    } else if end == Ranges::<I, V>::ref_bound(&V::maximum()) {
+    } else if end == ref_bound(&V::maximum()) {
         display_start_bound(start)
     } else {
         format!("{}, {}", display_start_bound(start), display_end_bound(end))
@@ -418,10 +431,6 @@ fn display_end_bound<V: version_trait::Version>(end: Bound<&V>) -> String {
         Bound::Included(v) => format!("<= {}", v),
     }
 }
-
-// trait IntervalB<V>: RangeBounds<V> {
-//     fn new(start_bound: Bound<V>, end_bound: Bound<V>) -> Self;
-// }
 
 // NumberInterval ##############################################################
 
@@ -469,6 +478,39 @@ pub mod tests {
     use proptest::prelude::*;
 
     use super::*;
+
+    // SidedBound tests.
+
+    use Bound::{Excluded, Included, Unbounded};
+    use SidedBound::{Left, Right};
+
+    fn sided_bound_strategy() -> impl Strategy<Value = SidedBound<u32>> {
+        prop_oneof![
+            bound_strategy().prop_map(Left),
+            bound_strategy().prop_map(Right),
+        ]
+    }
+
+    fn bound_strategy() -> impl Strategy<Value = Bound<u32>> {
+        prop_oneof![
+            Just(Unbounded),
+            any::<u32>().prop_map(Excluded),
+            any::<u32>().prop_map(Included),
+        ]
+    }
+
+    proptest! {
+
+        #[test]
+        fn reverse_bounds_reverse_order(sb1 in sided_bound_strategy(), sb2 in sided_bound_strategy()) {
+            let s1 = ref_sided_bound(&sb1);
+            let s2 = ref_sided_bound(&sb2);
+            assert_eq!(s1.compare(&s2), s2.compare(&s1).reverse());
+        }
+
+    }
+
+    // Ranges tests.
 
     pub fn strategy() -> impl Strategy<Value = Ranges<NumberInterval, NumberVersion>> {
         prop::collection::vec(any::<u32>(), 0..10).prop_map(|mut vec| {
