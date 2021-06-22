@@ -234,6 +234,47 @@ impl Version for SemanticVersion {
     }
 }
 
+// SemanticInterval ############################################################
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SemanticInterval {
+    start: Bound<SemanticVersion>,
+    end: Bound<SemanticVersion>,
+}
+
+impl RangeBounds<SemanticVersion> for SemanticInterval {
+    fn start_bound(&self) -> Bound<&SemanticVersion> {
+        ref_bound(&self.start)
+    }
+    fn end_bound(&self) -> Bound<&SemanticVersion> {
+        ref_bound(&self.end)
+    }
+}
+
+impl Interval<SemanticVersion> for SemanticInterval {
+    fn new(start_bound: Bound<SemanticVersion>, end_bound: Bound<SemanticVersion>) -> Self {
+        let start = match &start_bound {
+            Bound::Unbounded => Bound::Included(SemanticVersion::zero()),
+            _ => start_bound,
+        };
+        Self {
+            start,
+            end: end_bound,
+        }
+    }
+}
+
+// Ease the creation of SemanticInterval from classic ranges: (2, 0, 0)..(2, 5, 0)
+impl<RB: RangeBounds<(u32, u32, u32)>> From<RB> for SemanticInterval {
+    fn from(range: RB) -> Self {
+        Self::new(
+            map_bound(SemanticVersion::from, owned_bound(range.start_bound())),
+            map_bound(SemanticVersion::from, owned_bound(range.end_bound())),
+        )
+    }
+}
+
 // NumberVersion ###############################################################
 
 /// Simplest versions possible, just a positive number.
