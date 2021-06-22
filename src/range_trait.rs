@@ -25,7 +25,7 @@ use crate::version_trait::{Interval, NumberInterval, NumberVersion, Version};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Ranges<I, V> {
+pub struct Range<I, V> {
     segments: SmallVec<I>,
     phantom: PhantomData<V>,
 }
@@ -104,7 +104,7 @@ impl<V: Ord> SidedBound<&V> {
 }
 
 // Ranges building blocks.
-impl<I: Interval<V>, V: Version> Ranges<I, V> {
+impl<I: Interval<V>, V: Version> Range<I, V> {
     /// Empty set of versions.
     pub fn empty() -> Self {
         Self {
@@ -162,7 +162,7 @@ impl<I: Interval<V>, V: Version> Ranges<I, V> {
 }
 
 // Set operations.
-impl<I: Interval<V>, V: Version> Ranges<I, V> {
+impl<I: Interval<V>, V: Version> Range<I, V> {
     // Negate ##################################################################
 
     /// Compute the complement set of versions.
@@ -346,7 +346,7 @@ impl<I: Interval<V>, V: Version> Ranges<I, V> {
 
 // REPORT ######################################################################
 
-impl<I: Interval<V>, V: Version> fmt::Display for Ranges<I, V> {
+impl<I: Interval<V>, V: Version> fmt::Display for Range<I, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.segments.as_slice() {
             [] => write!(f, "∅"),
@@ -433,7 +433,7 @@ pub mod tests {
 
     // Ranges tests.
 
-    pub fn strategy() -> impl Strategy<Value = Ranges<NumberInterval, NumberVersion>> {
+    pub fn strategy() -> impl Strategy<Value = Range<NumberInterval, NumberVersion>> {
         prop::collection::vec(any::<u32>(), 0..10).prop_map(|mut vec| {
             vec.sort_unstable();
             vec.dedup();
@@ -445,7 +445,7 @@ pub mod tests {
             if let [v] = pair_iter.remainder() {
                 segments.push((v..).into());
             }
-            Ranges {
+            Range {
                 segments,
                 phantom: PhantomData,
             }
@@ -484,12 +484,12 @@ pub mod tests {
 
         #[test]
         fn intersection_with_any_is_identity(ranges in strategy()) {
-            assert_eq!(Ranges::full().intersection(&ranges), ranges);
+            assert_eq!(Range::full().intersection(&ranges), ranges);
         }
 
         #[test]
         fn intersection_with_none_is_none(ranges in strategy()) {
-            assert_eq!(Ranges::empty().intersection(&ranges), Ranges::empty());
+            assert_eq!(Range::empty().intersection(&ranges), Range::empty());
         }
 
         #[test]
@@ -504,7 +504,7 @@ pub mod tests {
 
         #[test]
         fn intesection_of_complements_is_none(ranges in strategy()) {
-            assert_eq!(ranges.complement().intersection(&ranges), Ranges::empty());
+            assert_eq!(ranges.complement().intersection(&ranges), Range::empty());
         }
 
         #[test]
@@ -516,7 +516,7 @@ pub mod tests {
 
         #[test]
         fn union_of_complements_is_any(ranges in strategy()) {
-            assert_eq!(ranges.complement().union(&ranges), Ranges::full());
+            assert_eq!(ranges.complement().union(&ranges), Range::full());
         }
 
         #[test]
@@ -528,7 +528,7 @@ pub mod tests {
 
         #[test]
         fn always_contains_exact(version in version_strat()) {
-            assert!(Ranges::<NumberInterval, _>::singleton(version).contains(&version));
+            assert!(Range::<NumberInterval, _>::singleton(version).contains(&version));
         }
 
         #[test]
@@ -538,7 +538,7 @@ pub mod tests {
 
         #[test]
         fn contains_intersection(ranges in strategy(), version in version_strat()) {
-            assert_eq!(ranges.contains(&version), ranges.intersection(&Ranges::singleton(version)) != Ranges::empty());
+            assert_eq!(ranges.contains(&version), ranges.intersection(&Range::singleton(version)) != Range::empty());
         }
     }
 }
