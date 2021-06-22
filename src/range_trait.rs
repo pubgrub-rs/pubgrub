@@ -30,7 +30,7 @@ pub struct Ranges<I, V> {
     phantom: PhantomData<V>,
 }
 
-pub trait IntervalB<V>: RangeBounds<V> {
+pub trait Interval<V>: RangeBounds<V> {
     fn new(start_bound: Bound<V>, end_bound: Bound<V>) -> Self;
 }
 
@@ -108,7 +108,7 @@ impl<V: Ord> SidedBound<&V> {
 }
 
 // Ranges building blocks.
-impl<I: IntervalB<V>, V: version_trait::Version> Ranges<I, V> {
+impl<I: Interval<V>, V: version_trait::Version> Ranges<I, V> {
     /// Empty set of versions.
     pub fn empty() -> Self {
         Self {
@@ -166,7 +166,7 @@ impl<I: IntervalB<V>, V: version_trait::Version> Ranges<I, V> {
 }
 
 // Set operations.
-impl<I: IntervalB<V>, V: version_trait::Version> Ranges<I, V> {
+impl<I: Interval<V>, V: version_trait::Version> Ranges<I, V> {
     // Negate ##################################################################
 
     /// Compute the complement set of versions.
@@ -386,7 +386,7 @@ fn owned_bound<V: Clone>(bound: Bound<&V>) -> Bound<V> {
 
 // REPORT ######################################################################
 
-impl<I: IntervalB<V>, V: version_trait::Version> fmt::Display for Ranges<I, V> {
+impl<I: Interval<V>, V: version_trait::Version> fmt::Display for Ranges<I, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.segments.as_slice() {
             [] => write!(f, "∅"),
@@ -404,7 +404,7 @@ impl<I: IntervalB<V>, V: version_trait::Version> fmt::Display for Ranges<I, V> {
     }
 }
 
-fn interval_to_string<I: IntervalB<V>, V: version_trait::Version>(seg: &I) -> String {
+fn interval_to_string<I: Interval<V>, V: version_trait::Version>(seg: &I) -> String {
     let start = seg.start_bound();
     let end = seg.end_bound();
     if start == ref_bound(&V::minimum()) {
@@ -455,7 +455,7 @@ impl RangeBounds<NumberVersion> for NumberInterval {
     }
 }
 
-impl IntervalB<NumberVersion> for NumberInterval {
+impl Interval<NumberVersion> for NumberInterval {
     fn new(start_bound: Bound<NumberVersion>, end_bound: Bound<NumberVersion>) -> Self {
         let start = match start_bound {
             Bound::Unbounded => NumberVersion(0),
