@@ -20,6 +20,7 @@ use std::marker::PhantomData;
 use std::ops::Bound;
 
 use crate::internal::small_vec::SmallVec;
+use crate::version_trait::{flip_bound, owned_bound, ref_bound};
 use crate::version_trait::{Interval, NumberInterval, NumberVersion, Version};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -343,34 +344,6 @@ impl<I: Interval<V>, V: Version> Ranges<I, V> {
     }
 }
 
-// Helper ##################################################################
-
-fn flip_bound<V>(bound: Bound<V>) -> Bound<V> {
-    match bound {
-        Bound::Unbounded => Bound::Unbounded,
-        Bound::Excluded(b) => Bound::Included(b),
-        Bound::Included(b) => Bound::Excluded(b),
-    }
-}
-
-/// Will be obsolete when .as_ref() hits stable.
-fn ref_bound<V>(bound: &Bound<V>) -> Bound<&V> {
-    match *bound {
-        Bound::Included(ref x) => Bound::Included(x),
-        Bound::Excluded(ref x) => Bound::Excluded(x),
-        Bound::Unbounded => Bound::Unbounded,
-    }
-}
-
-/// Will be obsolete when .cloned() hits stable.
-fn owned_bound<V: Clone>(bound: Bound<&V>) -> Bound<V> {
-    match bound {
-        Bound::Unbounded => Bound::Unbounded,
-        Bound::Included(x) => Bound::Included(x.clone()),
-        Bound::Excluded(x) => Bound::Excluded(x.clone()),
-    }
-}
-
 // REPORT ######################################################################
 
 impl<I: Interval<V>, V: Version> fmt::Display for Ranges<I, V> {
@@ -467,16 +440,10 @@ pub mod tests {
             let mut pair_iter = vec.chunks_exact(2);
             let mut segments = SmallVec::empty();
             while let Some([v1, v2]) = pair_iter.next() {
-                segments.push(NumberInterval::new(
-                    Bound::Included(NumberVersion(*v1)),
-                    Bound::Excluded(NumberVersion(*v2)),
-                ));
+                segments.push((v1..v2).into());
             }
             if let [v] = pair_iter.remainder() {
-                segments.push(NumberInterval::new(
-                    Bound::Included(NumberVersion(*v)),
-                    Bound::Unbounded,
-                ));
+                segments.push((v..).into());
             }
             Ranges {
                 segments,

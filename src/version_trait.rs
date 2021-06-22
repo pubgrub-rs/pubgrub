@@ -286,6 +286,16 @@ pub struct NumberInterval {
     end: Option<NumberVersion>,
 }
 
+// Ease the creation of NumberInterval from classic ranges: 0..10
+impl<RB: RangeBounds<u32>> From<RB> for NumberInterval {
+    fn from(range: RB) -> Self {
+        Self::new(
+            map_bound(NumberVersion::from, owned_bound(range.start_bound())),
+            map_bound(NumberVersion::from, owned_bound(range.end_bound())),
+        )
+    }
+}
+
 impl RangeBounds<NumberVersion> for NumberInterval {
     fn start_bound(&self) -> Bound<&NumberVersion> {
         Bound::Included(&self.start)
@@ -311,5 +321,41 @@ impl Interval<NumberVersion> for NumberInterval {
             Bound::Included(v) => Some(v.bump()),
         };
         Self { start, end }
+    }
+}
+
+// Helper ##################################################################
+
+pub fn map_bound<V, T, F: Fn(V) -> T>(f: F, bound: Bound<V>) -> Bound<T> {
+    match bound {
+        Bound::Unbounded => Bound::Unbounded,
+        Bound::Excluded(b) => Bound::Included(f(b)),
+        Bound::Included(b) => Bound::Excluded(f(b)),
+    }
+}
+
+pub fn flip_bound<V>(bound: Bound<V>) -> Bound<V> {
+    match bound {
+        Bound::Unbounded => Bound::Unbounded,
+        Bound::Excluded(b) => Bound::Included(b),
+        Bound::Included(b) => Bound::Excluded(b),
+    }
+}
+
+/// Will be obsolete when .as_ref() hits stable.
+pub fn ref_bound<V>(bound: &Bound<V>) -> Bound<&V> {
+    match *bound {
+        Bound::Included(ref x) => Bound::Included(x),
+        Bound::Excluded(ref x) => Bound::Excluded(x),
+        Bound::Unbounded => Bound::Unbounded,
+    }
+}
+
+/// Will be obsolete when .cloned() hits stable.
+pub fn owned_bound<V: Clone>(bound: Bound<&V>) -> Bound<V> {
+    match bound {
+        Bound::Unbounded => Bound::Unbounded,
+        Bound::Included(x) => Bound::Included(x.clone()),
+        Bound::Excluded(x) => Bound::Excluded(x.clone()),
     }
 }
