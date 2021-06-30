@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased [(diff)][unreleased-diff]
 
-## [0.2.1] - 2021-06-22 - [(diff with 0.2.0)][0.2.0-diff]
+## [0.2.1] - 2021-06-30 - [(diff with 0.2.0)][0.2.0-diff]
 
 This release is focused on performance improvements and code readability, without any change to the public API.
 
