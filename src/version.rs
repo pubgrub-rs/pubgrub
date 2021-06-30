@@ -81,9 +81,9 @@ impl From<(u32, u32, u32)> for SemanticVersion {
 }
 
 // Convert a version into a tuple (major, minor, patch).
-impl Into<(u32, u32, u32)> for SemanticVersion {
-    fn into(self) -> (u32, u32, u32) {
-        (self.major, self.minor, self.patch)
+impl From<SemanticVersion> for (u32, u32, u32) {
+    fn from(v: SemanticVersion) -> Self {
+        (v.major, v.minor, v.patch)
     }
 }
 
@@ -238,9 +238,9 @@ impl From<u32> for NumberVersion {
 }
 
 // Convert a version into an usize.
-impl Into<u32> for NumberVersion {
-    fn into(self) -> u32 {
-        self.0
+impl From<NumberVersion> for u32 {
+    fn from(version: NumberVersion) -> Self {
+        version.0
     }
 }
 

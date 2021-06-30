@@ -112,26 +112,19 @@ pub fn resolve<P: Package, V: Version>(
         next = decision.0.clone();
 
         // Pick the next compatible version.
+        let term_intersection = state
+            .partial_solution
+            .term_intersection_for_package(&next)
+            .expect("a package was chosen but we don't have a term.");
         let v = match decision.1 {
             None => {
-                let term = state
-                    .partial_solution
-                    .term_intersection_for_package(&next)
-                    .expect("a package was chosen but we don't have a term.")
-                    .clone();
-                state.add_incompatibility(|id| {
-                    Incompatibility::no_versions(id, next.clone(), term.clone())
-                });
+                let inc = Incompatibility::no_versions(next.clone(), term_intersection.clone());
+                state.add_incompatibility(inc);
                 continue;
             }
             Some(x) => x,
         };
-        if !state
-            .partial_solution
-            .term_intersection_for_package(&next)
-            .expect("a package was chosen but we don't have a term.")
-            .contains(&v)
-        {
+        if !term_intersection.contains(&v) {
             return Err(PubGrubError::ErrorChoosingPackageVersion(
                 "choose_package_version picked an incompatible version".into(),
             ));
@@ -153,9 +146,10 @@ pub fn resolve<P: Package, V: Version>(
                         source: err,
                     })? {
                     Dependencies::Unknown => {
-                        state.add_incompatibility(|id| {
-                            Incompatibility::unavailable_dependencies(id, p.clone(), v.clone())
-                        });
+                        state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                            p.clone(),
+                            v.clone(),
+                        ));
                         continue;
                     }
                     Dependencies::Known(x) => {
@@ -177,14 +171,12 @@ pub fn resolve<P: Package, V: Version>(
                 };
 
             // Add that package and version if the dependencies are not problematic.
-            let start_id = state.incompatibility_store.len();
             let dep_incompats =
-                Incompatibility::from_dependencies(start_id, p.clone(), v.clone(), &dependencies);
+                state.add_incompatibility_from_dependencies(p.clone(), v.clone(), &dependencies);
 
-            for incompat in dep_incompats.iter() {
-                state.add_incompatibility(|_| incompat.clone());
-            }
-            if dep_incompats
+            // TODO: I don't think this check can actually happen.
+            // We might want to put it under #[cfg(debug_assertions)].
+            if state.incompatibility_store[dep_incompats.clone()]
                 .iter()
                 .any(|incompat| state.is_terminal(incompat))
             {
@@ -194,9 +186,12 @@ pub fn resolve<P: Package, V: Version>(
                     "Root package depends on itself at a different version?".into(),
                 ));
             }
-            state
-                .partial_solution
-                .add_version(p.clone(), v, &dep_incompats);
+            state.partial_solution.add_version(
+                p.clone(),
+                v,
+                dep_incompats,
+                &state.incompatibility_store,
+            );
         } else {
             // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
             // terms and can add the decision directly.
@@ -346,7 +341,7 @@ impl<P: Package, V: Version> OfflineDependencyProvider<P, V> {
             .or_default() = package_deps;
     }
 
-    /// Lists packages that have bean saved.
+    /// Lists packages that have been saved.
     pub fn packages(&self) -> impl Iterator<Item = &P> {
         self.dependencies.keys()
     }
