@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased [(diff)][unreleased-diff]
 
+## [0.2.1] - 2021-06-30 - [(diff with 0.2.0)][0.2.0-diff]
+
+This release is focused on performance improvements and code readability, without any change to the public API.
+
+The code tends to be simpler around tricky parts of the algorithm such as conflict resolution.
+Some data structures have been rewritten (with no unsafe) to lower memory usage.
+Depending on scenarios, version 0.2.1 is 3 to 8 times faster than 0.2.0.
+As an example, solving all elm package versions existing went from 580ms to 175ms on my laptop.
+While solving a specific subset of packages from crates.io went from 2.5s to 320ms on my laptop.
+
+Below are listed all the important changes in the internal parts of the API.
+
+#### Added
+
+- New `SmallVec` data structure (with no unsafe) using fixed size arrays for up to 2 entries.
+- New `SmallMap` data structure (with no unsafe) using fixed size arrays for up to 2 entries.
+- New `Arena` data structure (with no unsafe) backed by a `Vec` and indexed with `Id<T>` where `T` is phantom data.
+
+#### Changed
+
+- Updated the `large_case` benchmark to run with both u16 and string package identifiers in registries.
+- Use the new `Arena` for the incompatibility store, and use its `Id<T>` identifiers to reference incompatibilities instead of full owned copies in the `incompatibilities` field of the solver `State`.
+- Save satisfier indices of each package involved in an incompatibility when looking for its satisfier. This speeds up the search for the previous satisfier.
+- Early unit propagation loop restart at the first conflict found instead of continuing evaluation for the current package.
+- Index incompatibilities by package in a hash map instead of using a vec.
+- Keep track of already contradicted incompatibilities in a `Set` until the next backtrack to speed up unit propagation.
+- Unify `history` and `memory` in `partial_solution` under a unique hash map indexed by packages. This should speed up access to relevan terms in conflict resolution.
+
 ## [0.2.0] - 2020-11-19 - [(diff with 0.1.0)][0.1.0-diff]
 
 This release brings many important improvements to PubGrub.
@@ -133,7 +161,10 @@ The gist of it is:
 - `.gitignore` configured for a Rust project.
 - `.github/workflows/` CI to automatically build, test and document on push and pull requests.
 
+[0.2.1]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.2.1
 [0.2.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.2.0
-[0.1.0-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.1.0
+
 [unreleased-diff]: https://github.com/pubgrub-rs/pubgrub/compare/release...dev
+[0.2.0-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.2.0...v0.2.1
+[0.1.0-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.1.0...v0.2.0

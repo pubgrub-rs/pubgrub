@@ -263,12 +263,11 @@ impl DefaultStringReporter {
                     //     recursively call on the second node,
                     //     and finally conclude.
                     (None, None) => {
+                        self.build_recursive(derived1);
                         if derived1.shared_id != None {
-                            self.build_recursive(derived1);
                             self.lines.push("".into());
                             self.build_recursive(current);
                         } else {
-                            self.build_recursive(derived1);
                             self.add_line_ref();
                             let ref1 = self.ref_count;
                             self.lines.push("".into());
