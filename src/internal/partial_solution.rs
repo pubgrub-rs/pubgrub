@@ -407,7 +407,16 @@ impl<P: Package, V: Version> PackageAssignments<P, V> {
                 self.highest_decision_level,
             ),
             AssignmentsIntersection::Derivations(_) => {
-                panic!("This must be a decision")
+                unreachable!(
+                    concat!(
+                        "while processing package {}: ",
+                        "accum_term = {} isn't a subset of incompat_term = {}, ",
+                        "which means the last assignment should have been a decision, ",
+                        "but instead it was a derivation. This shouldn't be possible! ",
+                        "(Maybe your Version ordering is broken?)"
+                    ),
+                    package, accum_term, incompat_term
+                )
             }
         }
     }
