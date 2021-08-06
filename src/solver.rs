@@ -92,6 +92,7 @@ pub fn resolve<P: Package, V: Version>(
             .should_cancel()
             .map_err(|err| PubGrubError::ErrorInShouldCancel(err))?;
 
+        log::info!("unit_propagation: {}", &next);
         state.unit_propagation(next)?;
 
         let potential_packages = state.partial_solution.potential_packages();
@@ -109,6 +110,7 @@ pub fn resolve<P: Package, V: Version>(
         let decision = dependency_provider
             .choose_package_version(potential_packages.unwrap())
             .map_err(PubGrubError::ErrorChoosingPackageVersion)?;
+        log::info!("DP chose: {} @ {:?}", decision.0, decision.1);
         next = decision.0.clone();
 
         // Pick the next compatible version.
@@ -195,6 +197,7 @@ pub fn resolve<P: Package, V: Version>(
         } else {
             // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
             // terms and can add the decision directly.
+            log::info!("add_decision (not first time): {} @ {}", &next, v);
             state.partial_solution.add_decision(next.clone(), v);
         }
     }

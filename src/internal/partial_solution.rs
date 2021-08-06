@@ -258,7 +258,14 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         // Check none of the dependencies (new_incompatibilities)
         // would create a conflict (be satisfied).
         if store[new_incompatibilities].iter().all(not_satisfied) {
+            log::info!("add_decision: {} @ {}", package, version);
             self.add_decision(package, version);
+        } else {
+            log::info!(
+                "not adding {} @ {} because of its dependencies",
+                package,
+                version
+            );
         }
     }
 
