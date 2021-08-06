@@ -401,6 +401,7 @@ pub mod tests {
     use proptest::prelude::*;
 
     use super::*;
+    use crate::version_trait::{SemanticInterval, SemanticVersion};
 
     // SidedBound tests.
 
@@ -434,6 +435,16 @@ pub mod tests {
     }
 
     // Ranges tests.
+
+    #[test]
+    fn negate_singleton() {
+        let s1: Range<SemanticInterval, SemanticVersion> = Range::singleton((1, 0, 0));
+        let s1c = s1.complement();
+        let s12 = Range::between((1, 0, 0), (2, 0, 0));
+        let s1c_12 = s1c.intersection(&s12);
+        let s12_1c = s12.intersection(&s1c);
+        assert_eq!(s1c_12, s12_1c);
+    }
 
     pub fn strategy() -> impl Strategy<Value = Range<NumberInterval, NumberVersion>> {
         prop::collection::vec(any::<u32>(), 0..10).prop_map(|mut vec| {

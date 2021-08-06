@@ -40,7 +40,7 @@ impl<P: Package, I: Interval<V>, V: Version> Display for PartialSolution<P, I, V
         let assignments: BTreeSet<String> = self
             .package_assignments
             .iter()
-            .map(|(_, pa)| pa.to_string())
+            .map(|(p, pa)| format!("{}: {}", p, pa))
             .collect();
         let assignments: Vec<_> = assignments.into_iter().collect();
         write!(
@@ -171,6 +171,7 @@ impl<P: Package, I: Interval<V>, V: Version> PartialSolution<P, I, V> {
     ) {
         use std::collections::hash_map::Entry;
         let term = store[cause].get(&package).unwrap().negate();
+        log::debug!("Add for {} the derivation term {}", package, term);
         let dated_derivation = DatedDerivation {
             global_index: self.next_global_index,
             decision_level: self.current_decision_level,
@@ -181,6 +182,7 @@ impl<P: Package, I: Interval<V>, V: Version> PartialSolution<P, I, V> {
             Entry::Occupied(mut occupied) => {
                 let mut pa = occupied.get_mut();
                 pa.highest_decision_level = self.current_decision_level;
+                log::debug!("Terms intersection before: {}", pa.assignments_intersection);
                 match &mut pa.assignments_intersection {
                     // Check that add_derivation is never called in the wrong context.
                     AssignmentsIntersection::Decision(_) => {
@@ -190,6 +192,7 @@ impl<P: Package, I: Interval<V>, V: Version> PartialSolution<P, I, V> {
                         *t = t.intersection(&term);
                     }
                 }
+                log::debug!("Terms intersection after: {}", pa.assignments_intersection);
                 pa.dated_derivations.push(dated_derivation);
             }
             Entry::Vacant(v) => {

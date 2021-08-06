@@ -106,6 +106,7 @@ pub fn resolve<P: Package, I: Interval<V> + Debug, V: Version>(
             // The borrow checker did not like using a match on potential_packages.
             // This `if ... is_none ... drop` is a workaround.
             // I believe this is a case where Polonius could help, when and if it lands in rustc.
+            log::debug!("Incompatibility store: {:?}", state.incompatibility_store);
             return state.partial_solution.extract_solution().ok_or_else(|| {
                 PubGrubError::Failure(
                     "How did we end up with no package to choose but no solution?".into(),
