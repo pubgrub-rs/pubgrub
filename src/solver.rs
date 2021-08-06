@@ -95,6 +95,10 @@ pub fn resolve<P: Package, I: Interval<V> + Debug, V: Version>(
 
         log::info!("unit_propagation: {}", &next);
         state.unit_propagation(next)?;
+        log::debug!(
+            "Partial solution after unit propagation: {}",
+            state.partial_solution
+        );
 
         let potential_packages = state.partial_solution.potential_packages();
         if potential_packages.is_none() {
