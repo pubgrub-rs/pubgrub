@@ -35,7 +35,7 @@ pub struct PartialSolution<P: Package, V: Version> {
     package_assignments: Map<P, PackageAssignments<P, V>>,
 }
 
-impl<P: Package, I: Interval<V>, V: Version> Display for PartialSolution<P, I, V> {
+impl<P: Package, V: Version> Display for PartialSolution<P, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let assignments: BTreeSet<String> = self
             .package_assignments
@@ -64,7 +64,7 @@ struct PackageAssignments<P: Package, V: Version> {
     assignments_intersection: AssignmentsIntersection<V>,
 }
 
-impl<P: Package, I: Interval<V>, V: Version> Display for PackageAssignments<P, I, V> {
+impl<P: Package, V: Version> Display for PackageAssignments<P, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let derivations: Vec<_> = self
             .dated_derivations
@@ -89,7 +89,7 @@ pub struct DatedDerivation<P: Package, V: Version> {
     cause: IncompId<P, V>,
 }
 
-impl<P: Package, I: Interval<V>, V: Version> Display for DatedDerivation<P, I, V> {
+impl<P: Package, V: Version> Display for DatedDerivation<P, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}, cause: {:?}", self.decision_level, self.cause)
     }
@@ -101,7 +101,7 @@ enum AssignmentsIntersection<V: Version> {
     Derivations(Term<V>),
 }
 
-impl<I: Interval<V>, V: Version> Display for AssignmentsIntersection<I, V> {
+impl<V: Version> Display for AssignmentsIntersection<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Decision((lvl, version, _)) => {
