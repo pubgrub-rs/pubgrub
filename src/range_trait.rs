@@ -45,7 +45,25 @@ fn ref_sided_bound<V>(sb: &SidedBound<V>) -> SidedBound<&V> {
     }
 }
 
-impl<V: Ord> SidedBound<&V> {
+impl<V: Ord> PartialOrd for SidedBound<V> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<V: Ord> Ord for SidedBound<V> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.compare(other)
+    }
+}
+
+impl<V: Ord> SidedBound<V> {
+    fn unwrap(self) -> Bound<V> {
+        match self {
+            Self::Left(bound) => bound,
+            Self::Right(bound) => bound,
+        }
+    }
     fn compare(&self, other: &Self) -> Ordering {
         match (&self, other) {
             // Handling of both left bounds.
@@ -360,7 +378,7 @@ impl<I: Interval<V>, V: Version> fmt::Display for Range<I, V> {
                     .iter()
                     .map(interval_to_string)
                     .collect();
-                write!(f, "{}", string_intervals.join(", "))
+                write!(f, "{}", string_intervals.join(" OR "))
             }
         }
     }
@@ -408,18 +426,25 @@ pub mod tests {
     use Bound::{Excluded, Included, Unbounded};
     use SidedBound::{Left, Right};
 
-    fn sided_bound_strategy() -> impl Strategy<Value = SidedBound<u32>> {
+    fn sided_bound_strategy() -> impl Strategy<Value = SidedBound<NumberVersion>> {
         prop_oneof![
             bound_strategy().prop_map(Left),
             bound_strategy().prop_map(Right),
         ]
     }
 
-    fn bound_strategy() -> impl Strategy<Value = Bound<u32>> {
+    fn bound_strategy() -> impl Strategy<Value = Bound<NumberVersion>> {
         prop_oneof![
             Just(Unbounded),
-            any::<u32>().prop_map(Excluded),
-            any::<u32>().prop_map(Included),
+            any::<u32>().prop_map(|n| Excluded(n.into())),
+            any::<u32>().prop_map(|n| Included(n.into())),
+        ]
+    }
+
+    fn no_unbound_strategy() -> impl Strategy<Value = Bound<NumberVersion>> {
+        prop_oneof![
+            any::<u32>().prop_map(|n| Excluded(n.into())),
+            any::<u32>().prop_map(|n| Included(n.into())),
         ]
     }
 
@@ -443,22 +468,50 @@ pub mod tests {
         let s12 = Range::between((1, 0, 0), (2, 0, 0));
         let s1c_12 = s1c.intersection(&s12);
         let s12_1c = s12.intersection(&s1c);
+        eprintln!("first:  {}", s1c);
+        eprintln!("first:  {:?}", s1c);
+        eprintln!("second: {}", s12);
+        eprintln!("second: {:?}", s12);
         assert_eq!(s1c_12, s12_1c);
     }
 
     pub fn strategy() -> impl Strategy<Value = Range<NumberInterval, NumberVersion>> {
-        prop::collection::vec(any::<u32>(), 0..10).prop_map(|mut vec| {
-            vec.sort_unstable();
+        // TODO: find a better strategy so that the "intersection_is_symmetric" test
+        // triggers the same failure than the negate_singleton above.
+        prop::collection::vec(no_unbound_strategy(), 0..20).prop_map(|mut vec| {
+            let extract = |b: &Bound<NumberVersion>| match b {
+                Unbounded => panic!("cannot happen"),
+                Excluded(v) => v.0,
+                Included(v) => v.0,
+            };
             vec.dedup();
+            vec.sort_unstable_by_key(extract);
+            let mut segments: SmallVec<NumberInterval> = SmallVec::empty();
+            let mut last_right: i64 = -1;
             let mut pair_iter = vec.chunks_exact(2);
-            let mut segments = SmallVec::empty();
-            while let Some([v1, v2]) = pair_iter.next() {
-                segments.push((v1..v2).into());
+            while let Some([b1, b2]) = pair_iter.next() {
+                let v1 = extract(b1);
+                let v2 = extract(b2);
+                if v1 as i64 == last_right {
+                    segments.push(NumberInterval::new(Excluded(v1.into()), b2.clone()));
+                } else if v1 == v2 {
+                    segments.push((v1..=v1).into());
+                } else {
+                    segments.push(NumberInterval::new(b1.clone(), b2.clone()));
+                }
+                last_right = v2 as i64;
             }
-            if let [v] = pair_iter.remainder() {
-                segments.push((v..).into());
+            if let [b1] = pair_iter.remainder() {
+                let v1 = extract(b1);
+                if v1 as i64 == last_right {
+                    segments.push(NumberInterval::new(Excluded(v1.into()), Unbounded));
+                } else {
+                    segments.push((v1..).into());
+                }
             }
+            eprintln!("generated segments length: {}", segments.len());
             Range {
+                // segments: merge_juxtaposed_segments(segments),
                 segments,
                 phantom: PhantomData,
             }
@@ -554,4 +607,16 @@ pub mod tests {
             assert_eq!(ranges.contains(&version), ranges.intersection(&Range::singleton(version)) != Range::empty());
         }
     }
+
+    // #[test]
+    // fn contains_negation_0() {
+    //     let full: Range<NumberInterval, NumberVersion> = Range::full();
+    //     println!("full: {:?}", full);
+    //     let full_comp = full.complement();
+    //     println!("full.complement(): {:?}", full_comp);
+    //     let v0 = NumberVersion::from(0);
+    //     assert_eq!(&full_comp, &Range::empty());
+    //     assert_ne!(full.contains(&v0), full_comp.contains(&v0));
+    //     panic!("force fail");
+    // }
 }

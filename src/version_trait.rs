@@ -312,19 +312,13 @@ impl Version for NumberVersion {
     }
 }
 
-impl NumberVersion {
-    fn bump(&self) -> Self {
-        NumberVersion(self.0 + 1)
-    }
-}
-
 // NumberInterval ##############################################################
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NumberInterval {
-    start: NumberVersion,
-    end: Option<NumberVersion>,
+    start: Bound<NumberVersion>,
+    end: Bound<NumberVersion>,
 }
 
 // Ease the creation of NumberInterval from classic ranges: 0..10
@@ -339,29 +333,19 @@ impl<RB: RangeBounds<u32>> From<RB> for NumberInterval {
 
 impl RangeBounds<NumberVersion> for NumberInterval {
     fn start_bound(&self) -> Bound<&NumberVersion> {
-        Bound::Included(&self.start)
+        ref_bound(&self.start)
     }
     fn end_bound(&self) -> Bound<&NumberVersion> {
-        match &self.end {
-            None => Bound::Unbounded,
-            Some(v) => Bound::Excluded(v),
-        }
+        ref_bound(&self.end)
     }
 }
 
 impl Interval<NumberVersion> for NumberInterval {
     fn new(start_bound: Bound<NumberVersion>, end_bound: Bound<NumberVersion>) -> Self {
-        let start = match start_bound {
-            Bound::Unbounded => NumberVersion(0),
-            Bound::Excluded(v) => v.bump(),
-            Bound::Included(v) => v,
-        };
-        let end = match end_bound {
-            Bound::Unbounded => None,
-            Bound::Excluded(v) => Some(v),
-            Bound::Included(v) => Some(v.bump()),
-        };
-        Self { start, end }
+        Self {
+            start: start_bound,
+            end: end_bound,
+        }
     }
 }
 
