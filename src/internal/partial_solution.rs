@@ -40,7 +40,7 @@ impl<P: Package, V: Version> Display for PartialSolution<P, V> {
         let assignments: BTreeSet<String> = self
             .package_assignments
             .iter()
-            .map(|(_, pa)| pa.to_string())
+            .map(|(p, pa)| format!("{}: {}", p, pa))
             .collect();
         let assignments: Vec<_> = assignments.into_iter().collect();
         write!(
