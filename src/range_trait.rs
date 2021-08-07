@@ -243,51 +243,51 @@ impl<I: Interval<V>, V: Version> Range<I, V> {
     /// Compute the intersection of two sets of versions.
     pub fn intersection(&self, other: &Self) -> Self {
         let mut segments = SmallVec::empty();
-        let mut left_iter = self.segments.iter();
-        let mut right_iter = other.segments.iter();
-        let mut left = left_iter.next();
-        let mut right = right_iter.next();
+        let mut self_iter = self.segments.iter();
+        let mut other_iter = other.segments.iter();
+        let mut first = self_iter.next();
+        let mut second = other_iter.next();
         loop {
-            match (left, right) {
-                (Some(seg_left), Some(seg_right)) => {
-                    let l1 = seg_left.start_bound();
-                    let l2 = seg_left.end_bound();
-                    let r1 = seg_right.start_bound();
-                    let r2 = seg_right.end_bound();
-                    match SidedBound::Right(l2).compare(&SidedBound::Left(r1)) {
+            match (first, second) {
+                (Some(first_seg), Some(second_seg)) => {
+                    let fs = first_seg.start_bound();
+                    let fe = first_seg.end_bound();
+                    let ss = second_seg.start_bound();
+                    let se = second_seg.end_bound();
+                    match SidedBound::Right(fe).compare(&SidedBound::Left(ss)) {
                         // Disjoint intervals with left < right.
-                        Ordering::Less => left = left_iter.next(),
-                        Ordering::Equal => left = left_iter.next(),
+                        Ordering::Less => first = self_iter.next(),
+                        Ordering::Equal => first = self_iter.next(),
                         // Possible intersection with left >= right.
                         Ordering::Greater => {
-                            match SidedBound::Right(r2).compare(&SidedBound::Left(l1)) {
+                            match SidedBound::Right(se).compare(&SidedBound::Left(fs)) {
                                 // Disjoint intervals with left < right.
-                                Ordering::Less => right = right_iter.next(),
-                                Ordering::Equal => right = right_iter.next(),
+                                Ordering::Less => second = other_iter.next(),
+                                Ordering::Equal => second = other_iter.next(),
                                 // Intersection for sure.
                                 Ordering::Greater => {
-                                    let start = match SidedBound::Left(l1)
-                                        .compare(&SidedBound::Right(r1))
+                                    let start = match SidedBound::Left(fs)
+                                        .compare(&SidedBound::Right(ss))
                                     {
-                                        Ordering::Less => r1,
-                                        _ => l1,
+                                        Ordering::Less => ss,
+                                        _ => fs,
                                     };
-                                    match SidedBound::Right(l2).compare(&SidedBound::Right(r2)) {
+                                    match SidedBound::Right(fe).compare(&SidedBound::Right(se)) {
                                         Ordering::Less => {
                                             segments
-                                                .push(I::new(owned_bound(start), owned_bound(l2)));
-                                            left = left_iter.next();
+                                                .push(I::new(owned_bound(start), owned_bound(fe)));
+                                            first = self_iter.next();
                                         }
                                         Ordering::Equal => {
                                             segments
-                                                .push(I::new(owned_bound(start), owned_bound(l2)));
-                                            left = left_iter.next();
-                                            right = right_iter.next();
+                                                .push(I::new(owned_bound(start), owned_bound(fe)));
+                                            first = self_iter.next();
+                                            second = other_iter.next();
                                         }
                                         Ordering::Greater => {
                                             segments
-                                                .push(I::new(owned_bound(start), owned_bound(r2)));
-                                            right = right_iter.next();
+                                                .push(I::new(owned_bound(start), owned_bound(se)));
+                                            second = other_iter.next();
                                         }
                                     }
                                 }
