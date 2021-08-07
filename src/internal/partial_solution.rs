@@ -282,7 +282,7 @@ impl<P: Package, I: Interval<V>, V: Version> PartialSolution<P, I, V> {
                     pa.dated_derivations
                         .iter()
                         .fold(Term::any(), |acc, dated_derivation| {
-                            let term = store[dated_derivation.cause].get(&p).unwrap().negate();
+                            let term = store[dated_derivation.cause].get(p).unwrap().negate();
                             acc.intersection(&term)
                         }),
                 );

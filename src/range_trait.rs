@@ -21,11 +21,12 @@ use std::ops::Bound;
 
 use crate::internal::small_vec::SmallVec;
 use crate::version_trait::{flip_bound, owned_bound, ref_bound};
-use crate::version_trait::{Interval, NumberInterval, NumberVersion, Version};
+use crate::version_trait::{Interval, Version};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
+/// New range with intervals.
 pub struct Range<I, V> {
     segments: SmallVec<I>,
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
@@ -38,12 +39,12 @@ enum SidedBound<V> {
     Right(Bound<V>),
 }
 
-fn ref_sided_bound<V>(sb: &SidedBound<V>) -> SidedBound<&V> {
-    match sb {
-        SidedBound::Left(bound) => SidedBound::Left(ref_bound(bound)),
-        SidedBound::Right(bound) => SidedBound::Right(ref_bound(bound)),
-    }
-}
+// fn ref_sided_bound<V>(sb: &SidedBound<V>) -> SidedBound<&V> {
+//     match sb {
+//         SidedBound::Left(bound) => SidedBound::Left(ref_bound(bound)),
+//         SidedBound::Right(bound) => SidedBound::Right(ref_bound(bound)),
+//     }
+// }
 
 impl<V: Ord> PartialOrd for SidedBound<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -58,12 +59,6 @@ impl<V: Ord> Ord for SidedBound<V> {
 }
 
 impl<V: Ord> SidedBound<V> {
-    fn unwrap(self) -> Bound<V> {
-        match self {
-            Self::Left(bound) => bound,
-            Self::Right(bound) => bound,
-        }
-    }
     fn compare(&self, other: &Self) -> Ordering {
         match (&self, other) {
             // Handling of both left bounds.
@@ -81,7 +76,7 @@ impl<V: Ord> SidedBound<V> {
             (SidedBound::Left(Bound::Included(l1)), SidedBound::Left(Bound::Included(l2))) => {
                 l1.cmp(l2)
             }
-            (SidedBound::Left(_), SidedBound::Left(_)) => other.compare(&self).reverse(),
+            (SidedBound::Left(_), SidedBound::Left(_)) => other.compare(self).reverse(),
 
             // Handling of both right bounds.
             (SidedBound::Right(Bound::Unbounded), SidedBound::Right(Bound::Unbounded)) => {
@@ -98,7 +93,7 @@ impl<V: Ord> SidedBound<V> {
             (SidedBound::Right(Bound::Included(r1)), SidedBound::Right(Bound::Included(r2))) => {
                 r1.cmp(r2)
             }
-            (SidedBound::Right(_), SidedBound::Right(_)) => other.compare(&self).reverse(),
+            (SidedBound::Right(_), SidedBound::Right(_)) => other.compare(self).reverse(),
 
             // Handling of left and right bounds.
             (SidedBound::Left(Bound::Unbounded), SidedBound::Right(_)) => Ordering::Less,
@@ -118,7 +113,7 @@ impl<V: Ord> SidedBound<V> {
             }
 
             // Handling of right and left bounds.
-            (SidedBound::Right(_), SidedBound::Left(_)) => other.compare(&self).reverse(),
+            (SidedBound::Right(_), SidedBound::Left(_)) => other.compare(self).reverse(),
         }
     }
 }
@@ -247,56 +242,44 @@ impl<I: Interval<V>, V: Version> Range<I, V> {
         let mut other_iter = other.segments.iter();
         let mut first = self_iter.next();
         let mut second = other_iter.next();
-        loop {
-            match (first, second) {
-                (Some(first_seg), Some(second_seg)) => {
-                    let fs = first_seg.start_bound();
-                    let fe = first_seg.end_bound();
-                    let ss = second_seg.start_bound();
-                    let se = second_seg.end_bound();
-                    match SidedBound::Right(fe).compare(&SidedBound::Left(ss)) {
+        while let (Some(first_seg), Some(second_seg)) = (first, second) {
+            let fs = first_seg.start_bound();
+            let fe = first_seg.end_bound();
+            let ss = second_seg.start_bound();
+            let se = second_seg.end_bound();
+            match SidedBound::Right(fe).compare(&SidedBound::Left(ss)) {
+                // Disjoint intervals with left < right.
+                Ordering::Less => first = self_iter.next(),
+                Ordering::Equal => first = self_iter.next(),
+                // Possible intersection with left >= right.
+                Ordering::Greater => {
+                    match SidedBound::Right(se).compare(&SidedBound::Left(fs)) {
                         // Disjoint intervals with left < right.
-                        Ordering::Less => first = self_iter.next(),
-                        Ordering::Equal => first = self_iter.next(),
-                        // Possible intersection with left >= right.
+                        Ordering::Less => second = other_iter.next(),
+                        Ordering::Equal => second = other_iter.next(),
+                        // Intersection for sure.
                         Ordering::Greater => {
-                            match SidedBound::Right(se).compare(&SidedBound::Left(fs)) {
-                                // Disjoint intervals with left < right.
-                                Ordering::Less => second = other_iter.next(),
-                                Ordering::Equal => second = other_iter.next(),
-                                // Intersection for sure.
+                            let start = match SidedBound::Left(fs).compare(&SidedBound::Left(ss)) {
+                                Ordering::Less => ss,
+                                _ => fs,
+                            };
+                            match SidedBound::Right(fe).compare(&SidedBound::Right(se)) {
+                                Ordering::Less => {
+                                    segments.push(I::new(owned_bound(start), owned_bound(fe)));
+                                    first = self_iter.next();
+                                }
+                                Ordering::Equal => {
+                                    segments.push(I::new(owned_bound(start), owned_bound(fe)));
+                                    first = self_iter.next();
+                                    second = other_iter.next();
+                                }
                                 Ordering::Greater => {
-                                    let start =
-                                        match SidedBound::Left(fs).compare(&SidedBound::Left(ss)) {
-                                            Ordering::Less => ss,
-                                            _ => fs,
-                                        };
-                                    match SidedBound::Right(fe).compare(&SidedBound::Right(se)) {
-                                        Ordering::Less => {
-                                            segments
-                                                .push(I::new(owned_bound(start), owned_bound(fe)));
-                                            first = self_iter.next();
-                                        }
-                                        Ordering::Equal => {
-                                            segments
-                                                .push(I::new(owned_bound(start), owned_bound(fe)));
-                                            first = self_iter.next();
-                                            second = other_iter.next();
-                                        }
-                                        Ordering::Greater => {
-                                            segments
-                                                .push(I::new(owned_bound(start), owned_bound(se)));
-                                            second = other_iter.next();
-                                        }
-                                    }
+                                    segments.push(I::new(owned_bound(start), owned_bound(se)));
+                                    second = other_iter.next();
                                 }
                             }
                         }
                     }
-                }
-                // Left or right has ended.
-                _ => {
-                    break;
                 }
             }
         }

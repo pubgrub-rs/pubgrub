@@ -236,6 +236,7 @@ impl Version for SemanticVersion {
 
 // SemanticInterval ############################################################
 
+/// Interval for semantic versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SemanticInterval {
@@ -314,6 +315,7 @@ impl Version for NumberVersion {
 
 // NumberInterval ##############################################################
 
+/// Interval for number versions.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NumberInterval {
@@ -351,6 +353,7 @@ impl Interval<NumberVersion> for NumberInterval {
 
 // Helper ##################################################################
 
+/// Map function inside a Bound.
 pub fn map_bound<V, T, F: Fn(V) -> T>(f: F, bound: Bound<V>) -> Bound<T> {
     match bound {
         Bound::Unbounded => Bound::Unbounded,
@@ -359,6 +362,7 @@ pub fn map_bound<V, T, F: Fn(V) -> T>(f: F, bound: Bound<V>) -> Bound<T> {
     }
 }
 
+/// Flip a bound by exchanging Excluded and Included.
 pub fn flip_bound<V>(bound: Bound<V>) -> Bound<V> {
     match bound {
         Bound::Unbounded => Bound::Unbounded,

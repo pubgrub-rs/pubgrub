@@ -161,6 +161,7 @@ impl<P: Package, I: Interval<V> + Debug, V: Version> State<P, I, V> {
 
     /// Return the root cause and the backtracked model.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
+    #[allow(clippy::type_complexity)]
     fn conflict_resolution(
         &mut self,
         incompatibility: IncompId<P, I, V>,
