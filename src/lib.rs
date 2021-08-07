@@ -213,6 +213,7 @@ pub mod error;
 pub mod package;
 pub mod range;
 pub mod report;
+pub mod report_bis;
 pub mod solver;
 pub mod term;
 pub mod term_bis;

@@ -5,6 +5,7 @@
 pub mod arena;
 pub mod core;
 pub mod incompatibility;
+pub mod incompatibility_bis;
 pub mod partial_solution;
 pub mod small_map;
 pub mod small_vec;
