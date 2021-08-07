@@ -47,16 +47,16 @@
 //! We can model that scenario with this library as follows
 //! ```
 //! # use pubgrub::solver::{OfflineDependencyProvider, resolve};
-//! # use pubgrub::version::NumberVersion;
-//! # use pubgrub::range::Range;
+//! # use pubgrub::version_trait::{NumberInterval, NumberVersion};
+//! # use pubgrub::range_trait::Range;
 //! #
-//! let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//! let mut dependency_provider = OfflineDependencyProvider::<&str, NumberInterval, NumberVersion>::new();
 //!
 //! dependency_provider.add_dependencies(
-//!     "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
+//!     "root", 1, vec![("menu", Range::full()), ("icons", Range::full())],
 //! );
-//! dependency_provider.add_dependencies("menu", 1, vec![("dropdown", Range::any())]);
-//! dependency_provider.add_dependencies("dropdown", 1, vec![("icons", Range::any())]);
+//! dependency_provider.add_dependencies("menu", 1, vec![("dropdown", Range::full())]);
+//! dependency_provider.add_dependencies("dropdown", 1, vec![("icons", Range::full())]);
 //! dependency_provider.add_dependencies("icons", 1, vec![]);
 //!
 //! // Run the algorithm.
@@ -76,16 +76,16 @@
 //! This may be done quite easily by implementing the two following functions.
 //! ```
 //! # use pubgrub::solver::{DependencyProvider, Dependencies};
-//! # use pubgrub::version::SemanticVersion;
-//! # use pubgrub::range::Range;
+//! # use pubgrub::version_trait::{SemanticInterval, SemanticVersion};
+//! # use pubgrub::range_trait::Range;
 //! # use pubgrub::type_aliases::Map;
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
 //! #
 //! # struct MyDependencyProvider;
 //! #
-//! impl DependencyProvider<String, SemanticVersion> for MyDependencyProvider {
-//!     fn choose_package_version<T: Borrow<String>, U: Borrow<Range<SemanticVersion>>>(&self,packages: impl Iterator<Item=(T, U)>) -> Result<(T, Option<SemanticVersion>), Box<dyn Error>> {
+//! impl DependencyProvider<String, SemanticInterval, SemanticVersion> for MyDependencyProvider {
+//!     fn choose_package_version<T: Borrow<String>, U: Borrow<Range<SemanticInterval, SemanticVersion>>>(&self,packages: impl Iterator<Item=(T, U)>) -> Result<(T, Option<SemanticVersion>), Box<dyn Error>> {
 //!         unimplemented!()
 //!     }
 //!
@@ -93,7 +93,7 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Dependencies<String, SemanticVersion>, Box<dyn Error>> {
+//!     ) -> Result<Dependencies<String, SemanticInterval, SemanticVersion>, Box<dyn Error>> {
 //!         unimplemented!()
 //!     }
 //! }
@@ -153,13 +153,13 @@
 //! [Output](crate::report::Reporter::Output) type and a single method.
 //! ```
 //! # use pubgrub::package::Package;
-//! # use pubgrub::version::Version;
+//! # use pubgrub::version_trait::{Version, Interval};
 //! # use pubgrub::report::DerivationTree;
 //! #
-//! pub trait Reporter<P: Package, V: Version> {
+//! pub trait Reporter<P: Package, I: Interval<V>, V: Version> {
 //!     type Output;
 //!
-//!     fn report(derivation_tree: &DerivationTree<P, V>) -> Self::Output;
+//!     fn report(derivation_tree: &DerivationTree<P, I, V>) -> Self::Output;
 //! }
 //! ```
 //! Implementing a [Reporter](crate::report::Reporter) may involve a lot of heuristics
@@ -172,9 +172,9 @@
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
 //! # use pubgrub::report::{DefaultStringReporter, Reporter};
 //! # use pubgrub::error::PubGrubError;
-//! # use pubgrub::version::NumberVersion;
+//! # use pubgrub::version_trait::{NumberInterval, NumberVersion};
 //! #
-//! # let dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//! # let dependency_provider = OfflineDependencyProvider::<&str, NumberInterval, NumberVersion>::new();
 //! # let root_package = "root";
 //! # let root_version = 1;
 //! #
