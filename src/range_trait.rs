@@ -266,12 +266,11 @@ impl<I: Interval<V>, V: Version> Range<I, V> {
                                 Ordering::Equal => second = other_iter.next(),
                                 // Intersection for sure.
                                 Ordering::Greater => {
-                                    let start = match SidedBound::Left(fs)
-                                        .compare(&SidedBound::Right(ss))
-                                    {
-                                        Ordering::Less => ss,
-                                        _ => fs,
-                                    };
+                                    let start =
+                                        match SidedBound::Left(fs).compare(&SidedBound::Left(ss)) {
+                                            Ordering::Less => ss,
+                                            _ => fs,
+                                        };
                                     match SidedBound::Right(fe).compare(&SidedBound::Right(se)) {
                                         Ordering::Less => {
                                             segments
