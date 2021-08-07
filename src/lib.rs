@@ -210,17 +210,12 @@
 #![warn(missing_docs)]
 
 pub mod error;
-pub mod error_bis;
 pub mod package;
 pub mod range;
 pub mod report;
-pub mod report_bis;
 pub mod solver;
-pub mod solver_bis;
 pub mod term;
-pub mod term_bis;
 pub mod type_aliases;
-pub mod type_aliases_bis;
 pub mod version;
 pub mod version_set;
 

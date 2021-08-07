@@ -2,8 +2,6 @@
 
 //! Publicly exported type aliases.
 
-use crate::range::Range;
-
 /// Map implementation used by the library.
 pub type Map<K, V> = rustc_hash::FxHashMap<K, V>;
 
@@ -17,4 +15,4 @@ pub type SelectedDependencies<P, V> = Map<P, V>;
 /// inside [DependencyConstraints] and [Dependencies::Unknown](crate::solver::Dependencies::Unknown):
 /// the former means the package has no dependencies and it is a known fact,
 /// while the latter means they could not be fetched by [DependencyProvider].
-pub type DependencyConstraints<P, V> = Map<P, Range<V>>;
+pub type DependencyConstraints<P, VS> = Map<P, VS>;
