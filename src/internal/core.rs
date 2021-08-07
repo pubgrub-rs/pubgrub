@@ -15,8 +15,7 @@ use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::internal::small_vec::SmallVec;
 use crate::package::Package;
 use crate::report::DerivationTree;
-use crate::solver::DependencyConstraints;
-use crate::type_aliases::Map;
+use crate::type_aliases::{DependencyConstraints, Map};
 use crate::version::Version;
 
 /// Current state of the PubGrub algorithm.

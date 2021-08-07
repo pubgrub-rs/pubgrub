@@ -74,7 +74,7 @@ use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
 use crate::range::Range;
-use crate::type_aliases::{Map, SelectedDependencies};
+use crate::type_aliases::{DependencyConstraints, Map, SelectedDependencies};
 use crate::version::Version;
 
 /// Main function of the library.
@@ -209,14 +209,6 @@ pub enum Dependencies<P: Package, V: Version> {
     /// Container for all available package versions.
     Known(DependencyConstraints<P, V>),
 }
-
-/// Subtype of [Dependencies] which holds information about
-/// all possible versions a given package can accept.
-/// There is a difference in semantics between an empty [Map<P, Range<V>>](crate::type_aliases::Map)
-/// inside [DependencyConstraints] and [Dependencies::Unknown]:
-/// the former means the package has no dependencies and it is a known fact,
-/// while the latter means they could not be fetched by [DependencyProvider].
-pub type DependencyConstraints<P, V> = Map<P, Range<V>>;
 
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
 /// An implementor needs to be supplied to the [resolve] function.
