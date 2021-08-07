@@ -39,13 +39,6 @@ enum SidedBound<V> {
     Right(Bound<V>),
 }
 
-// fn ref_sided_bound<V>(sb: &SidedBound<V>) -> SidedBound<&V> {
-//     match sb {
-//         SidedBound::Left(bound) => SidedBound::Left(ref_bound(bound)),
-//         SidedBound::Right(bound) => SidedBound::Right(ref_bound(bound)),
-//     }
-// }
-
 impl<V: Ord> PartialOrd for SidedBound<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -409,12 +402,19 @@ pub mod tests {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::version_trait::{SemanticInterval, SemanticVersion};
+    use crate::version_trait::{NumberInterval, NumberVersion};
 
     // SidedBound tests.
 
     use Bound::{Excluded, Included, Unbounded};
     use SidedBound::{Left, Right};
+
+    fn ref_sided_bound<V>(sb: &SidedBound<V>) -> SidedBound<&V> {
+        match sb {
+            SidedBound::Left(bound) => SidedBound::Left(ref_bound(bound)),
+            SidedBound::Right(bound) => SidedBound::Right(ref_bound(bound)),
+        }
+    }
 
     fn sided_bound_strategy() -> impl Strategy<Value = SidedBound<NumberVersion>> {
         prop_oneof![
