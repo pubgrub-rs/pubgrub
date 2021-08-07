@@ -210,6 +210,7 @@
 #![warn(missing_docs)]
 
 pub mod error;
+pub mod error_bis;
 pub mod package;
 pub mod range;
 pub mod report;
