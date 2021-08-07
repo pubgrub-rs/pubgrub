@@ -219,6 +219,7 @@ pub mod solver;
 pub mod term;
 pub mod term_bis;
 pub mod type_aliases;
+pub mod type_aliases_bis;
 pub mod version;
 pub mod version_set;
 
