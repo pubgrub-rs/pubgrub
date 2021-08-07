@@ -15,31 +15,47 @@
 //!  - [between(v1, v2)](Range::between): the set defined by `v1 <= versions < v2`
 
 use std::cmp::Ordering;
-use std::fmt;
+use std::fmt::{self, Debug};
 
 use crate::internal::small_vec::SmallVec;
 use crate::version::Version;
-use crate::version_set::VersionSet;
 
-impl<V: Version> VersionSet for Range<V> {
-    type V = V;
+/// Trait describing sets of versions.
+pub trait VersionSet: Debug + Clone + Eq {
+    /// Version type associated with the sets manipulated.
+    type V;
+
     // Constructors
-    fn empty() -> Self {
-        Range::none()
-    }
-    fn singleton(v: Self::V) -> Self {
-        Range::exact(v)
-    }
+    /// Constructor for an empty set containing no version.
+    fn empty() -> Self;
+    /// Constructor for a set containing exactly one version.
+    fn singleton(v: Self::V) -> Self;
+
     // Operations
-    fn complement(&self) -> Self {
-        self.negate()
-    }
-    fn intersection(&self, other: &Self) -> Self {
-        self.intersection(other)
-    }
+    /// Compute the complement of this set.
+    fn complement(&self) -> Self;
+    /// Compute the intersection with another set.
+    fn intersection(&self, other: &Self) -> Self;
+
     // Membership
-    fn contains(&self, v: &Self::V) -> bool {
-        self.contains(v)
+    /// Evaluate membership of a version in this set.
+    fn contains(&self, v: &Self::V) -> bool;
+
+    // Automatically implemented functions ###########################
+
+    /// Constructor for the set containing all versions.
+    /// Automatically implemented as `Self::empty().complement()`.
+    fn full() -> Self {
+        Self::empty().complement()
+    }
+
+    /// Compute the union with another set.
+    /// Thanks to set properties, this is automatically implemented as:
+    /// `self.complement().intersection(&other.complement()).complement()`
+    fn union(&self, other: &Self) -> Self {
+        self.complement()
+            .intersection(&other.complement())
+            .complement()
     }
 }
 

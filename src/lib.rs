@@ -215,7 +215,9 @@ pub mod range;
 pub mod report;
 pub mod solver;
 pub mod term;
+pub mod term_bis;
 pub mod type_aliases;
 pub mod version;
+pub mod version_set;
 
 mod internal;
