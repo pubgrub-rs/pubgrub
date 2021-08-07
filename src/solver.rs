@@ -137,38 +137,37 @@ pub fn resolve<P: Package, V: Version>(
         {
             // Retrieve that package dependencies.
             let p = &next;
-            let dependencies =
-                match dependency_provider
-                    .get_dependencies(&p, &v)
-                    .map_err(|err| PubGrubError::ErrorRetrievingDependencies {
-                        package: p.clone(),
-                        version: v.clone(),
-                        source: err,
-                    })? {
-                    Dependencies::Unknown => {
-                        state.add_incompatibility(Incompatibility::unavailable_dependencies(
-                            p.clone(),
-                            v.clone(),
-                        ));
-                        continue;
+            let dependencies = match dependency_provider.get_dependencies(p, &v).map_err(|err| {
+                PubGrubError::ErrorRetrievingDependencies {
+                    package: p.clone(),
+                    version: v.clone(),
+                    source: err,
+                }
+            })? {
+                Dependencies::Unknown => {
+                    state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                        p.clone(),
+                        v.clone(),
+                    ));
+                    continue;
+                }
+                Dependencies::Known(x) => {
+                    if x.contains_key(p) {
+                        return Err(PubGrubError::SelfDependency {
+                            package: p.clone(),
+                            version: v.clone(),
+                        });
                     }
-                    Dependencies::Known(x) => {
-                        if x.contains_key(&p) {
-                            return Err(PubGrubError::SelfDependency {
-                                package: p.clone(),
-                                version: v.clone(),
-                            });
-                        }
-                        if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
-                            return Err(PubGrubError::DependencyOnTheEmptySet {
-                                package: p.clone(),
-                                version: v.clone(),
-                                dependent: dependent.clone(),
-                            });
-                        }
-                        x
+                    if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
+                        return Err(PubGrubError::DependencyOnTheEmptySet {
+                            package: p.clone(),
+                            version: v.clone(),
+                            dependent: dependent.clone(),
+                        });
                     }
-                };
+                    x
+                }
+            };
 
             // Add that package and version if the dependencies are not problematic.
             let dep_incompats =

@@ -152,7 +152,7 @@ impl<P: Package, V: Version> Incompatibility<P, V> {
             false
         } else {
             let (package, term) = self.package_terms.iter().next().unwrap();
-            (package == root_package) && term.contains(&root_version)
+            (package == root_package) && term.contains(root_version)
         }
     }
 
@@ -220,7 +220,7 @@ impl<'a, P: Package, V: Version + 'a> Incompatibility<P, V> {
     pub fn relation(&self, terms: impl Fn(&P) -> Option<&'a Term<V>>) -> Relation<P> {
         let mut relation = Relation::Satisfied;
         for (package, incompat_term) in self.package_terms.iter() {
-            match terms(package).map(|term| incompat_term.relation_with(&term)) {
+            match terms(package).map(|term| incompat_term.relation_with(term)) {
                 Some(term::Relation::Satisfied) => {}
                 Some(term::Relation::Contradicted) => {
                     return Relation::Contradicted(package.clone());

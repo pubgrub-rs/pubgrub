@@ -162,7 +162,7 @@ impl<'a, V: 'a + Version> Term<V> {
 
 impl<V: Version> AsRef<Term<V>> for Term<V> {
     fn as_ref(&self) -> &Term<V> {
-        &self
+        self
     }
 }
 
