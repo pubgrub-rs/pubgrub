@@ -40,7 +40,7 @@ jobs:
         run: cargo build --verbose
 
       - name: Run tests
-        run: cargo test --features=serde --verbose
+        run: cargo test --verbose
 
   clippy:
     name: No warnings from Clippy
