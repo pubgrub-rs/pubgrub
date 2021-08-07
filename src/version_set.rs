@@ -19,7 +19,7 @@ use std::fmt::{Debug, Display};
 /// Trait describing sets of versions.
 pub trait VersionSet: Debug + Display + Clone + Eq {
     /// Version type associated with the sets manipulated.
-    type V: Clone + Debug + Display;
+    type V: Debug + Display + Clone + Ord;
 
     // Constructors
     /// Constructor for an empty set containing no version.

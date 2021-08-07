@@ -216,6 +216,7 @@ pub mod range;
 pub mod report;
 pub mod report_bis;
 pub mod solver;
+pub mod solver_bis;
 pub mod term;
 pub mod term_bis;
 pub mod type_aliases;
