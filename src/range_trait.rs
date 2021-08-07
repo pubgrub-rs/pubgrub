@@ -495,7 +495,11 @@ pub mod tests {
                 if v1 as i64 == last_right {
                     segments.push(NumberInterval::new(Excluded(v1.into()), b2.clone()));
                 } else if v1 == v2 {
-                    segments.push((v1..=v1).into());
+                    // segments.push((v1..=v1).into());
+                    segments.push(NumberInterval::new(
+                        Included(v1.into()),
+                        Included(v2.into()),
+                    ));
                 } else {
                     segments.push(NumberInterval::new(b1.clone(), b2.clone()));
                 }
@@ -523,6 +527,13 @@ pub mod tests {
     }
 
     proptest! {
+
+        // #[test]
+        // fn long_ranges(ranges in strategy()) {
+        //     if ranges.segments.len() > 2 {
+        //         assert_eq!(ranges, Range::empty());
+        //     }
+        // }
 
         // Testing negate ----------------------------------
 
