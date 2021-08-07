@@ -7,9 +7,9 @@
 //! of the ranges building blocks.
 //!
 //! Those building blocks are:
-//!  - [none()](Range::none): the empty set
-//!  - [any()](Range::any): the set of all possible versions
-//!  - [exact(v)](Range::exact): the set containing only the version v
+//!  - [empty()](Range::empty): the empty set
+//!  - [full()](Range::full): the set of all possible versions
+//!  - [singleton(v)](Range::singleton): the set containing only the version v
 //!  - [higher_than(v)](Range::higher_than): the set defined by `v <= versions`
 //!  - [strictly_lower_than(v)](Range::strictly_lower_than): the set defined by `versions < v`
 //!  - [between(v1, v2)](Range::between): the set defined by `v1 <= versions < v2`
