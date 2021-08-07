@@ -168,6 +168,14 @@ impl<I: Interval<V>, V: Version> Range<I, V> {
         }
     }
 
+    /// Set of all versions strictly lower than some version.
+    pub fn strictly_higher_than(v: impl Into<V>) -> Self {
+        Self {
+            segments: SmallVec::one(I::new(Bound::Excluded(v.into()), V::maximum())),
+            phantom: PhantomData,
+        }
+    }
+
     /// Set of all versions comprised between two given versions.
     /// The lower bound is included and the higher bound excluded.
     /// `v1 <= v < v2`.
@@ -462,17 +470,12 @@ pub mod tests {
     // Ranges tests.
 
     #[test]
-    fn negate_singleton() {
-        let s1: Range<SemanticInterval, SemanticVersion> = Range::singleton((1, 0, 0));
-        let s1c = s1.complement();
-        let s12 = Range::between((1, 0, 0), (2, 0, 0));
-        let s1c_12 = s1c.intersection(&s12);
-        let s12_1c = s12.intersection(&s1c);
-        eprintln!("first:  {}", s1c);
-        eprintln!("first:  {:?}", s1c);
-        eprintln!("second: {}", s12);
-        eprintln!("second: {:?}", s12);
-        assert_eq!(s1c_12, s12_1c);
+    fn failing_symmetric() {
+        let s1: Range<NumberInterval, NumberVersion> = Range::strictly_higher_than(0);
+        let s2 = Range::higher_than(0);
+        eprintln!("first:  {}", s1);
+        eprintln!("second: {}", s2);
+        assert_eq!(s1.intersection(&s2), s2.intersection(&s1));
     }
 
     pub fn strategy() -> impl Strategy<Value = Range<NumberInterval, NumberVersion>> {
