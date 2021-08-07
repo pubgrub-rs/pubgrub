@@ -44,9 +44,12 @@
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
 //! # use pubgrub::version::NumberVersion;
 //! # use pubgrub::error::PubGrubError;
+//! # use pubgrub::range::Range;
 //! #
-//! # fn try_main() -> Result<(), PubGrubError<&'static str, NumberVersion>> {
-//! #     let dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//! # type NumVS = Range<NumberVersion>;
+//! #
+//! # fn try_main() -> Result<(), PubGrubError<&'static str, NumVS>> {
+//! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! #     let package = "root";
 //! #     let version = 1;
 //! let solution = resolve(&dependency_provider, package, version)?;
