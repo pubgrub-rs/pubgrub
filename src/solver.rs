@@ -239,6 +239,7 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
     /// of the available versions in preference order for any package.
     ///
     /// Note: the type `T` ensures that this returns an item from the `packages` argument.
+    #[allow(clippy::type_complexity)]
     fn choose_package_version<T: Borrow<P>, U: Borrow<VS>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
@@ -363,6 +364,7 @@ impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
 /// Packages are picked with the fewest versions contained in the constraints first.
 /// Versions are picked with the newest versions first.
 impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependencyProvider<P, VS> {
+    #[allow(clippy::type_complexity)]
     fn choose_package_version<T: Borrow<P>, U: Borrow<VS>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
