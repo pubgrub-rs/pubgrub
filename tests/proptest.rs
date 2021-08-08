@@ -10,7 +10,7 @@ use pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies, DependencyProvider,
     OfflineDependencyProvider,
 };
-use pubgrub::version::NumberVersion;
+use pubgrub::version::{NumberVersion, SemanticVersion};
 use pubgrub::version_set::VersionSet;
 
 use proptest::collection::{btree_map, vec};
@@ -91,6 +91,7 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
 }
 
 type NumVS = Range<NumberVersion>;
+type SemVS = Range<SemanticVersion>;
 
 #[test]
 #[should_panic]
@@ -501,10 +502,8 @@ fn large_case() {
                 }
             }
         } else if name.ends_with("str_SemanticVersion.ron") {
-            let dependency_provider: OfflineDependencyProvider<
-                &str,
-                pubgrub::version::SemanticVersion,
-            > = ron::de::from_str(&data).unwrap();
+            let dependency_provider: OfflineDependencyProvider<&str, SemVS> =
+                ron::de::from_str(&data).unwrap();
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {
                 for n in dependency_provider.versions(p).unwrap() {
