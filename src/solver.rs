@@ -295,6 +295,13 @@ where
 /// A basic implementation of [DependencyProvider].
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "VS::V: serde::Serialize, VS: serde::Serialize, P: serde::Serialize",
+        deserialize = "VS::V: serde::Deserialize<'de>, VS: serde::Deserialize<'de>, P: serde::Deserialize<'de>"
+    ))
+)]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct OfflineDependencyProvider<P: Package, VS: VersionSet> {
     dependencies: Map<P, BTreeMap<VS::V, DependencyConstraints<P, VS>>>,
