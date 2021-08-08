@@ -203,7 +203,7 @@ pub fn resolve<P: Package, VS: VersionSet>(
 }
 
 /// An enum used by [DependencyProvider] that holds information about package dependencies.
-/// For each [Package] there is a [Range] of concrete versions it allows as a dependency.
+/// For each [Package] there is a set of versions allowed as a dependency.
 #[derive(Clone)]
 pub enum Dependencies<P: Package, VS: VersionSet> {
     /// Package dependencies are unavailable.
@@ -219,7 +219,7 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
     /// is the process of choosing the next package
     /// and version that will be appended to the partial solution.
     /// Every time such a decision must be made,
-    /// potential valid packages and version ranges are preselected by the resolver,
+    /// potential valid packages and sets of versions are preselected by the resolver,
     /// and the dependency provider must choose.
     ///
     /// The strategy employed to choose such package and version

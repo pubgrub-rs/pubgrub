@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MPL-2.0
 
-//! Ranges are constraints defining sets of versions.
+//! As its name suggests, the [VersionSet] trait describes sets of versions.
 //!
-//! Concretely, those constraints correspond to any set of versions
-//! representable as the concatenation, union, and complement
-//! of the ranges building blocks.
+//! One needs to define
+//! - the associate type for versions,
+//! - two constructors for the empty set and a singleton set,
+//! - the complement and intersection set operations,
+//! - and a function to evaluate membership of versions.
 //!
-//! Those building blocks are:
-//!  - [none()](Range::none): the empty set
-//!  - [any()](Range::any): the set of all possible versions
-//!  - [exact(v)](Range::exact): the set containing only the version v
-//!  - [higher_than(v)](Range::higher_than): the set defined by `v <= versions`
-//!  - [strictly_lower_than(v)](Range::strictly_lower_than): the set defined by `versions < v`
-//!  - [between(v1, v2)](Range::between): the set defined by `v1 <= versions < v2`
+//! Two functions are automatically derived, thanks to the mathematical properties of sets.
+//! You can overwrite those implementations, but we highly recommend that you don't,
+//! except if you are confident in a correct implementation that brings much performance gains.
+//!
+//! It is also extremely important that the `Eq` trait is correctly implemented.
+//! In particular, you can only use `#[derive(Eq, PartialEq)]` if `Eq` is strictly equivalent to the
+//! structural equality, i.e. if versions have canonical representations.
+//! Such problems may arise if your implementations of `complement()` and `intersection()` do not
+//! return canonical representations so be careful there.
 
 use std::fmt::{Debug, Display};
 
