@@ -151,7 +151,7 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
             false
         } else {
             let (package, term) = self.package_terms.iter().next().unwrap();
-            (package == root_package) && term.contains(&root_version)
+            (package == root_package) && term.contains(root_version)
         }
     }
 
@@ -219,7 +219,7 @@ impl<'a, P: Package, VS: VersionSet + 'a> Incompatibility<P, VS> {
     pub fn relation(&self, terms: impl Fn(&P) -> Option<&'a Term<VS>>) -> Relation<P> {
         let mut relation = Relation::Satisfied;
         for (package, incompat_term) in self.package_terms.iter() {
-            match terms(package).map(|term| incompat_term.relation_with(&term)) {
+            match terms(package).map(|term| incompat_term.relation_with(term)) {
                 Some(term::Relation::Satisfied) => {}
                 Some(term::Relation::Contradicted) => {
                     return Relation::Contradicted(package.clone());

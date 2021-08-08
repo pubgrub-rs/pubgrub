@@ -159,7 +159,6 @@ impl<VS: VersionSet> Term<VS> {
     }
 }
 
-// impl<V: Version> AsRef<Term<V>> for Term<V> {
 impl<VS: VersionSet> AsRef<Self> for Term<VS> {
     fn as_ref(&self) -> &Self {
         self
