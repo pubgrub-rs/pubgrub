@@ -3,6 +3,8 @@
 //! A Memory acts like a structured partial solution
 //! where terms are regrouped by package in a [Map](crate::type_aliases::Map).
 
+use std::fmt::Display;
+
 use crate::internal::arena::Arena;
 use crate::internal::incompatibility::{IncompId, Incompatibility, Relation};
 use crate::internal::small_map::SmallMap;
@@ -32,6 +34,24 @@ pub struct PartialSolution<P: Package, V: Version> {
     package_assignments: Map<P, PackageAssignments<P, V>>,
 }
 
+impl<P: Package, V: Version> Display for PartialSolution<P, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut assignments: Vec<_> = self
+            .package_assignments
+            .iter()
+            .map(|(p, pa)| format!("{}: {}", p, pa))
+            .collect();
+        assignments.sort();
+        write!(
+            f,
+            "next_global_index: {}\ncurrent_decision_level: {:?}\npackage_assignements:\n{}",
+            self.next_global_index,
+            self.current_decision_level,
+            assignments.join("\t\n")
+        )
+    }
+}
+
 /// Package assignments contain the potential decision and derivations
 /// that have already been made for a given package,
 /// as well as the intersection of terms by all of these.
@@ -43,6 +63,24 @@ struct PackageAssignments<P: Package, V: Version> {
     assignments_intersection: AssignmentsIntersection<V>,
 }
 
+impl<P: Package, V: Version> Display for PackageAssignments<P, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let derivations: Vec<_> = self
+            .dated_derivations
+            .iter()
+            .map(|dd| dd.to_string())
+            .collect();
+        write!(
+            f,
+            "decision range: {:?}..{:?}\nderivations:\n  {}\n,assignments_intersection: {}",
+            self.smallest_decision_level,
+            self.highest_decision_level,
+            derivations.join("\n  "),
+            self.assignments_intersection
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct DatedDerivation<P: Package, V: Version> {
     global_index: u32,
@@ -50,10 +88,27 @@ pub struct DatedDerivation<P: Package, V: Version> {
     cause: IncompId<P, V>,
 }
 
+impl<P: Package, V: Version> Display for DatedDerivation<P, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}, cause: {:?}", self.decision_level, self.cause)
+    }
+}
+
 #[derive(Clone, Debug)]
 enum AssignmentsIntersection<V: Version> {
     Decision((u32, V, Term<V>)),
     Derivations(Term<V>),
+}
+
+impl<V: Version> Display for AssignmentsIntersection<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Decision((lvl, version, _)) => {
+                write!(f, "Decision: level {}, v = {}", lvl, version)
+            }
+            Self::Derivations(term) => write!(f, "Derivations term: {}", term),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -258,7 +313,14 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
         // Check none of the dependencies (new_incompatibilities)
         // would create a conflict (be satisfied).
         if store[new_incompatibilities].iter().all(not_satisfied) {
+            log::info!("add_decision: {} @ {}", package, version);
             self.add_decision(package, version);
+        } else {
+            log::info!(
+                "not adding {} @ {} because of its dependencies",
+                package,
+                version
+            );
         }
     }
 

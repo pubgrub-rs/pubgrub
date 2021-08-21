@@ -5,9 +5,21 @@ use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::type_aliases::Map;
 use pubgrub::version::{NumberVersion, SemanticVersion};
 
+use log::LevelFilter;
+use std::io::Write;
+
+fn init_log() {
+    let _ = env_logger::builder()
+        .filter_level(LevelFilter::Trace)
+        .format(|buf, record| writeln!(buf, "{}", record.args()))
+        .is_test(true)
+        .try_init();
+}
+
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#no-conflicts
 fn no_conflict() {
+    init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
@@ -38,6 +50,7 @@ fn no_conflict() {
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#avoiding-conflict-during-decision-making
 fn avoiding_conflict_during_decision_making() {
+    init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
@@ -73,6 +86,7 @@ fn avoiding_conflict_during_decision_making() {
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#performing-conflict-resolution
 fn conflict_resolution() {
+    init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
@@ -106,6 +120,7 @@ fn conflict_resolution() {
 #[test]
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#conflict-resolution-with-a-partial-satisfier
 fn conflict_with_partial_satisfier() {
+    init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
     #[rustfmt::skip]
     // root 1.0.0 depends on foo ^1.0.0 and target ^2.0.0
@@ -171,6 +186,7 @@ fn conflict_with_partial_satisfier() {
 ///
 /// Solution: a0, b0, c0, d0
 fn double_choices() {
+    init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
     dependency_provider.add_dependencies("a", 0, vec![("b", Range::any()), ("c", Range::any())]);
     dependency_provider.add_dependencies("b", 0, vec![("d", Range::exact(0))]);
