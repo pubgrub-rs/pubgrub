@@ -3,7 +3,6 @@
 //! A Memory acts like a structured partial solution
 //! where terms are regrouped by package in a [Map](crate::type_aliases::Map).
 
-use std::collections::BTreeSet;
 use std::fmt::Display;
 
 use crate::internal::arena::Arena;
@@ -37,18 +36,18 @@ pub struct PartialSolution<P: Package, V: Version> {
 
 impl<P: Package, V: Version> Display for PartialSolution<P, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let assignments: BTreeSet<String> = self
+        let mut assignments: Vec<_> = self
             .package_assignments
             .iter()
             .map(|(p, pa)| format!("{}: {}", p, pa))
             .collect();
-        let assignments: Vec<_> = assignments.into_iter().collect();
+        assignments.sort();
         write!(
             f,
             "next_global_index: {}\ncurrent_decision_level: {:?}\npackage_assignements:\n{}",
             self.next_global_index,
             self.current_decision_level,
-            assignments.join("\n")
+            assignments.join("\t\n")
         )
     }
 }
@@ -279,7 +278,7 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
                     pa.dated_derivations
                         .iter()
                         .fold(Term::any(), |acc, dated_derivation| {
-                            let term = store[dated_derivation.cause].get(&p).unwrap().negate();
+                            let term = store[dated_derivation.cause].get(p).unwrap().negate();
                             acc.intersection(&term)
                         }),
                 );

@@ -23,7 +23,7 @@ include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples
 thiserror = "1.0"
 rustc-hash = "1.1.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
-log = { version = "0.4.14", default-features = false } # for debug logs in tests
+log = "0.4.14" # for debug logs in tests
 
 [dev-dependencies]
 proptest = "0.10.1"
