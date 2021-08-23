@@ -89,7 +89,7 @@ impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P,
 #[should_panic]
 fn should_cancel_can_panic() {
     let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
-    dependency_provider.add_dependencies(0, 0, vec![(666, Range::any())]);
+    dependency_provider.add_dependencies(0, 0, [(666, Range::any())]);
 
     // Run the algorithm.
     let _ = resolve(
@@ -333,8 +333,8 @@ proptest! {
                     (Ok(l), Ok(r)) => assert_eq!(l, r),
                     (Err(PubGrubError::NoSolution(derivation_l)), Err(PubGrubError::NoSolution(derivation_r))) => {
                         prop_assert_eq!(
-                            DefaultStringReporter::report(&derivation_l),
-                            DefaultStringReporter::report(&derivation_r)
+                            DefaultStringReporter::report(derivation_l),
+                            DefaultStringReporter::report(derivation_r)
                         )},
                     _ => panic!("not the same result")
                 }
@@ -423,7 +423,7 @@ proptest! {
                 dependency_provider
                     .versions(&p)
                     .unwrap()
-                    .map(move |v| (p, v.clone()))
+                    .map(move |&v| (p, v))
             })
             .collect();
         let to_remove: Set<(_, _)> = indexes_to_remove.iter().map(|x| x.get(&all_versions)).cloned().collect();
