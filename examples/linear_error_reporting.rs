@@ -13,7 +13,7 @@ fn main() {
     // root 1.0.0 depends on foo ^1.0.0 and baz ^1.0.0
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
-        vec![
+        [
             ("foo", Range::between((1, 0, 0), (2, 0, 0))),
             ("baz", Range::between((1, 0, 0), (2, 0, 0))),
         ],
@@ -22,17 +22,17 @@ fn main() {
     // foo 1.0.0 depends on bar ^2.0.0
         dependency_provider.add_dependencies(
         "foo", (1, 0, 0),
-        vec![("bar", Range::between((2, 0, 0), (3, 0, 0)))],
+        [("bar", Range::between((2, 0, 0), (3, 0, 0)))],
     );
     #[rustfmt::skip]
     // bar 2.0.0 depends on baz ^3.0.0
         dependency_provider.add_dependencies(
         "bar", (2, 0, 0),
-        vec![("baz", Range::between((3, 0, 0), (4, 0, 0)))],
+        [("baz", Range::between((3, 0, 0), (4, 0, 0)))],
     );
     // baz 1.0.0 and 3.0.0 have no dependencies
-    dependency_provider.add_dependencies("baz", (1, 0, 0), vec![]);
-    dependency_provider.add_dependencies("baz", (3, 0, 0), vec![]);
+    dependency_provider.add_dependencies("baz", (1, 0, 0), []);
+    dependency_provider.add_dependencies("baz", (3, 0, 0), []);
 
     // Run the algorithm.
     match resolve(&dependency_provider, "root", (1, 0, 0)) {

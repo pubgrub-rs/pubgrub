@@ -24,15 +24,15 @@ fn no_conflict() {
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
-        vec![("foo", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("foo", Range::between((1, 0, 0), (2, 0, 0)))],
     );
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "foo", (1, 0, 0),
-        vec![("bar", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("bar", Range::between((1, 0, 0), (2, 0, 0)))],
     );
-    dependency_provider.add_dependencies("bar", (1, 0, 0), vec![]);
-    dependency_provider.add_dependencies("bar", (2, 0, 0), vec![]);
+    dependency_provider.add_dependencies("bar", (1, 0, 0), []);
+    dependency_provider.add_dependencies("bar", (2, 0, 0), []);
 
     // Run the algorithm.
     let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
@@ -55,7 +55,7 @@ fn avoiding_conflict_during_decision_making() {
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
-        vec![
+        [
             ("foo", Range::between((1, 0, 0), (2, 0, 0))),
             ("bar", Range::between((1, 0, 0), (2, 0, 0))),
         ],
@@ -63,12 +63,12 @@ fn avoiding_conflict_during_decision_making() {
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "foo", (1, 1, 0),
-        vec![("bar", Range::between((2, 0, 0), (3, 0, 0)))],
+        [("bar", Range::between((2, 0, 0), (3, 0, 0)))],
     );
-    dependency_provider.add_dependencies("foo", (1, 0, 0), vec![]);
-    dependency_provider.add_dependencies("bar", (1, 0, 0), vec![]);
-    dependency_provider.add_dependencies("bar", (1, 1, 0), vec![]);
-    dependency_provider.add_dependencies("bar", (2, 0, 0), vec![]);
+    dependency_provider.add_dependencies("foo", (1, 0, 0), []);
+    dependency_provider.add_dependencies("bar", (1, 0, 0), []);
+    dependency_provider.add_dependencies("bar", (1, 1, 0), []);
+    dependency_provider.add_dependencies("bar", (2, 0, 0), []);
 
     // Run the algorithm.
     let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
@@ -91,18 +91,18 @@ fn conflict_resolution() {
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
-        vec![("foo", Range::higher_than((1, 0, 0)))],
+        [("foo", Range::higher_than((1, 0, 0)))],
     );
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "foo", (2, 0, 0),
-        vec![("bar", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("bar", Range::between((1, 0, 0), (2, 0, 0)))],
     );
-    dependency_provider.add_dependencies("foo", (1, 0, 0), vec![]);
+    dependency_provider.add_dependencies("foo", (1, 0, 0), []);
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "bar", (1, 0, 0),
-        vec![("foo", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("foo", Range::between((1, 0, 0), (2, 0, 0)))],
     );
 
     // Run the algorithm.
@@ -126,7 +126,7 @@ fn conflict_with_partial_satisfier() {
     // root 1.0.0 depends on foo ^1.0.0 and target ^2.0.0
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
-        vec![
+        [
             ("foo", Range::between((1, 0, 0), (2, 0, 0))),
             ("target", Range::between((2, 0, 0), (3, 0, 0))),
         ],
@@ -135,33 +135,33 @@ fn conflict_with_partial_satisfier() {
     // foo 1.1.0 depends on left ^1.0.0 and right ^1.0.0
         dependency_provider.add_dependencies(
         "foo", (1, 1, 0),
-        vec![
+        [
             ("left", Range::between((1, 0, 0), (2, 0, 0))),
             ("right", Range::between((1, 0, 0), (2, 0, 0))),
         ],
     );
-    dependency_provider.add_dependencies("foo", (1, 0, 0), vec![]);
+    dependency_provider.add_dependencies("foo", (1, 0, 0), []);
     #[rustfmt::skip]
     // left 1.0.0 depends on shared >=1.0.0
         dependency_provider.add_dependencies(
         "left", (1, 0, 0),
-        vec![("shared", Range::higher_than((1, 0, 0)))],
+        [("shared", Range::higher_than((1, 0, 0)))],
     );
     #[rustfmt::skip]
     // right 1.0.0 depends on shared <2.0.0
         dependency_provider.add_dependencies(
         "right", (1, 0, 0),
-        vec![("shared", Range::strictly_lower_than((2, 0, 0)))],
+        [("shared", Range::strictly_lower_than((2, 0, 0)))],
     );
-    dependency_provider.add_dependencies("shared", (2, 0, 0), vec![]);
+    dependency_provider.add_dependencies("shared", (2, 0, 0), []);
     #[rustfmt::skip]
     // shared 1.0.0 depends on target ^1.0.0
         dependency_provider.add_dependencies(
         "shared", (1, 0, 0),
-        vec![("target", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("target", Range::between((1, 0, 0), (2, 0, 0)))],
     );
-    dependency_provider.add_dependencies("target", (2, 0, 0), vec![]);
-    dependency_provider.add_dependencies("target", (1, 0, 0), vec![]);
+    dependency_provider.add_dependencies("target", (2, 0, 0), []);
+    dependency_provider.add_dependencies("target", (1, 0, 0), []);
 
     // Run the algorithm.
     let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
@@ -188,12 +188,12 @@ fn conflict_with_partial_satisfier() {
 fn double_choices() {
     init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
-    dependency_provider.add_dependencies("a", 0, vec![("b", Range::any()), ("c", Range::any())]);
-    dependency_provider.add_dependencies("b", 0, vec![("d", Range::exact(0))]);
-    dependency_provider.add_dependencies("b", 1, vec![("d", Range::exact(1))]);
-    dependency_provider.add_dependencies("c", 0, vec![]);
-    dependency_provider.add_dependencies("c", 1, vec![("d", Range::exact(2))]);
-    dependency_provider.add_dependencies("d", 0, vec![]);
+    dependency_provider.add_dependencies("a", 0, [("b", Range::any()), ("c", Range::any())]);
+    dependency_provider.add_dependencies("b", 0, [("d", Range::exact(0))]);
+    dependency_provider.add_dependencies("b", 1, [("d", Range::exact(1))]);
+    dependency_provider.add_dependencies("c", 0, []);
+    dependency_provider.add_dependencies("c", 1, [("d", Range::exact(2))]);
+    dependency_provider.add_dependencies("d", 0, []);
 
     // Solution.
     let mut expected_solution = Map::default();

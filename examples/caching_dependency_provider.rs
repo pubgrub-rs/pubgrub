@@ -49,7 +49,7 @@ impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P,
                         cache.add_dependencies(
                             package.clone(),
                             version.clone(),
-                            dependencies.clone().into_iter(),
+                            dependencies.clone(),
                         );
                         Ok(Dependencies::Known(dependencies))
                     }

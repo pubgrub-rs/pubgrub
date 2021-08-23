@@ -82,7 +82,7 @@ impl<P: Package, V: Version> SatResolve<P, V> {
             for (p1, range) in &deps {
                 let empty_vec = vec![];
                 let mut matches: Vec<varisat::Lit> = all_versions_by_p
-                    .get(&p1)
+                    .get(p1)
                     .unwrap_or(&empty_vec)
                     .iter()
                     .filter(|(v1, _)| range.contains(v1))
