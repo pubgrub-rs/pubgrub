@@ -162,13 +162,17 @@ impl<P: Package, V: Version> PartialSolution<P, V> {
     pub fn find_satisfier_and_previous_satisfier_level(
         &self,
         incompat: &Incompatibility<P, V>,
-    ) -> (&Assignment<P, V>, usize, usize) {
+    ) -> Result<(&Assignment<P, V>, usize, usize), &'static str> {
         let ((satisfier_level, satisfier), previous_assignments) =
-            Self::find_satisfier(incompat, self.history.as_slice())
-                .expect("We should always find a satisfier if called in the right context.");
+            match Self::find_satisfier(incompat, self.history.as_slice()) {
+                Some(x) => x,
+                None => {
+                    return Err("We should always find a satisfier if called in the right context.")
+                }
+            };
         let previous_satisfier_level =
             Self::find_previous_satisfier(incompat, satisfier, previous_assignments);
-        (satisfier, satisfier_level, previous_satisfier_level)
+        Ok((satisfier, satisfier_level, previous_satisfier_level))
     }
 
     /// A satisfier is the earliest assignment in partial solution such that the incompatibility

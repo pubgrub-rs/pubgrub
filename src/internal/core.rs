@@ -129,7 +129,8 @@ impl<P: Package, V: Version> State<P, V> {
             } else {
                 let (satisfier, satisfier_level, previous_satisfier_level) = self
                     .partial_solution
-                    .find_satisfier_and_previous_satisfier_level(&current_incompat);
+                    .find_satisfier_and_previous_satisfier_level(&current_incompat)
+                    .map_err(|msg| PubGrubError::Failure(msg.to_string()))?;
                 match satisfier {
                     Decision { .. } => {
                         self.backtrack(
