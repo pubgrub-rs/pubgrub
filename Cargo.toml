@@ -15,6 +15,14 @@ include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples
 
 [dependencies]
 thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 proptest = "0.10.1"
+criterion = "0.3"
+pubv2 = { package = "pubgrub", version = "0.2.1", features = ["serde"] }
+ron = "0.6"
+
+[[bench]]
+name = "large_case"
+harness = false

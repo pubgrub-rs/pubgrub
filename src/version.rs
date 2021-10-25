@@ -5,6 +5,8 @@
 //! Traits and implementations to create and compare versions.
 
 use std::fmt::{self, Debug, Display};
+use std::str::FromStr;
+use thiserror::Error;
 
 /// Versions have a minimal version (a "0" version)
 /// and are ordered such that every version has a next one.
@@ -21,6 +23,68 @@ pub struct SemanticVersion {
     major: usize,
     minor: usize,
     patch: usize,
+}
+
+impl<'de> serde::Deserialize<'de> for SemanticVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Error creating [SemanticVersion] from [String].
+#[derive(Error, Debug, PartialEq)]
+pub enum VersionParseError {
+    /// [SemanticVersion] must contain major, minor, patch versions.
+    #[error("version {full_version} must contain 3 numbers separated by dot")]
+    NotThreeParts {
+        /// [SemanticVersion] that was being parsed.
+        full_version: String,
+    },
+    /// Wrapper around [ParseIntError](core::num::ParseIntError).
+    #[error("cannot parse '{version_part}' in '{full_version}' as u32: {parse_error}")]
+    ParseIntError {
+        /// [SemanticVersion] that was being parsed.
+        full_version: String,
+        /// A version part where parsing failed.
+        version_part: String,
+        /// A specific error resulted from parsing a part of the version as [u32].
+        parse_error: String,
+    },
+}
+
+impl FromStr for SemanticVersion {
+    type Err = VersionParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parse_usize = |part: &str| {
+            part.parse::<usize>().map_err(|e| Self::Err::ParseIntError {
+                full_version: s.to_string(),
+                version_part: part.to_string(),
+                parse_error: e.to_string(),
+            })
+        };
+
+        let mut parts = s.split('.');
+        match (parts.next(), parts.next(), parts.next(), parts.next()) {
+            (Some(major), Some(minor), Some(patch), None) => {
+                let major = parse_usize(major)?;
+                let minor = parse_usize(minor)?;
+                let patch = parse_usize(patch)?;
+                Ok(Self {
+                    major,
+                    minor,
+                    patch,
+                })
+            }
+            _ => Err(Self::Err::NotThreeParts {
+                full_version: s.to_string(),
+            }),
+        }
+    }
 }
 
 // Constructors

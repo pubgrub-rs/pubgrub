@@ -20,7 +20,8 @@ use crate::version::Version;
 use std::fmt;
 
 /// A Range is a set of versions.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, serde::Deserialize)]
+#[serde(transparent)]
 pub struct Range<V: Version> {
     segments: Vec<Interval<V>>,
 }
