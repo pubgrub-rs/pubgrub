@@ -191,11 +191,11 @@ fn conflict_with_partial_satisfier() {
 fn double_choices() {
     init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
-    dependency_provider.add_dependencies("a", 0, [("b", Range::any()), ("c", Range::any())]);
-    dependency_provider.add_dependencies("b", 0, [("d", Range::exact(0))]);
-    dependency_provider.add_dependencies("b", 1, [("d", Range::exact(1))]);
+    dependency_provider.add_dependencies("a", 0, [("b", Range::full()), ("c", Range::full())]);
+    dependency_provider.add_dependencies("b", 0, [("d", Range::singleton(0))]);
+    dependency_provider.add_dependencies("b", 1, [("d", Range::singleton(1))]);
     dependency_provider.add_dependencies("c", 0, []);
-    dependency_provider.add_dependencies("c", 1, [("d", Range::exact(2))]);
+    dependency_provider.add_dependencies("c", 1, [("d", Range::singleton(2))]);
     dependency_provider.add_dependencies("d", 0, []);
 
     // Solution.

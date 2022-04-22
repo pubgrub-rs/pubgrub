@@ -1,4 +1,5 @@
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 #[derive(Clone)]
@@ -108,6 +109,13 @@ impl<T: fmt::Debug> fmt::Debug for SmallVec<T> {
     }
 }
 
+impl<T: Hash> Hash for SmallVec<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.len().hash(state);
+        Hash::hash_slice(self.as_slice(), state);
+    }
+}
+
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize> serde::Serialize for SmallVec<T> {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
@@ -125,6 +133,40 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for SmallVec<T> {
             v.push(item);
         }
         Ok(v)
+    }
+}
+
+impl<T> IntoIterator for SmallVec<T> {
+    type Item = T;
+    type IntoIter = SmallVecIntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            SmallVec::Empty => SmallVecIntoIter::Empty,
+            SmallVec::One(a) => SmallVecIntoIter::One(IntoIterator::into_iter(a)),
+            SmallVec::Two(a) => SmallVecIntoIter::Two(IntoIterator::into_iter(a)),
+            SmallVec::Flexible(v) => SmallVecIntoIter::Flexible(IntoIterator::into_iter(v)),
+        }
+    }
+}
+
+pub enum SmallVecIntoIter<T> {
+    Empty,
+    One(<[T; 1] as IntoIterator>::IntoIter),
+    Two(<[T; 2] as IntoIterator>::IntoIter),
+    Flexible(<Vec<T> as IntoIterator>::IntoIter),
+}
+
+impl<T> Iterator for SmallVecIntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            SmallVecIntoIter::Empty => None,
+            SmallVecIntoIter::One(it) => it.next(),
+            SmallVecIntoIter::Two(it) => it.next(),
+            SmallVecIntoIter::Flexible(it) => it.next(),
+        }
     }
 }
 

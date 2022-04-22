@@ -14,10 +14,10 @@ type NumVS = Range<NumberVersion>;
 fn main() {
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
     dependency_provider.add_dependencies(
-        "root", 1, [("menu", Range::any()), ("icons", Range::any())],
+        "root", 1, [("menu", Range::full()), ("icons", Range::full())],
     );
-    dependency_provider.add_dependencies("menu", 1, [("dropdown", Range::any())]);
-    dependency_provider.add_dependencies("dropdown", 1, [("icons", Range::any())]);
+    dependency_provider.add_dependencies("menu", 1, [("dropdown", Range::full())]);
+    dependency_provider.add_dependencies("dropdown", 1, [("icons", Range::full())]);
     dependency_provider.add_dependencies("icons", 1, []);
 
     // Run the algorithm.

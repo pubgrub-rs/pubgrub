@@ -276,12 +276,12 @@ pub mod tests {
             let mut store = Arena::new();
             let i1 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([("p1", t1.clone()), ("p2", t2.negate())]),
-                kind: Kind::UnavailableDependencies("0", Range::any())
+                kind: Kind::UnavailableDependencies("0", Range::full())
             });
 
             let i2 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([("p2", t2), ("p3", t3.clone())]),
-                kind: Kind::UnavailableDependencies("0", Range::any())
+                kind: Kind::UnavailableDependencies("0", Range::full())
             });
 
             let mut i3 = Map::default();
