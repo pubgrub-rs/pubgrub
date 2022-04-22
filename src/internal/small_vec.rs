@@ -1,4 +1,5 @@
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 #[derive(Clone)]
@@ -105,6 +106,13 @@ impl<T: PartialEq> PartialEq for SmallVec<T> {
 impl<T: fmt::Debug> fmt::Debug for SmallVec<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_slice().fmt(f)
+    }
+}
+
+impl<T: Hash> Hash for SmallVec<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.len().hash(state);
+        Hash::hash_slice(self.as_slice(), state);
     }
 }
 
