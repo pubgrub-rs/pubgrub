@@ -16,6 +16,7 @@
 
 use std::cmp::Ordering;
 use std::fmt;
+use std::ops::{Bound, RangeBounds};
 
 use crate::internal::small_vec::SmallVec;
 use crate::version::Version;
@@ -83,6 +84,31 @@ impl<V: Version> Range<V> {
             }
         } else {
             Self::none()
+        }
+    }
+
+    /// Construct a simple range from anything that impls [RangeBounds] like `v1..v2`.
+    pub fn from_range_bounds<R, IV>(bounds: R) -> Self
+    where
+        R: RangeBounds<IV>,
+        for<'a> &'a IV: Into<V>,
+    {
+        let start = match bounds.start_bound() {
+            Bound::Included(s) => s.into(),
+            Bound::Excluded(s) => s.into().bump(),
+            Bound::Unbounded => V::lowest(),
+        };
+        let end = match bounds.end_bound() {
+            Bound::Included(e) => Some(e.into().bump()),
+            Bound::Excluded(e) => Some(e.into()),
+            Bound::Unbounded => None,
+        };
+        if end.is_some() && end.as_ref() <= Some(&start) {
+            Self::none()
+        } else {
+            Self {
+                segments: SmallVec::one((start, end)),
+            }
         }
     }
 }
@@ -260,6 +286,24 @@ impl<V: Version> Range<V> {
     pub fn lowest_version(&self) -> Option<V> {
         self.segments.first().map(|(start, _)| start).cloned()
     }
+
+    /// Convert to something that can be used with
+    /// [BTreeMap::range](std::collections::BTreeMap::range).
+    /// All versions contained in self, will be in the output,
+    /// but there may be versions in the output that are not contained in self.
+    /// Returns None if the range is empty.
+    pub fn bounding_range(&self) -> Option<(Bound<&V>, Bound<&V>)> {
+        self.segments.first().map(|(start, _)| {
+            let end = {
+                self.segments
+                    .last()
+                    .and_then(|(_, l)| l.as_ref())
+                    .map(Bound::Excluded)
+                    .unwrap_or(Bound::Unbounded)
+            };
+            (Bound::Included(start), end)
+        })
+    }
 }
 
 // REPORT ######################################################################
@@ -404,6 +448,26 @@ pub mod tests {
         #[test]
         fn contains_intersection(range in strategy(), version in version_strat()) {
             assert_eq!(range.contains(&version), range.intersection(&Range::exact(version)) != Range::none());
+        }
+
+        #[test]
+        fn contains_bounding_range(range in strategy(), version in version_strat()) {
+            if range.contains(&version) {
+                assert!(range.bounding_range().map(|b| b.contains(&version)).unwrap_or(false));
+            }
+        }
+
+        #[test]
+        fn from_range_bounds(range in any::<(Bound<u32>, Bound<u32>)>(), version in version_strat()) {
+            let rv: Range<NumberVersion> = Range::from_range_bounds(range);
+            assert_eq!(range.contains(&version.0), rv.contains(&version));
+        }
+
+        #[test]
+        fn from_range_bounds_round_trip(range in any::<(Bound<u32>, Bound<u32>)>()) {
+            let rv: Range<NumberVersion> = Range::from_range_bounds(range);
+            let rv2: Range<NumberVersion> = rv.bounding_range().map(Range::from_range_bounds::<_, NumberVersion>).unwrap_or_else(Range::none);
+            assert_eq!(rv, rv2);
         }
     }
 }

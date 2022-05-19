@@ -13,15 +13,15 @@ fn main() {
     // root 1.0.0 depends on foo ^1.0.0
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
-        [("foo", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("foo", Range::from_range_bounds((1, 0, 0)..(2, 0, 0)))],
     );
     #[rustfmt::skip]
     // foo 1.0.0 depends on a ^1.0.0 and b ^1.0.0
         dependency_provider.add_dependencies(
         "foo", (1, 0, 0),
         [
-            ("a", Range::between((1, 0, 0), (2, 0, 0))),
-            ("b", Range::between((1, 0, 0), (2, 0, 0))),
+            ("a", Range::from_range_bounds((1, 0, 0)..(2, 0, 0))),
+            ("b", Range::from_range_bounds((1, 0, 0)..(2, 0, 0))),
         ],
     );
     #[rustfmt::skip]
@@ -29,15 +29,15 @@ fn main() {
         dependency_provider.add_dependencies(
         "foo", (1, 1, 0),
         [
-            ("x", Range::between((1, 0, 0), (2, 0, 0))),
-            ("y", Range::between((1, 0, 0), (2, 0, 0))),
+            ("x", Range::from_range_bounds((1, 0, 0)..(2, 0, 0))),
+            ("y", Range::from_range_bounds((1, 0, 0)..(2, 0, 0))),
         ],
     );
     #[rustfmt::skip]
     // a 1.0.0 depends on b ^2.0.0
         dependency_provider.add_dependencies(
         "a", (1, 0, 0),
-        [("b", Range::between((2, 0, 0), (3, 0, 0)))],
+        [("b", Range::from_range_bounds((2, 0, 0)..(3, 0, 0)))],
     );
     // b 1.0.0 and 2.0.0 have no dependencies.
     dependency_provider.add_dependencies("b", (1, 0, 0), []);
@@ -46,7 +46,7 @@ fn main() {
     // x 1.0.0 depends on y ^2.0.0.
         dependency_provider.add_dependencies(
         "x", (1, 0, 0),
-        [("y", Range::between((2, 0, 0), (3, 0, 0)))],
+        [("y", Range::from_range_bounds((2, 0, 0)..(3, 0, 0)))],
     );
     // y 1.0.0 and 2.0.0 have no dependencies.
     dependency_provider.add_dependencies("y", (1, 0, 0), []);
