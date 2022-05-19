@@ -25,22 +25,22 @@ fn main() {
 
     // Dependencies of the menu lib.
     dependency_provider.add_dependencies("menu", (1, 0, 0), [
-        ("dropdown", Range::strictly_lower_than((2, 0, 0))),
+        ("dropdown", Range::from_range_bounds(..(2, 0, 0))),
     ]);
     dependency_provider.add_dependencies("menu", (1, 1, 0), [
-        ("dropdown", Range::higher_than((2, 0, 0))),
+        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
     ]);
     dependency_provider.add_dependencies("menu", (1, 2, 0), [
-        ("dropdown", Range::higher_than((2, 0, 0))),
+        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
     ]);
     dependency_provider.add_dependencies("menu", (1, 3, 0), [
-        ("dropdown", Range::higher_than((2, 0, 0))),
+        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
     ]);
     dependency_provider.add_dependencies("menu", (1, 4, 0), [
-        ("dropdown", Range::higher_than((2, 0, 0))),
+        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
     ]);
     dependency_provider.add_dependencies("menu", (1, 5, 0), [
-        ("dropdown", Range::higher_than((2, 0, 0))),
+        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
     ]);
 
     // Dependencies of the dropdown lib.
