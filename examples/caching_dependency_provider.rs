@@ -54,7 +54,7 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
                         cache.add_dependencies(
                             package.clone(),
                             version.clone(),
-                            dependencies.clone().into_iter(),
+                            dependencies.clone(),
                         );
                         Ok(Dependencies::Known(dependencies))
                     }

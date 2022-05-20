@@ -114,6 +114,10 @@ impl<P: Package, VS: VersionSet> State<P, VS> {
                     // If the partial solution satisfies the incompatibility
                     // we must perform conflict resolution.
                     Relation::Satisfied => {
+                        log::info!(
+                            "Start conflict resolution because incompat satisfied:\n   {}",
+                            current_incompat
+                        );
                         conflict_id = Some(incompat_id);
                         break;
                     }
@@ -182,6 +186,7 @@ impl<P: Package, VS: VersionSet> State<P, VS> {
                             current_incompat_changed,
                             previous_satisfier_level,
                         );
+                        log::info!("backtrack to {:?}", previous_satisfier_level);
                         return Ok((package, current_incompat_id));
                     }
                     SameDecisionLevels { satisfier_cause } => {
@@ -191,6 +196,7 @@ impl<P: Package, VS: VersionSet> State<P, VS> {
                             &package,
                             &self.incompatibility_store,
                         );
+                        log::info!("prior cause: {}", prior_cause);
                         current_incompat_id = self.incompatibility_store.alloc(prior_cause);
                         current_incompat_changed = true;
                     }
