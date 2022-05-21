@@ -15,12 +15,12 @@
 //!  - [between(v1, v2)](Range::between): the set defined by `v1 <= versions < v2`
 
 use crate::{internal::small_vec::SmallVec, version_set::VersionSet};
+use std::ops::RangeBounds;
 use std::{
     cmp::Ordering,
     fmt::{Debug, Display, Formatter},
     ops::Bound::{self, Excluded, Included, Unbounded},
 };
-use std::ops::RangeBounds;
 
 /// A Range represents multiple intervals of a continuous range of monotone increasing
 /// values.
@@ -194,38 +194,38 @@ impl<V: Ord> Range<V> {
 
     /// Construct a simple range from anything that impls [RangeBounds] like `v1..v2`.
     pub fn from_range_bounds<R, IV>(bounds: R) -> Self
-        where
-            R: RangeBounds<IV>,
-            IV: Clone + Into<V>
+    where
+        R: RangeBounds<IV>,
+        IV: Clone + Into<V>,
     {
         let start = match bounds.start_bound() {
             Included(v) => Included(v.clone().into()),
             Excluded(v) => Excluded(v.clone().into()),
-            Unbounded => Unbounded
+            Unbounded => Unbounded,
         };
         let end = match bounds.end_bound() {
             Included(v) => Included(v.clone().into()),
             Excluded(v) => Excluded(v.clone().into()),
-            Unbounded => Unbounded
+            Unbounded => Unbounded,
         };
         match (start, end) {
             (Included(a), Included(b)) if b < a => Self::none(),
             (Excluded(a), Excluded(b)) if b < a => Self::none(),
             (Included(a), Excluded(b)) if b <= a => Self::none(),
             (Excluded(a), Included(b)) if b <= a => Self::none(),
-            (a,b) => Self {
-                segments: SmallVec::one((a,b))
-            }
+            (a, b) => Self {
+                segments: SmallVec::one((a, b)),
+            },
         }
     }
 }
 
-/// Implementation of [`Bounds::as_ref`] which is currently marked as unstable.
+/// Implementation of [`Bound::as_ref`] which is currently marked as unstable.
 fn bounds_as_ref<V>(bounds: &Bound<V>) -> Bound<&V> {
     match bounds {
         Included(v) => Included(v),
         Excluded(v) => Excluded(v),
-        Unbounded => Unbounded
+        Unbounded => Unbounded,
     }
 }
 
