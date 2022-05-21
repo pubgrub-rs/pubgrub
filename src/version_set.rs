@@ -14,7 +14,7 @@
 //!
 //! It is also extremely important that the `Eq` trait is correctly implemented.
 //! In particular, you can only use `#[derive(Eq, PartialEq)]` if `Eq` is strictly equivalent to the
-//! structural equality, i.e. if versions have canonical representations.
+//! structural equality, i.e. if version sets have canonical representations.
 //! Such problems may arise if your implementations of `complement()` and `intersection()` do not
 //! return canonical representations so be careful there.
 
