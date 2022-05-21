@@ -48,17 +48,17 @@
 //! ```
 //! # use pubgrub::solver::{OfflineDependencyProvider, resolve};
 //! # use pubgrub::version::NumberVersion;
-//! # use pubgrub::range::Range;
+//! # use pubgrub::bounded_range::BoundedRange;
 //!
-//! type NumVS = Range<NumberVersion>;
+//! type NumVS = BoundedRange<NumberVersion>;
 //!
 //! let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //!
 //! dependency_provider.add_dependencies(
-//!     "root", 1, [("menu", Range::any()), ("icons", Range::any())],
+//!     "root", 1, [("menu", BoundedRange::any()), ("icons", BoundedRange::any())],
 //! );
-//! dependency_provider.add_dependencies("menu", 1, [("dropdown", Range::any())]);
-//! dependency_provider.add_dependencies("dropdown", 1, [("icons", Range::any())]);
+//! dependency_provider.add_dependencies("menu", 1, [("dropdown", BoundedRange::any())]);
+//! dependency_provider.add_dependencies("dropdown", 1, [("icons", BoundedRange::any())]);
 //! dependency_provider.add_dependencies("icons", 1, []);
 //!
 //! // Run the algorithm.
@@ -79,14 +79,14 @@
 //! ```
 //! # use pubgrub::solver::{DependencyProvider, Dependencies};
 //! # use pubgrub::version::SemanticVersion;
-//! # use pubgrub::range::Range;
+//! # use pubgrub::bounded_range::BoundedRange;
 //! # use pubgrub::type_aliases::Map;
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
 //! #
 //! # struct MyDependencyProvider;
 //! #
-//! type SemVS = Range<SemanticVersion>;
+//! type SemVS = BoundedRange<SemanticVersion>;
 //!
 //! impl DependencyProvider<String, SemVS> for MyDependencyProvider {
 //!     fn choose_package_version<T: Borrow<String>, U: Borrow<SemVS>>(&self,packages: impl Iterator<Item=(T, U)>) -> Result<(T, Option<SemanticVersion>), Box<dyn Error>> {
@@ -177,9 +177,9 @@
 //! # use pubgrub::report::{DefaultStringReporter, Reporter};
 //! # use pubgrub::error::PubGrubError;
 //! # use pubgrub::version::NumberVersion;
-//! # use pubgrub::range::Range;
+//! # use pubgrub::bounded_range::BoundedRange;
 //! #
-//! # type NumVS = Range<NumberVersion>;
+//! # type NumVS = BoundedRange<NumberVersion>;
 //! #
 //! # let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! # let root_package = "root";
@@ -216,9 +216,10 @@
 #![allow(clippy::rc_buffer)]
 #![warn(missing_docs)]
 
+pub mod bounded_range;
+pub mod discrete_range;
 pub mod error;
 pub mod package;
-pub mod range;
 pub mod report;
 pub mod solver;
 pub mod term;

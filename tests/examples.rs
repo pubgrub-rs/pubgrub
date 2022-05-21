@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::range::Range;
+use pubgrub::bounded_range::BoundedRange;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::type_aliases::Map;
 use pubgrub::version::{NumberVersion, SemanticVersion};
 
-type NumVS = Range<NumberVersion>;
-type SemVS = Range<SemanticVersion>;
+type NumVS = BoundedRange<NumberVersion>;
+type SemVS = BoundedRange<SemanticVersion>;
 
 use log::LevelFilter;
 use std::io::Write;
@@ -26,13 +26,13 @@ fn no_conflict() {
     let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
-        "root", (1, 0, 0),
-        [("foo", Range::between((1, 0, 0), (2, 0, 0)))],
+            "root", (1, 0, 0),
+            [("foo", BoundedRange::between((1, 0, 0), (2, 0, 0)))],
     );
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
-        "foo", (1, 0, 0),
-        [("bar", Range::between((1, 0, 0), (2, 0, 0)))],
+            "foo", (1, 0, 0),
+            [("bar", BoundedRange::between((1, 0, 0), (2, 0, 0)))],
     );
     dependency_provider.add_dependencies("bar", (1, 0, 0), []);
     dependency_provider.add_dependencies("bar", (2, 0, 0), []);
@@ -59,14 +59,14 @@ fn avoiding_conflict_during_decision_making() {
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
         [
-            ("foo", Range::between((1, 0, 0), (2, 0, 0))),
-            ("bar", Range::between((1, 0, 0), (2, 0, 0))),
+            ("foo", BoundedRange::between((1, 0, 0), (2, 0, 0))),
+            ("bar", BoundedRange::between((1, 0, 0), (2, 0, 0))),
         ],
     );
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
-        "foo", (1, 1, 0),
-        [("bar", Range::between((2, 0, 0), (3, 0, 0)))],
+            "foo", (1, 1, 0),
+            [("bar", BoundedRange::between((2, 0, 0), (3, 0, 0)))],
     );
     dependency_provider.add_dependencies("foo", (1, 0, 0), []);
     dependency_provider.add_dependencies("bar", (1, 0, 0), []);
@@ -93,19 +93,19 @@ fn conflict_resolution() {
     let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
-        "root", (1, 0, 0),
-        [("foo", Range::higher_than((1, 0, 0)))],
+            "root", (1, 0, 0),
+            [("foo", BoundedRange::higher_than((1, 0, 0)))],
     );
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
-        "foo", (2, 0, 0),
-        [("bar", Range::between((1, 0, 0), (2, 0, 0)))],
+            "foo", (2, 0, 0),
+            [("bar", BoundedRange::between((1, 0, 0), (2, 0, 0)))],
     );
     dependency_provider.add_dependencies("foo", (1, 0, 0), []);
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
-        "bar", (1, 0, 0),
-        [("foo", Range::between((1, 0, 0), (2, 0, 0)))],
+            "bar", (1, 0, 0),
+            [("foo", BoundedRange::between((1, 0, 0), (2, 0, 0)))],
     );
 
     // Run the algorithm.
@@ -130,8 +130,8 @@ fn conflict_with_partial_satisfier() {
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
         [
-            ("foo", Range::between((1, 0, 0), (2, 0, 0))),
-            ("target", Range::between((2, 0, 0), (3, 0, 0))),
+            ("foo", BoundedRange::between((1, 0, 0), (2, 0, 0))),
+            ("target", BoundedRange::between((2, 0, 0), (3, 0, 0))),
         ],
     );
     #[rustfmt::skip]
@@ -139,29 +139,29 @@ fn conflict_with_partial_satisfier() {
         dependency_provider.add_dependencies(
         "foo", (1, 1, 0),
         [
-            ("left", Range::between((1, 0, 0), (2, 0, 0))),
-            ("right", Range::between((1, 0, 0), (2, 0, 0))),
+            ("left", BoundedRange::between((1, 0, 0), (2, 0, 0))),
+            ("right", BoundedRange::between((1, 0, 0), (2, 0, 0))),
         ],
     );
     dependency_provider.add_dependencies("foo", (1, 0, 0), []);
     #[rustfmt::skip]
     // left 1.0.0 depends on shared >=1.0.0
         dependency_provider.add_dependencies(
-        "left", (1, 0, 0),
-        [("shared", Range::higher_than((1, 0, 0)))],
+            "left", (1, 0, 0),
+            [("shared", BoundedRange::higher_than((1, 0, 0)))],
     );
     #[rustfmt::skip]
     // right 1.0.0 depends on shared <2.0.0
         dependency_provider.add_dependencies(
-        "right", (1, 0, 0),
-        [("shared", Range::strictly_lower_than((2, 0, 0)))],
+            "right", (1, 0, 0),
+            [("shared", BoundedRange::strictly_lower_than((2, 0, 0)))],
     );
     dependency_provider.add_dependencies("shared", (2, 0, 0), []);
     #[rustfmt::skip]
     // shared 1.0.0 depends on target ^1.0.0
         dependency_provider.add_dependencies(
-        "shared", (1, 0, 0),
-        [("target", Range::between((1, 0, 0), (2, 0, 0)))],
+            "shared", (1, 0, 0),
+            [("target", BoundedRange::between((1, 0, 0), (2, 0, 0)))],
     );
     dependency_provider.add_dependencies("target", (2, 0, 0), []);
     dependency_provider.add_dependencies("target", (1, 0, 0), []);
@@ -191,11 +191,15 @@ fn conflict_with_partial_satisfier() {
 fn double_choices() {
     init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
-    dependency_provider.add_dependencies("a", 0, [("b", Range::any()), ("c", Range::any())]);
-    dependency_provider.add_dependencies("b", 0, [("d", Range::exact(0))]);
-    dependency_provider.add_dependencies("b", 1, [("d", Range::exact(1))]);
+    dependency_provider.add_dependencies(
+        "a",
+        0,
+        [("b", BoundedRange::any()), ("c", BoundedRange::any())],
+    );
+    dependency_provider.add_dependencies("b", 0, [("d", BoundedRange::exact(0))]);
+    dependency_provider.add_dependencies("b", 1, [("d", BoundedRange::exact(1))]);
     dependency_provider.add_dependencies("c", 0, []);
-    dependency_provider.add_dependencies("c", 1, [("d", Range::exact(2))]);
+    dependency_provider.add_dependencies("c", 1, [("d", BoundedRange::exact(2))]);
     dependency_provider.add_dependencies("d", 0, []);
 
     // Solution.

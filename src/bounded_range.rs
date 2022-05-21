@@ -27,13 +27,13 @@ use std::{
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct Range<V> {
+pub struct BoundedRange<V> {
     segments: SmallVec<Interval<V>>,
 }
 
 type Interval<V> = (Bound<V>, Bound<V>);
 
-impl<V> Range<V> {
+impl<V> BoundedRange<V> {
     /// Empty set of versions.
     pub fn none() -> Self {
         Self {
@@ -84,7 +84,7 @@ impl<V> Range<V> {
     }
 }
 
-impl<V: Clone> Range<V> {
+impl<V: Clone> BoundedRange<V> {
     /// Set containing exactly one version
     pub fn exact(v: impl Into<V>) -> Self {
         let v = v.into();
@@ -171,7 +171,7 @@ impl<V: Clone> Range<V> {
     }
 }
 
-impl<V: Ord> Range<V> {
+impl<V: Ord> BoundedRange<V> {
     /// Returns true if the this Range contains the specified value.
     pub fn contains(&self, v: &V) -> bool {
         for segment in self.segments.iter() {
@@ -229,7 +229,7 @@ fn bounds_as_ref<V>(bounds: &Bound<V>) -> Bound<&V> {
     }
 }
 
-impl<V: Ord + Clone> Range<V> {
+impl<V: Ord + Clone> BoundedRange<V> {
     /// Computes the union of two sets of versions.
     pub fn union(&self, other: &Self) -> Self {
         self.negate().intersection(&other.negate()).negate()
@@ -366,41 +366,41 @@ impl<V: Ord + Clone> Range<V> {
     }
 }
 
-impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
+impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for BoundedRange<T> {
     type V = T;
 
     fn empty() -> Self {
-        Range::none()
+        BoundedRange::none()
     }
 
     fn singleton(v: Self::V) -> Self {
-        Range::exact(v)
+        BoundedRange::exact(v)
     }
 
     fn complement(&self) -> Self {
-        Range::negate(self)
+        BoundedRange::negate(self)
     }
 
     fn intersection(&self, other: &Self) -> Self {
-        Range::intersection(self, other)
+        BoundedRange::intersection(self, other)
     }
 
     fn contains(&self, v: &Self::V) -> bool {
-        Range::contains(self, v)
+        BoundedRange::contains(self, v)
     }
 
     fn full() -> Self {
-        Range::any()
+        BoundedRange::any()
     }
 
     fn union(&self, other: &Self) -> Self {
-        Range::union(self, other)
+        BoundedRange::union(self, other)
     }
 }
 
 // REPORT ######################################################################
 
-impl<V: Display + Eq> Display for Range<V> {
+impl<V: Display + Eq> Display for BoundedRange<V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.segments.is_empty() {
             write!(f, "∅")?;
@@ -441,7 +441,7 @@ pub mod tests {
 
     use super::*;
 
-    pub fn strategy() -> impl Strategy<Value = Range<u32>> {
+    pub fn strategy() -> impl Strategy<Value = BoundedRange<u32>> {
         prop::collection::vec(any::<u32>(), 0..10)
             .prop_map(|mut vec| {
                 vec.sort_unstable();
@@ -486,7 +486,7 @@ pub mod tests {
                         segments.push((start, end));
                     }
                 }
-                return Range { segments };
+                return BoundedRange { segments };
             })
     }
 
@@ -522,12 +522,12 @@ pub mod tests {
 
         #[test]
         fn intersection_with_any_is_identity(range in strategy()) {
-            assert_eq!(Range::any().intersection(&range), range);
+            assert_eq!(BoundedRange::any().intersection(&range), range);
         }
 
         #[test]
         fn intersection_with_none_is_none(range in strategy()) {
-            assert_eq!(Range::none().intersection(&range), Range::none());
+            assert_eq!(BoundedRange::none().intersection(&range), BoundedRange::none());
         }
 
         #[test]
@@ -542,7 +542,7 @@ pub mod tests {
 
         #[test]
         fn intesection_of_complements_is_none(range in strategy()) {
-            assert_eq!(range.negate().intersection(&range), Range::none());
+            assert_eq!(range.negate().intersection(&range), BoundedRange::none());
         }
 
         #[test]
@@ -554,7 +554,7 @@ pub mod tests {
 
         #[test]
         fn union_of_complements_is_any(range in strategy()) {
-            assert_eq!(range.negate().union(&range), Range::any());
+            assert_eq!(range.negate().union(&range), BoundedRange::any());
         }
 
         #[test]
@@ -566,7 +566,7 @@ pub mod tests {
 
         #[test]
         fn always_contains_exact(version in version_strat()) {
-            assert!(Range::exact(version).contains(&version));
+            assert!(BoundedRange::exact(version).contains(&version));
         }
 
         #[test]
@@ -576,7 +576,7 @@ pub mod tests {
 
         #[test]
         fn contains_intersection(range in strategy(), version in version_strat()) {
-            assert_eq!(range.contains(&version), range.intersection(&Range::exact(version)) != Range::none());
+            assert_eq!(range.contains(&version), range.intersection(&BoundedRange::exact(version)) != BoundedRange::none());
         }
 
         #[test]
@@ -588,14 +588,14 @@ pub mod tests {
 
         #[test]
         fn from_range_bounds(range in any::<(Bound<u32>, Bound<u32>)>(), version in version_strat()) {
-            let rv: Range<u32> = Range::from_range_bounds(range);
+            let rv: BoundedRange<u32> = BoundedRange::from_range_bounds(range);
             assert_eq!(range.contains(&version), rv.contains(&version));
         }
 
         #[test]
         fn from_range_bounds_round_trip(range in any::<(Bound<u32>, Bound<u32>)>()) {
-            let rv: Range<u32> = Range::from_range_bounds(range);
-            let rv2: Range<u32> = rv.bounding_range().map(Range::from_range_bounds::<_, u32>).unwrap_or_else(Range::none);
+            let rv: BoundedRange<u32> = BoundedRange::from_range_bounds(range);
+            let rv2: BoundedRange<u32> = rv.bounding_range().map(BoundedRange::from_range_bounds::<_, u32>).unwrap_or_else(BoundedRange::none);
             assert_eq!(rv, rv2);
         }
     }

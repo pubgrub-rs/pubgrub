@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use pubgrub::bounded_range::BoundedRange;
 use pubgrub::error::PubGrubError;
-use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, Reporter};
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::SemanticVersion;
 
-type SemVS = Range<SemanticVersion>;
+type SemVS = BoundedRange<SemanticVersion>;
 
 // https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting
 fn main() {
@@ -16,21 +16,21 @@ fn main() {
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
         [
-            ("foo", Range::from_range_bounds((1, 0, 0)..(2, 0, 0))),
-            ("baz", Range::from_range_bounds((1, 0, 0)..(2, 0, 0))),
+            ("foo", BoundedRange::from_range_bounds((1, 0, 0)..(2, 0, 0))),
+            ("baz", BoundedRange::from_range_bounds((1, 0, 0)..(2, 0, 0))),
         ],
     );
     #[rustfmt::skip]
     // foo 1.0.0 depends on bar ^2.0.0
         dependency_provider.add_dependencies(
-        "foo", (1, 0, 0),
-        [("bar", Range::from_range_bounds((2, 0, 0)..(3, 0, 0)))],
+            "foo", (1, 0, 0),
+            [("bar", BoundedRange::from_range_bounds((2, 0, 0)..(3, 0, 0)))],
     );
     #[rustfmt::skip]
     // bar 2.0.0 depends on baz ^3.0.0
         dependency_provider.add_dependencies(
-        "bar", (2, 0, 0),
-        [("baz", Range::from_range_bounds((3, 0, 0)..(4, 0, 0)))],
+            "bar", (2, 0, 0),
+            [("baz", BoundedRange::from_range_bounds((3, 0, 0)..(4, 0, 0)))],
     );
     // baz 1.0.0 and 3.0.0 have no dependencies
     dependency_provider.add_dependencies("baz", (1, 0, 0), []);

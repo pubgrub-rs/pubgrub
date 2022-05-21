@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use pubgrub::bounded_range::BoundedRange;
 use pubgrub::error::PubGrubError;
-use pubgrub::range::Range;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::NumberVersion;
 
-type NumVS = Range<NumberVersion>;
+type NumVS = BoundedRange<NumberVersion>;
 
 #[test]
 fn same_result_on_repeated_runs() {
@@ -14,9 +14,13 @@ fn same_result_on_repeated_runs() {
     dependency_provider.add_dependencies("c", 0, []);
     dependency_provider.add_dependencies("c", 2, []);
     dependency_provider.add_dependencies("b", 0, []);
-    dependency_provider.add_dependencies("b", 1, [("c", Range::between(0, 1))]);
+    dependency_provider.add_dependencies("b", 1, [("c", BoundedRange::between(0, 1))]);
 
-    dependency_provider.add_dependencies("a", 0, [("b", Range::any()), ("c", Range::any())]);
+    dependency_provider.add_dependencies(
+        "a",
+        0,
+        [("b", BoundedRange::any()), ("c", BoundedRange::any())],
+    );
 
     let name = "a";
     let ver = NumberVersion(0);
@@ -32,13 +36,13 @@ fn same_result_on_repeated_runs() {
 #[test]
 fn should_always_find_a_satisfier() {
     let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
-    dependency_provider.add_dependencies("a", 0, [("b", Range::none())]);
+    dependency_provider.add_dependencies("a", 0, [("b", BoundedRange::none())]);
     assert!(matches!(
         resolve(&dependency_provider, "a", 0),
         Err(PubGrubError::DependencyOnTheEmptySet { .. })
     ));
 
-    dependency_provider.add_dependencies("c", 0, [("a", Range::any())]);
+    dependency_provider.add_dependencies("c", 0, [("a", BoundedRange::any())]);
     assert!(matches!(
         resolve(&dependency_provider, "c", 0),
         Err(PubGrubError::DependencyOnTheEmptySet { .. })
@@ -48,7 +52,7 @@ fn should_always_find_a_satisfier() {
 #[test]
 fn cannot_depend_on_self() {
     let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
-    dependency_provider.add_dependencies("a", 0, [("a", Range::any())]);
+    dependency_provider.add_dependencies("a", 0, [("a", BoundedRange::any())]);
     assert!(matches!(
         resolve(&dependency_provider, "a", 0),
         Err(PubGrubError::SelfDependency { .. })

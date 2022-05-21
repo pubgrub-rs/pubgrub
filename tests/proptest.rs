@@ -4,7 +4,6 @@ use std::{collections::BTreeSet as Set, error::Error};
 
 use pubgrub::error::PubGrubError;
 use pubgrub::package::Package;
-use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, Reporter};
 use pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies, DependencyProvider,
@@ -90,14 +89,16 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
     }
 }
 
-type NumVS = Range<NumberVersion>;
-type SemVS = Range<SemanticVersion>;
+// type NumVS = pubgrub::discrete_range::DiscreteRange<NumberVersion>;
+// type SemVS = pubgrub::discrete_range::DiscreteRange<SemanticVersion>;
+type NumVS = pubgrub::bounded_range::BoundedRange<NumberVersion>;
+type SemVS = pubgrub::bounded_range::BoundedRange<SemanticVersion>;
 
 #[test]
 #[should_panic]
 fn should_cancel_can_panic() {
     let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
-    dependency_provider.add_dependencies(0, 0, [(666, Range::any())]);
+    dependency_provider.add_dependencies(0, 0, [(666, NumVS::any())]);
 
     // Run the algorithm.
     let _ = resolve(
@@ -197,15 +198,15 @@ pub fn registry_strategy<N: Package + Ord>(
                         deps.push((
                             dep_name,
                             if c == 0 && d == s_last_index {
-                                Range::any()
+                                NumVS::any()
                             } else if c == 0 {
-                                Range::strictly_lower_than(s[d].0 + 1)
+                                NumVS::strictly_lower_than(s[d].0 + 1)
                             } else if d == s_last_index {
-                                Range::higher_than(s[c].0)
+                                NumVS::higher_than(s[c].0)
                             } else if c == d {
-                                Range::exact(s[c].0)
+                                NumVS::exact(s[c].0)
                             } else {
-                                Range::between(s[c].0, s[d].0 + 1)
+                                NumVS::between(s[c].0, s[d].0 + 1)
                             },
                         ))
                     }
@@ -227,7 +228,7 @@ pub fn registry_strategy<N: Package + Ord>(
                     dependency_provider.add_dependencies(
                         name,
                         ver,
-                        deps.unwrap_or_else(|| vec![(bad_name.clone(), Range::any())]),
+                        deps.unwrap_or_else(|| vec![(bad_name.clone(), NumVS::any())]),
                     );
                 }
 
@@ -488,8 +489,21 @@ fn large_case() {
         let name = case.file_name().unwrap().to_string_lossy();
         eprintln!("{}", name);
         let data = std::fs::read_to_string(&case).unwrap();
-        if name.ends_with("u16_NumberVersion.ron") {
-            let dependency_provider: OfflineDependencyProvider<u16, NumVS> =
+        if name.ends_with("u16_discrete_NumberVersion.ron") {
+            let dependency_provider: OfflineDependencyProvider<u16, DiscreteRange<NumberVersion>> =
+                ron::de::from_str(&data).unwrap();
+            let mut sat = SatResolve::new(&dependency_provider);
+            for p in dependency_provider.packages() {
+                for n in dependency_provider.versions(p).unwrap() {
+                    if let Ok(s) = resolve(&dependency_provider, p.clone(), n.clone()) {
+                        assert!(sat.sat_is_valid_solution(&s));
+                    } else {
+                        assert!(!sat.sat_resolve(p, &n));
+                    }
+                }
+            }
+        } else if name.ends_with("u16_bounded_NumberVersion.ron") {
+            let dependency_provider: OfflineDependencyProvider<u16, BoundedRange<NumberVersion>> =
                 ron::de::from_str(&data).unwrap();
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {

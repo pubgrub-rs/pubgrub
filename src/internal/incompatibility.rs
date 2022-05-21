@@ -257,7 +257,7 @@ impl<P: Package, VS: VersionSet> fmt::Display for Incompatibility<P, VS> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::range::Range;
+    use crate::bounded_range::BoundedRange;
     use crate::term::tests::strategy as term_strat;
     use crate::type_aliases::Map;
     use proptest::prelude::*;
@@ -276,12 +276,12 @@ pub mod tests {
             let mut store = Arena::new();
             let i1 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([("p1", t1.clone()), ("p2", t2.negate())]),
-                kind: Kind::UnavailableDependencies("0", Range::any())
+                kind: Kind::UnavailableDependencies("0", BoundedRange::any())
             });
 
             let i2 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([("p2", t2), ("p3", t3.clone())]),
-                kind: Kind::UnavailableDependencies("0", Range::any())
+                kind: Kind::UnavailableDependencies("0", BoundedRange::any())
             });
 
             let mut i3 = Map::default();

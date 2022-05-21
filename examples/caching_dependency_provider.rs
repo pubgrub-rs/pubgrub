@@ -3,13 +3,13 @@
 use std::cell::RefCell;
 use std::error::Error;
 
+use pubgrub::bounded_range::BoundedRange;
 use pubgrub::package::Package;
-use pubgrub::range::Range;
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
 use pubgrub::version::NumberVersion;
 use pubgrub::version_set::VersionSet;
 
-type NumVS = Range<NumberVersion>;
+type NumVS = BoundedRange<NumberVersion>;
 
 // An example implementing caching dependency provider that will
 // store queried dependencies in memory and check them before querying more from remote.
