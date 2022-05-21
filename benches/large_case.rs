@@ -4,16 +4,21 @@ use std::time::Duration;
 extern crate criterion;
 use self::criterion::*;
 
+use pubgrub::bounded_range::BoundedRange;
+use pubgrub::discrete_range::DiscreteRange;
 use pubgrub::package::Package;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::{NumberVersion, SemanticVersion, Version};
+use pubgrub::version_set::VersionSet;
 use serde::de::Deserialize;
 use std::hash::Hash;
 
-fn bench<'a, P: Package + Deserialize<'a>, V: Version + Hash + Deserialize<'a>>(
+fn bench<'a, P: Package + Deserialize<'a>, V: VersionSet + Deserialize<'a>>(
     b: &mut Bencher,
     case: &'a str,
-) {
+) where
+    <V as VersionSet>::V: Deserialize<'a>,
+{
     let dependency_provider: OfflineDependencyProvider<P, V> = ron::de::from_str(&case).unwrap();
 
     b.iter(|| {
@@ -33,13 +38,17 @@ fn bench_nested(c: &mut Criterion) {
         let case = case.unwrap().path();
         let name = case.file_name().unwrap().to_string_lossy();
         let data = std::fs::read_to_string(&case).unwrap();
-        if name.ends_with("u16_NumberVersion.ron") {
+        if name.ends_with("u16_discrete_NumberVersion.ron") {
             group.bench_function(name, |b| {
-                bench::<u16, NumberVersion>(b, &data);
+                bench::<u16, DiscreteRange<NumberVersion>>(b, &data);
+            });
+        } else if name.ends_with("u16_bounded_NumberVersion.ron") {
+            group.bench_function(name, |b| {
+                bench::<u16, BoundedRange<NumberVersion>>(b, &data);
             });
         } else if name.ends_with("str_SemanticVersion.ron") {
             group.bench_function(name, |b| {
-                bench::<&str, SemanticVersion>(b, &data);
+                bench::<&str, DiscreteRange<SemanticVersion>>(b, &data);
             });
         }
     }
