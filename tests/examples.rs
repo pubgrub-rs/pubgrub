@@ -5,6 +5,9 @@ use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::type_aliases::Map;
 use pubgrub::version::{NumberVersion, SemanticVersion};
 
+type NumVS = Range<NumberVersion>;
+type SemVS = Range<SemanticVersion>;
+
 use log::LevelFilter;
 use std::io::Write;
 
@@ -20,7 +23,7 @@ fn init_log() {
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#no-conflicts
 fn no_conflict() {
     init_log();
-    let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
@@ -51,7 +54,7 @@ fn no_conflict() {
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#avoiding-conflict-during-decision-making
 fn avoiding_conflict_during_decision_making() {
     init_log();
-    let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
@@ -87,7 +90,7 @@ fn avoiding_conflict_during_decision_making() {
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#performing-conflict-resolution
 fn conflict_resolution() {
     init_log();
-    let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
@@ -121,7 +124,7 @@ fn conflict_resolution() {
 /// https://github.com/dart-lang/pub/blob/master/doc/solver.md#conflict-resolution-with-a-partial-satisfier
 fn conflict_with_partial_satisfier() {
     init_log();
-    let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     #[rustfmt::skip]
     // root 1.0.0 depends on foo ^1.0.0 and target ^2.0.0
         dependency_provider.add_dependencies(
@@ -187,7 +190,7 @@ fn conflict_with_partial_satisfier() {
 /// Solution: a0, b0, c0, d0
 fn double_choices() {
     init_log();
-    let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
     dependency_provider.add_dependencies("a", 0, [("b", Range::any()), ("c", Range::any())]);
     dependency_provider.add_dependencies("b", 0, [("d", Range::exact(0))]);
     dependency_provider.add_dependencies("b", 1, [("d", Range::exact(1))]);

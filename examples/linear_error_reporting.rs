@@ -6,9 +6,11 @@ use pubgrub::report::{DefaultStringReporter, Reporter};
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::SemanticVersion;
 
+type SemVS = Range<SemanticVersion>;
+
 // https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting
 fn main() {
-    let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     #[rustfmt::skip]
     // root 1.0.0 depends on foo ^1.0.0 and baz ^1.0.0
         dependency_provider.add_dependencies(

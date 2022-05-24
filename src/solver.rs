@@ -44,9 +44,12 @@
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
 //! # use pubgrub::version::NumberVersion;
 //! # use pubgrub::error::PubGrubError;
+//! # use pubgrub::range::Range;
 //! #
-//! # fn try_main() -> Result<(), PubGrubError<&'static str, NumberVersion>> {
-//! #     let dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//! # type NumVS = Range<NumberVersion>;
+//! #
+//! # fn try_main() -> Result<(), PubGrubError<&'static str, NumVS>> {
+//! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! #     let package = "root";
 //! #     let version = 1;
 //! let solution = resolve(&dependency_provider, package, version)?;
@@ -73,19 +76,18 @@ use crate::error::PubGrubError;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
-use crate::range::Range;
-use crate::type_aliases::{Map, SelectedDependencies};
-use crate::version::Version;
+use crate::type_aliases::{DependencyConstraints, Map, SelectedDependencies};
+use crate::version_set::VersionSet;
 
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
-pub fn resolve<P: Package, V: Version>(
-    dependency_provider: &impl DependencyProvider<P, V>,
+pub fn resolve<P: Package, VS: VersionSet>(
+    dependency_provider: &impl DependencyProvider<P, VS>,
     package: P,
-    version: impl Into<V>,
-) -> Result<SelectedDependencies<P, V>, PubGrubError<P, V>> {
+    version: impl Into<VS::V>,
+) -> Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS>> {
     let mut state = State::init(package.clone(), version.into());
-    let mut added_dependencies: Map<P, Set<V>> = Map::default();
+    let mut added_dependencies: Map<P, Set<VS::V>> = Map::default();
     let mut next = package;
     loop {
         dependency_provider
@@ -164,7 +166,7 @@ pub fn resolve<P: Package, V: Version>(
                             version: v.clone(),
                         });
                     }
-                    if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
+                    if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&VS::empty()) {
                         return Err(PubGrubError::DependencyOnTheEmptySet {
                             package: p.clone(),
                             version: v.clone(),
@@ -207,31 +209,23 @@ pub fn resolve<P: Package, V: Version>(
 }
 
 /// An enum used by [DependencyProvider] that holds information about package dependencies.
-/// For each [Package] there is a [Range] of concrete versions it allows as a dependency.
+/// For each [Package] there is a set of versions allowed as a dependency.
 #[derive(Clone)]
-pub enum Dependencies<P: Package, V: Version> {
+pub enum Dependencies<P: Package, VS: VersionSet> {
     /// Package dependencies are unavailable.
     Unknown,
     /// Container for all available package versions.
-    Known(DependencyConstraints<P, V>),
+    Known(DependencyConstraints<P, VS>),
 }
-
-/// Subtype of [Dependencies] which holds information about
-/// all possible versions a given package can accept.
-/// There is a difference in semantics between an empty [Map<P, Range<V>>](crate::type_aliases::Map)
-/// inside [DependencyConstraints] and [Dependencies::Unknown]:
-/// the former means the package has no dependencies and it is a known fact,
-/// while the latter means they could not be fetched by [DependencyProvider].
-pub type DependencyConstraints<P, V> = Map<P, Range<V>>;
 
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
 /// An implementor needs to be supplied to the [resolve] function.
-pub trait DependencyProvider<P: Package, V: Version> {
+pub trait DependencyProvider<P: Package, VS: VersionSet> {
     /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
     /// is the process of choosing the next package
     /// and version that will be appended to the partial solution.
     /// Every time such a decision must be made,
-    /// potential valid packages and version ranges are preselected by the resolver,
+    /// potential valid packages and sets of versions are preselected by the resolver,
     /// and the dependency provider must choose.
     ///
     /// The strategy employed to choose such package and version
@@ -252,18 +246,19 @@ pub trait DependencyProvider<P: Package, V: Version> {
     /// of the available versions in preference order for any package.
     ///
     /// Note: the type `T` ensures that this returns an item from the `packages` argument.
-    fn choose_package_version<T: Borrow<P>, U: Borrow<Range<V>>>(
+    #[allow(clippy::type_complexity)]
+    fn choose_package_version<T: Borrow<P>, U: Borrow<VS>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<V>), Box<dyn Error>>;
+    ) -> Result<(T, Option<VS::V>), Box<dyn Error>>;
 
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
     fn get_dependencies(
         &self,
         package: &P,
-        version: &V,
-    ) -> Result<Dependencies<P, V>, Box<dyn Error>>;
+        version: &VS::V,
+    ) -> Result<Dependencies<P, VS>, Box<dyn Error>>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
@@ -282,38 +277,44 @@ pub trait DependencyProvider<P: Package, V: Version> {
 /// The helper finds the package from the `packages` argument with the fewest versions from
 /// `list_available_versions` contained in the constraints. Then takes that package and finds the
 /// first version contained in the constraints.
-pub fn choose_package_with_fewest_versions<P: Package, V: Version, T, U, I, F>(
+pub fn choose_package_with_fewest_versions<P: Package, VS: VersionSet, T, U, I, F>(
     list_available_versions: F,
     potential_packages: impl Iterator<Item = (T, U)>,
-) -> (T, Option<V>)
+) -> (T, Option<VS::V>)
 where
     T: Borrow<P>,
-    U: Borrow<Range<V>>,
-    I: Iterator<Item = V>,
+    U: Borrow<VS>,
+    I: Iterator<Item = VS::V>,
     F: Fn(&P) -> I,
 {
-    let count_valid = |(p, range): &(T, U)| {
+    let count_valid = |(p, set): &(T, U)| {
         list_available_versions(p.borrow())
-            .filter(|v| range.borrow().contains(v.borrow()))
+            .filter(|v| set.borrow().contains(v.borrow()))
             .count()
     };
-    let (pkg, range) = potential_packages
+    let (pkg, set) = potential_packages
         .min_by_key(count_valid)
         .expect("potential_packages gave us an empty iterator");
-    let version =
-        list_available_versions(pkg.borrow()).find(|v| range.borrow().contains(v.borrow()));
+    let version = list_available_versions(pkg.borrow()).find(|v| set.borrow().contains(v.borrow()));
     (pkg, version)
 }
 
 /// A basic implementation of [DependencyProvider].
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "VS::V: serde::Serialize, VS: serde::Serialize, P: serde::Serialize",
+        deserialize = "VS::V: serde::Deserialize<'de>, VS: serde::Deserialize<'de>, P: serde::Deserialize<'de>"
+    ))
+)]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct OfflineDependencyProvider<P: Package, V: Version> {
-    dependencies: Map<P, BTreeMap<V, DependencyConstraints<P, V>>>,
+pub struct OfflineDependencyProvider<P: Package, VS: VersionSet> {
+    dependencies: Map<P, BTreeMap<VS::V, DependencyConstraints<P, VS>>>,
 }
 
-impl<P: Package, V: Version> OfflineDependencyProvider<P, V> {
+impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
     /// Creates an empty OfflineDependencyProvider with no dependencies.
     pub fn new() -> Self {
         Self {
@@ -331,10 +332,10 @@ impl<P: Package, V: Version> OfflineDependencyProvider<P, V> {
     /// The API does not allow to add dependencies one at a time to uphold an assumption that
     /// [OfflineDependencyProvider.get_dependencies(p, v)](OfflineDependencyProvider::get_dependencies)
     /// provides all dependencies of a given package (p) and version (v) pair.
-    pub fn add_dependencies<I: IntoIterator<Item = (P, Range<V>)>>(
+    pub fn add_dependencies<I: IntoIterator<Item = (P, VS)>>(
         &mut self,
         package: P,
-        version: impl Into<V>,
+        version: impl Into<VS::V>,
         dependencies: I,
     ) {
         let package_deps = dependencies.into_iter().collect();
@@ -354,13 +355,13 @@ impl<P: Package, V: Version> OfflineDependencyProvider<P, V> {
 
     /// Lists versions of saved packages in sorted order.
     /// Returns [None] if no information is available regarding that package.
-    pub fn versions(&self, package: &P) -> Option<impl Iterator<Item = &V>> {
+    pub fn versions(&self, package: &P) -> Option<impl Iterator<Item = &VS::V>> {
         self.dependencies.get(package).map(|k| k.keys())
     }
 
     /// Lists dependencies of a given package and version.
     /// Returns [None] if no information is available regarding that package and version pair.
-    fn dependencies(&self, package: &P, version: &V) -> Option<DependencyConstraints<P, V>> {
+    fn dependencies(&self, package: &P, version: &VS::V) -> Option<DependencyConstraints<P, VS>> {
         self.dependencies.get(package)?.get(version).cloned()
     }
 }
@@ -369,11 +370,12 @@ impl<P: Package, V: Version> OfflineDependencyProvider<P, V> {
 /// contains all dependency information available in memory.
 /// Packages are picked with the fewest versions contained in the constraints first.
 /// Versions are picked with the newest versions first.
-impl<P: Package, V: Version> DependencyProvider<P, V> for OfflineDependencyProvider<P, V> {
-    fn choose_package_version<T: Borrow<P>, U: Borrow<Range<V>>>(
+impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependencyProvider<P, VS> {
+    #[allow(clippy::type_complexity)]
+    fn choose_package_version<T: Borrow<P>, U: Borrow<VS>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<V>), Box<dyn Error>> {
+    ) -> Result<(T, Option<VS::V>), Box<dyn Error>> {
         Ok(choose_package_with_fewest_versions(
             |p| {
                 self.dependencies
@@ -390,8 +392,8 @@ impl<P: Package, V: Version> DependencyProvider<P, V> for OfflineDependencyProvi
     fn get_dependencies(
         &self,
         package: &P,
-        version: &V,
-    ) -> Result<Dependencies<P, V>, Box<dyn Error>> {
+        version: &VS::V,
+    ) -> Result<Dependencies<P, VS>, Box<dyn Error>> {
         Ok(match self.dependencies(package, version) {
             None => Dependencies::Unknown,
             Some(dependencies) => Dependencies::Known(dependencies),

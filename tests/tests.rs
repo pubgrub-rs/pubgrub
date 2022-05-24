@@ -5,9 +5,11 @@ use pubgrub::range::Range;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::NumberVersion;
 
+type NumVS = Range<NumberVersion>;
+
 #[test]
 fn same_result_on_repeated_runs() {
-    let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
 
     dependency_provider.add_dependencies("c", 0, []);
     dependency_provider.add_dependencies("c", 2, []);
@@ -29,7 +31,7 @@ fn same_result_on_repeated_runs() {
 
 #[test]
 fn should_always_find_a_satisfier() {
-    let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
     dependency_provider.add_dependencies("a", 0, [("b", Range::none())]);
     assert!(matches!(
         resolve(&dependency_provider, "a", 0),
@@ -45,7 +47,7 @@ fn should_always_find_a_satisfier() {
 
 #[test]
 fn cannot_depend_on_self() {
-    let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
     dependency_provider.add_dependencies("a", 0, [("a", Range::any())]);
     assert!(matches!(
         resolve(&dependency_provider, "a", 0),

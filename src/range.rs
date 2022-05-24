@@ -20,6 +20,29 @@ use std::ops::{Bound, RangeBounds};
 
 use crate::internal::small_vec::SmallVec;
 use crate::version::Version;
+use crate::version_set::VersionSet;
+
+impl<V: Version> VersionSet for Range<V> {
+    type V = V;
+    // Constructors
+    fn empty() -> Self {
+        Range::none()
+    }
+    fn singleton(v: Self::V) -> Self {
+        Range::exact(v)
+    }
+    // Operations
+    fn complement(&self) -> Self {
+        self.negate()
+    }
+    fn intersection(&self, other: &Self) -> Self {
+        self.intersection(other)
+    }
+    // Membership
+    fn contains(&self, v: &Self::V) -> bool {
+        self.contains(v)
+    }
+}
 
 /// A Range is a set of versions.
 #[derive(Debug, Clone, Eq, PartialEq)]

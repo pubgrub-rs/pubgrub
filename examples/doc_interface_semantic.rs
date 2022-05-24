@@ -6,6 +6,8 @@ use pubgrub::report::{DefaultStringReporter, Reporter};
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::SemanticVersion;
 
+type SemVS = Range<SemanticVersion>;
+
 // `root` depends on `menu` and `icons 1.0.0`
 // `menu 1.0.0` depends on `dropdown < 2.0.0`
 // `menu >= 1.1.0` depends on `dropdown >= 2.0.0`
@@ -14,7 +16,7 @@ use pubgrub::version::SemanticVersion;
 // `icons` has no dependency
 #[rustfmt::skip]
 fn main() {
-    let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     // Direct dependencies: menu and icons.
     dependency_provider.add_dependencies("root", (1, 0, 0), [
         ("menu", Range::any()),
