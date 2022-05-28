@@ -95,14 +95,6 @@ impl<V: Clone> Range<V> {
         }
     }
 
-    /// Set containing all versions expect one
-    pub fn not_equal(v: impl Into<V>) -> Self {
-        let v = v.into();
-        Self {
-            segments: SmallVec::Two([(Unbounded, Excluded(v.clone())), (Excluded(v), Unbounded)]),
-        }
-    }
-
     /// Returns the complement of this Range.
     pub fn complement(&self) -> Self {
         match self.segments.first() {
