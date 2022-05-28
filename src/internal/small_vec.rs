@@ -126,13 +126,36 @@ impl<T: serde::Serialize> serde::Serialize for SmallVec<T> {
 #[cfg(feature = "serde")]
 impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for SmallVec<T> {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let items: Vec<T> = serde::Deserialize::deserialize(d)?;
-
-        let mut v = Self::empty();
-        for item in items {
-            v.push(item);
+        struct SmallVecVisitor<T> {
+            marker: std::marker::PhantomData<T>,
         }
-        Ok(v)
+
+        impl<'de, T> serde::de::Visitor<'de> for SmallVecVisitor<T>
+        where
+            T: serde::Deserialize<'de>,
+        {
+            type Value = SmallVec<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a sequence")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut values = SmallVec::empty();
+                while let Some(value) = seq.next_element()? {
+                    values.push(value);
+                }
+                Ok(values)
+            }
+        }
+
+        let visitor = SmallVecVisitor {
+            marker: Default::default(),
+        };
+        d.deserialize_seq(visitor)
     }
 }
 
