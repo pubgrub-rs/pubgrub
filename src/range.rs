@@ -168,12 +168,6 @@ impl<V: Ord> Range<V> {
 
     /// Returns true if the this Range contains the specified value.
     pub fn contains(&self, v: &V) -> bool {
-        if let Some(bounding_range) = self.bounding_range() {
-            if !bounding_range.contains(v) {
-                return false;
-            }
-        }
-
         for segment in self.segments.iter() {
             if match segment {
                 (Unbounded, Unbounded) => true,
@@ -230,6 +224,13 @@ fn bound_as_ref<V>(bound: &Bound<V>) -> Bound<&V> {
 }
 
 impl<V: Ord + Clone> Range<V> {
+    /// Computes the union of this `Range` and another.
+    pub fn union(&self, other: &Self) -> Self {
+        self.complement()
+            .intersection(&other.complement())
+            .complement()
+    }
+
     /// Computes the intersection of two sets of versions.
     pub fn intersection(&self, other: &Self) -> Self {
         let mut segments: SmallVec<Interval<V>> = SmallVec::empty();
@@ -386,6 +387,10 @@ impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
 
     fn full() -> Self {
         Range::full()
+    }
+
+    fn union(&self, other: &Self) -> Self {
+        Range::union(self, other)
     }
 }
 
