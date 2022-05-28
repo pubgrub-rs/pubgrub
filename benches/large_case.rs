@@ -11,13 +11,13 @@ use pubgrub::version::{NumberVersion, SemanticVersion};
 use pubgrub::version_set::VersionSet;
 use serde::de::Deserialize;
 
-fn bench<'a, P: Package + Deserialize<'a>, V: VersionSet + Deserialize<'a>>(
+fn bench<'a, P: Package + Deserialize<'a>, VS: VersionSet + Deserialize<'a>>(
     b: &mut Bencher,
     case: &'a str,
 ) where
-    <V as VersionSet>::V: Deserialize<'a>,
+    <VS as VersionSet>::V: Deserialize<'a>,
 {
-    let dependency_provider: OfflineDependencyProvider<P, V> = ron::de::from_str(&case).unwrap();
+    let dependency_provider: OfflineDependencyProvider<P, VS> = ron::de::from_str(&case).unwrap();
 
     b.iter(|| {
         for p in dependency_provider.packages() {
