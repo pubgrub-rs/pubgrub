@@ -467,54 +467,53 @@ impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Range<V> {
 #[cfg(test)]
 pub mod tests {
     use proptest::prelude::*;
-    use proptest::test_runner::TestRng;
 
     use super::*;
 
     pub fn strategy() -> impl Strategy<Value = Range<u32>> {
-        prop::collection::vec(any::<u32>(), 0..10)
-            .prop_map(|mut vec| {
-                vec.sort_unstable();
-                vec.dedup();
-                vec
-            })
-            .prop_perturb(|vec, mut rng| {
+        (
+            any::<(bool, bool)>(),
+            prop::collection::vec(any::<(u32, bool)>(), 1..10),
+        )
+            .prop_map(|((start_bounded, end_bounded), mut vec)| {
+                // Ensure the bounds are increasing and non-repeating
+                vec.sort_by_key(|(value, _)| *value);
+                vec.dedup_by_key(|(value, _)| *value);
+
+                // Construct an iterator of bounds instead of values
+                let mut vec: Vec<_> = vec
+                    .into_iter()
+                    .map(|(value, inclusive)| {
+                        if inclusive {
+                            Included(value)
+                        } else {
+                            Excluded(value)
+                        }
+                    })
+                    .collect();
+
+                // Add the start bound
+                if !start_bounded {
+                    vec.insert(0, Unbounded);
+                }
+
+                // Add end bound
+                if !end_bounded {
+                    if (vec.len() % 2) == 0 {
+                        // Drop the last element if it would result in an uneven vec
+                        vec.pop();
+                    }
+                    vec.push(Unbounded);
+                } else if (vec.len() % 2) == 1 {
+                    // Drop the last element if it would result in an uneven vec
+                    vec.pop();
+                }
+
                 let mut segments = SmallVec::empty();
-                let mut iter = vec.into_iter().peekable();
-                if let Some(first) = iter.next() {
-                    fn next_bound<I: Iterator<Item = u32>>(
-                        iter: &mut I,
-                        rng: &mut TestRng,
-                    ) -> Bound<u32> {
-                        if let Some(next) = iter.next() {
-                            if rng.gen_bool(0.5) {
-                                Included(next)
-                            } else {
-                                Excluded(next)
-                            }
-                        } else {
-                            Unbounded
-                        }
-                    }
-
-                    let start = if rng.gen_bool(0.3) {
-                        Unbounded
-                    } else {
-                        if rng.gen_bool(0.5) {
-                            Included(first)
-                        } else {
-                            Excluded(first)
-                        }
-                    };
-
-                    let end = next_bound(&mut iter, &mut rng);
+                let mut iter = vec.into_iter();
+                while let Some(start) = iter.next() {
+                    let end = iter.next().expect("not an even amount of values");
                     segments.push((start, end));
-
-                    while iter.peek().is_some() {
-                        let start = next_bound(&mut iter, &mut rng);
-                        let end = next_bound(&mut iter, &mut rng);
-                        segments.push((start, end));
-                    }
                 }
                 return Range { segments };
             })
