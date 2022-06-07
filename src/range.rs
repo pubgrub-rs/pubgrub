@@ -413,50 +413,64 @@ pub mod tests {
 
     pub fn strategy() -> impl Strategy<Value = Range<u32>> {
         (
-            any::<(bool, bool)>(),
+            any::<bool>(),
             prop::collection::vec(any::<(u32, bool)>(), 1..10),
         )
-            .prop_map(|((start_bounded, end_bounded), mut vec)| {
-                // Ensure the bounds are increasing and non-repeating
-                vec.sort_by_key(|(value, _)| *value);
-                vec.dedup_by_key(|(value, _)| *value);
-
-                // Construct an iterator of bounds instead of values
-                let mut vec: Vec<_> = vec
-                    .into_iter()
-                    .map(|(value, inclusive)| {
-                        if inclusive {
-                            Included(value)
-                        } else {
-                            Excluded(value)
+            .prop_map(|(start_bounded, deltas)| {
+                let mut start = if start_bounded { Some(Unbounded) } else { None };
+                let mut largest: u32 = 0;
+                let mut last_bound_was_inclusive = false;
+                let mut segments = SmallVec::Empty;
+                for (delta, inclusive) in deltas {
+                    // Add the offset to the current bound
+                    largest = match largest.checked_add(delta) {
+                        Some(s) => s,
+                        None => {
+                            // Skip this offset, if it would result in a too large bound.
+                            continue;
                         }
-                    })
-                    .collect();
+                    };
 
-                // Add the start bound
-                if !start_bounded {
-                    vec.insert(0, Unbounded);
-                }
+                    let current_bound = if inclusive {
+                        Included(largest)
+                    } else {
+                        Excluded(largest)
+                    };
 
-                // Add end bound
-                if !end_bounded {
-                    if (vec.len() % 2) == 0 {
-                        // Drop the last element if it would result in an uneven vec
-                        vec.pop();
+                    // If we already have a start bound, the next offset defines the complete range.
+                    // If we don't have a start bound, we have to generate one.
+                    if let Some(start_bound) = start.take() {
+                        // If the delta from the start bound 0 and the start bound itself is
+                        // exclusive, we wont get a valid segment. E.g:
+                        //
+                        // Exclusive(x), Exclusive(x) -> Basically nothing, so invalid
+                        // Exclusive(x), Inclusive(x) -> Also invalid
+                        //
+                        // If that's the case, skip this delta
+                        if delta == 0 && matches!(start_bound, Excluded(_)) {
+                            start = Some(start_bound);
+                            continue;
+                        }
+                        last_bound_was_inclusive = inclusive;
+                        segments.push((start_bound, current_bound));
+                    } else {
+                        // If the delta from the end bound of the last range is 0 and both the last
+                        // end bound and the current bound are inclusive, we skip the delta because
+                        // they basically overlap.
+                        if delta == 0 && last_bound_was_inclusive && inclusive {
+                            continue;
+                        }
+                        start = Some(current_bound);
                     }
-                    vec.push(Unbounded);
-                } else if (vec.len() % 2) == 1 {
-                    // Drop the last element if it would result in an uneven vec
-                    vec.pop();
                 }
 
-                let mut segments = SmallVec::empty();
-                let mut iter = vec.into_iter();
-                while let Some(start) = iter.next() {
-                    let end = iter.next().expect("not an even amount of values");
-                    segments.push((start, end));
+                // If we still have a start bound, but didnt have enough deltas to complete another
+                // segment, we add an unbounded upperbound.
+                if let Some(start_bound) = start {
+                    segments.push((start_bound, Unbounded));
                 }
-                return Range { segments };
+
+                return Range { segments }.check_invariants();
             })
     }
 
