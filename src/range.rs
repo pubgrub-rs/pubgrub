@@ -15,6 +15,15 @@
 //!  - [lower_than(v)](Range::lower_than): the set defined by `versions <= v`
 //!  - [strictly_lower_than(v)](Range::strictly_lower_than): the set defined by `versions < v`
 //!  - [between(v1, v2)](Range::between): the set defined by `v1 <= versions < v2`
+//!
+//! Ranges can be created from any type that implements [`Ord`] + [`Clone`].
+//!
+//! In general any range will always be represented in the same way unless the the type `T` does not
+//! represent a continuous space. If the type `T` does not represent a continuous space there is
+//! no way to distinguish an unbounded bound from the minimal or maximum value of the range. For
+//! instance the segment `[Unbounded, Exclusive(0u32)]` does not include any value but its
+//! representation differs from the empty set. This means that for types that represent a discrete
+//! range there is the potential that the same set of versions is represented in multiple ways.
 
 use crate::{internal::small_vec::SmallVec, version_set::VersionSet};
 use std::ops::RangeBounds;
