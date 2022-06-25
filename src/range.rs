@@ -18,12 +18,37 @@
 //!
 //! Ranges can be created from any type that implements [`Ord`] + [`Clone`].
 //!
-//! In general any range will always be represented in the same way unless the the type `T` does not
-//! represent a continuous space. If the type `T` does not represent a continuous space there is
-//! no way to distinguish an unbounded bound from the minimal or maximum value of the range. For
-//! instance the segment `[Unbounded, Exclusive(0u32)]` does not include any value but its
-//! representation differs from the empty set. This means that for types that represent a discrete
-//! range there is the potential that the same set of versions is represented in multiple ways.
+//! In order to advance the solver front, comparisons of versions sets are necessary in the algorithm.
+//! To do those comparisons between two sets S1 and S2 we use the mathematical property that S1 ⊂ S2 if and only if S1 ∩ S2 == S1.
+//! We can thus compute an intersection and evaluate an equality to answer if S1 is a subset of S2.
+//! But this means that the implementation of equality must be correct semantically.
+//! In practice, if equality is derived automatically, this means sets must have unique representations.
+//!
+//! By migrating from a custom representation for discrete sets in v0.2
+//! to a generic bounded representation for continuous sets in v0.3
+//! we are potentially breaking that assumption in two ways:
+//!
+//!  1. Minimal and maximal `Unbounded` values can be replaced by their equivalent if it exists.
+//!  2. Simplifying adjacent bounds of discrete sets cannot be detected and automated in the generic intersection code.
+//!
+//! An example for each can be given when `T` is `u32`.
+//! First, we can have both segments `S1 = (Unbounded, Included(42u32))` and `S2 = (Included(0), Included(42u32))`
+//! that represent the same segment but are structurally different.
+//! Thus, a derived equality check would answer `false` to `S1 == S2` while it's true.
+//!
+//! Second both segments `S1 = (Included(1), Included(5))` and `S2 = (Included(1), Included(3)) + (Included(4), Included(5))` are equal.
+//! But without asking the user to provide a `bump` function for discrete sets,
+//! the algorithm is not able tell that the space between the right `Included(3)` bound and the left `Included(4)` bound is empty.
+//! Thus the algorithm is not able to reduce S2 to its canonical S1 form while computing sets operations like intersections in the generic code.
+//!
+//! This is likely to lead to user facing theoretically correct but practically nonsensical ranges,
+//! like (Unbounded, Excluded(0)) or (Excluded(6), Excluded(7)).
+//! In general nonsensical inputs often lead to hard to track bugs.
+//! But as far as we can tell this should work in practice.
+//! So for now this crate only provides an implementation for continuous ranges.
+//! With the v0.3 api the user could choose to bring back the discrete implementation from v0.2, as documented in the guide.
+//! If doing so regularly fixes bugs seen by users, we will bring it back into the core library.
+//! If we do not see practical bugs, or we get a formal proof that the code cannot lead to error states, then we may remove this warning.
 
 use crate::{internal::small_vec::SmallVec, version_set::VersionSet};
 use std::ops::RangeBounds;
