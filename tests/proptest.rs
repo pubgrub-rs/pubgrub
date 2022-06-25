@@ -97,7 +97,7 @@ type SemVS = Range<SemanticVersion>;
 #[should_panic]
 fn should_cancel_can_panic() {
     let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
-    dependency_provider.add_dependencies(0, 0, [(666, Range::any())]);
+    dependency_provider.add_dependencies(0, 0, [(666, Range::full())]);
 
     // Run the algorithm.
     let _ = resolve(
@@ -197,13 +197,13 @@ pub fn registry_strategy<N: Package + Ord>(
                         deps.push((
                             dep_name,
                             if c == 0 && d == s_last_index {
-                                Range::any()
+                                Range::full()
                             } else if c == 0 {
                                 Range::strictly_lower_than(s[d].0 + 1)
                             } else if d == s_last_index {
                                 Range::higher_than(s[c].0)
                             } else if c == d {
-                                Range::exact(s[c].0)
+                                Range::singleton(s[c].0)
                             } else {
                                 Range::between(s[c].0, s[d].0 + 1)
                             },
@@ -227,7 +227,7 @@ pub fn registry_strategy<N: Package + Ord>(
                     dependency_provider.add_dependencies(
                         name,
                         ver,
-                        deps.unwrap_or_else(|| vec![(bad_name.clone(), Range::any())]),
+                        deps.unwrap_or_else(|| vec![(bad_name.clone(), Range::full())]),
                     );
                 }
 
