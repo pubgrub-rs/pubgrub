@@ -221,14 +221,6 @@ impl<V: Ord> Range<V> {
 
     fn check_invariants(self) -> Self {
         if cfg!(debug_assertions) {
-            for (i, (s, e)) in self.segments.iter().enumerate() {
-                if matches!(s, Unbounded) && i != 0 {
-                    panic!()
-                }
-                if matches!(e, Unbounded) && i != (self.segments.len() - 1) {
-                    panic!()
-                }
-            }
             for p in self.segments.as_slice().windows(2) {
                 match (&p[0].1, &p[1].0) {
                     (Included(l_end), Included(r_start)) => assert!(l_end < r_start),
