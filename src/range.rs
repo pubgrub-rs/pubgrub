@@ -444,8 +444,12 @@ pub mod tests {
             any::<bool>(),
             prop::collection::vec(any::<(u32, bool)>(), 1..10),
         )
-            .prop_map(|(start_bounded, deltas)| {
-                let mut start = if start_bounded { Some(Unbounded) } else { None };
+            .prop_map(|(start_unbounded, deltas)| {
+                let mut start = if start_unbounded {
+                    Some(Unbounded)
+                } else {
+                    None
+                };
                 let mut largest: u32 = 0;
                 let mut last_bound_was_inclusive = false;
                 let mut segments = SmallVec::Empty;
