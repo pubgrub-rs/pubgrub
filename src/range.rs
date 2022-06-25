@@ -420,6 +420,8 @@ pub mod tests {
 
     use super::*;
 
+    /// Generate version sets from a random vector of deltas between bounds.
+    /// Each bound is randomly inclusive or exclusive.
     pub fn strategy() -> impl Strategy<Value = Range<u32>> {
         (
             any::<bool>(),
@@ -449,24 +451,19 @@ pub mod tests {
                     // If we already have a start bound, the next offset defines the complete range.
                     // If we don't have a start bound, we have to generate one.
                     if let Some(start_bound) = start.take() {
-                        // If the delta from the start bound 0 and the start bound itself is
-                        // exclusive, we wont get a valid segment. E.g:
-                        //
-                        // Exclusive(x), Exclusive(x) -> Basically nothing, so invalid
-                        // Exclusive(x), Inclusive(x) -> Also invalid
-                        //
-                        // If that's the case, skip this delta
-                        if delta == 0 && matches!(start_bound, Excluded(_)) {
+                        // If the delta from the start bound is 0, the only authorized configuration is
+                        // Included(x), Included(x)
+                        if delta == 0 && !(matches!(start_bound, Included(_)) && inclusive) {
                             start = Some(start_bound);
                             continue;
                         }
                         last_bound_was_inclusive = inclusive;
                         segments.push((start_bound, current_bound));
                     } else {
-                        // If the delta from the end bound of the last range is 0 and both the last
-                        // end bound and the current bound are inclusive, we skip the delta because
-                        // they basically overlap.
-                        if delta == 0 && last_bound_was_inclusive && inclusive {
+                        // If the delta from the end bound of the last range is 0 and
+                        // any of the last ending or current starting bound is inclusive,
+                        // we skip the delta because they basically overlap.
+                        if delta == 0 && (last_bound_was_inclusive || inclusive) {
                             continue;
                         }
                         start = Some(current_bound);
