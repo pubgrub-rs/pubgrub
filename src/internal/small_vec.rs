@@ -202,11 +202,11 @@ pub mod tests {
 
     proptest! {
         #[test]
-        fn push_and_pop(comands: Vec<Option<u8>>) {
+        fn push_and_pop(commands: Vec<Option<u8>>) {
             let mut v = vec![];
             let mut sv = SmallVec::Empty;
-            for comand in comands {
-                match comand {
+            for command in commands {
+                match command {
                     Some(i) => {
                         v.push(i);
                         sv.push(i);
