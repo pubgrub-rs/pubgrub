@@ -491,7 +491,7 @@ pub mod tests {
                     }
                 }
 
-                // If we still have a start bound, but didnt have enough deltas to complete another
+                // If we still have a start bound, but didn't have enough deltas to complete another
                 // segment, we add an unbounded upperbound.
                 if let Some(start_bound) = start {
                     segments.push((start_bound, Unbounded));
