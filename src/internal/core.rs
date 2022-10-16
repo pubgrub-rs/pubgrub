@@ -15,6 +15,7 @@ use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::internal::small_vec::SmallVec;
 use crate::package::Package;
 use crate::report::DerivationTree;
+use crate::solver::Requirement;
 use crate::type_aliases::{DependencyConstraints, Map};
 use crate::version_set::VersionSet;
 
@@ -75,14 +76,25 @@ impl<P: Package, VS: VersionSet> State<P, VS> {
         &mut self,
         package: P,
         version: VS::V,
-        deps: &DependencyConstraints<P, VS>,
+        deps: &DependencyConstraints<P, Requirement<VS>>,
     ) -> std::ops::Range<IncompId<P, VS>> {
         // Create incompatibilities and allocate them in the store.
-        let new_incompats_id_range = self
-            .incompatibility_store
-            .alloc_iter(deps.iter().map(|dep| {
-                Incompatibility::from_dependency(package.clone(), version.clone(), dep)
-            }));
+        let new_incompats_id_range =
+            self.incompatibility_store
+                .alloc_iter(deps.iter().map(|(dep, requirement)| match requirement {
+                    Requirement::Required(range) => Incompatibility::from_required_dependency(
+                        package.clone(),
+                        version.clone(),
+                        (dep, range),
+                    ),
+                    Requirement::Constrained(range) => {
+                        Incompatibility::from_constrained_dependency(
+                            package.clone(),
+                            version.clone(),
+                            (dep, range),
+                        )
+                    }
+                }));
         // Merge the newly created incompatibilities with the older ones.
         for id in IncompId::range_to_iter(new_incompats_id_range.clone()) {
             self.merge_incompatibility(id);

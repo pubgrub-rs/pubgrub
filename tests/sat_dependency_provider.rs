@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::package::Package;
-use pubgrub::solver::{Dependencies, DependencyProvider, OfflineDependencyProvider};
+use pubgrub::solver::{Dependencies, DependencyProvider, OfflineDependencyProvider, Requirement};
 use pubgrub::type_aliases::{Map, SelectedDependencies};
 use pubgrub::version_set::VersionSet;
 use varisat::ExtendFormula;
@@ -79,19 +79,37 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
                 Dependencies::Unknown => panic!(),
                 Dependencies::Known(d) => d,
             };
-            for (p1, range) in &deps {
+            for (p1, requirement) in &deps {
                 let empty_vec = vec![];
-                let mut matches: Vec<varisat::Lit> = all_versions_by_p
-                    .get(p1)
-                    .unwrap_or(&empty_vec)
-                    .iter()
-                    .filter(|(v1, _)| range.contains(v1))
-                    .map(|(_, var1)| var1.positive())
-                    .collect();
-                // ^ the `dep` is satisfied or
-                matches.push(var.negative());
-                // ^ `p` is not active
-                cnf.add_clause(&matches);
+
+                match requirement {
+                    Requirement::Required(range) => {
+                        let mut matches = Vec::new();
+                        for (p1_version, p1_version_var) in
+                            all_versions_by_p.get(p1).unwrap_or(&empty_vec).iter()
+                        {
+                            if range.contains(p1_version) {
+                                matches.push(p1_version_var.positive());
+                            }
+                        }
+
+                        // ^ the `dep` is satisfied or
+                        matches.push(var.negative());
+
+                        // ^ `p` is not active
+                        cnf.add_clause(&matches);
+                    }
+                    Requirement::Constrained(range) => {
+                        for (p1_version, p1_version_var) in
+                            all_versions_by_p.get(p1).unwrap_or(&empty_vec).iter()
+                        {
+                            if !range.contains(p1_version) {
+                                // Either this specific variant is not selected or non-matching dependency versions are not selected.
+                                cnf.add_clause(&[var.negative(), p1_version_var.negative()]);
+                            }
+                        }
+                    }
+                }
             }
         }
 

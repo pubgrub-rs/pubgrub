@@ -51,7 +51,7 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
                 let dependencies = self.remote_dependencies.get_dependencies(package, version);
                 match dependencies {
                     Ok(Dependencies::Known(dependencies)) => {
-                        cache.add_dependencies(
+                        cache.add_requirements(
                             package.clone(),
                             version.clone(),
                             dependencies.clone(),

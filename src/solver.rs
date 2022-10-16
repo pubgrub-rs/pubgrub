@@ -166,7 +166,10 @@ pub fn resolve<P: Package, VS: VersionSet>(
                             version: v.clone(),
                         });
                     }
-                    if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&VS::empty()) {
+                    if let Some((dependent, _)) = x
+                        .iter()
+                        .find(|(_, r)| matches!(r, Requirement::Required(r) if r == &VS::empty()))
+                    {
                         return Err(PubGrubError::DependencyOnTheEmptySet {
                             package: p.clone(),
                             version: v.clone(),
@@ -215,7 +218,17 @@ pub enum Dependencies<P: Package, VS: VersionSet> {
     /// Package dependencies are unavailable.
     Unknown,
     /// Container for all available package versions.
-    Known(DependencyConstraints<P, VS>),
+    Known(DependencyConstraints<P, Requirement<VS>>),
+}
+
+/// An enum that defines the type of dependency.
+#[derive(Clone, Debug)]
+pub enum Requirement<VS: VersionSet> {
+    /// A dependency that is resolved as part of the solution.
+    Required(VS),
+
+    /// Constrains the version of package but does not require inclusion of the package.
+    Constrained(VS),
 }
 
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
@@ -311,7 +324,7 @@ where
 )]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct OfflineDependencyProvider<P: Package, VS: VersionSet> {
-    dependencies: Map<P, BTreeMap<VS::V, DependencyConstraints<P, VS>>>,
+    dependencies: Map<P, BTreeMap<VS::V, DependencyConstraints<P, Requirement<VS>>>>,
 }
 
 impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
@@ -324,10 +337,11 @@ impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
 
     /// Registers the dependencies of a package and version pair.
     /// Dependencies must be added with a single call to
-    /// [add_dependencies](OfflineDependencyProvider::add_dependencies).
-    /// All subsequent calls to
-    /// [add_dependencies](OfflineDependencyProvider::add_dependencies) for a given
-    /// package version pair will replace the dependencies by the new ones.
+    /// [add_dependencies](OfflineDependencyProvider::add_dependencies),
+    /// [add_constraints](OfflineDependencyProvider::add_constraints), or
+    /// [add_requirements](OfflineDependencyProvider::add_requirements).
+    /// All subsequent calls to any of those functions for a given package version pair will replace the
+    /// dependencies by the new ones.
     ///
     /// The API does not allow to add dependencies one at a time to uphold an assumption that
     /// [OfflineDependencyProvider.get_dependencies(p, v)](OfflineDependencyProvider::get_dependencies)
@@ -338,14 +352,76 @@ impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
         version: impl Into<VS::V>,
         dependencies: I,
     ) {
-        let package_deps = dependencies.into_iter().collect();
         let v = version.into();
-        *self
+        let entries = self
             .dependencies
             .entry(package)
             .or_default()
             .entry(v)
-            .or_default() = package_deps;
+            .or_default();
+        for (dep, range) in dependencies.into_iter() {
+            entries.insert(dep, Requirement::Required(range));
+        }
+    }
+
+    /// Registers the dependencies of a package and version pair that may *not* be included in the final
+    /// solution but if it is included in the solution (through another package for example) it must meet
+    /// the requirements defined in this function call..
+    /// Dependencies must be added with a single call to
+    /// [add_dependencies](OfflineDependencyProvider::add_dependencies),
+    /// [add_constraints](OfflineDependencyProvider::add_constraints), or
+    /// [add_requirements](OfflineDependencyProvider::add_requirements).
+    /// All subsequent calls to any of those functions for a given package version pair will replace the
+    /// dependencies by the new ones.
+    ///
+    /// The API does not allow to add dependencies one at a time to uphold an assumption that
+    /// [OfflineDependencyProvider.get_dependencies(p, v)](OfflineDependencyProvider::get_dependencies)
+    /// provides all dependencies of a given package (p) and version (v) pair.
+    pub fn add_constraints<I: IntoIterator<Item = (P, VS)>>(
+        &mut self,
+        package: P,
+        version: impl Into<VS::V>,
+        dependencies: I,
+    ) {
+        let v = version.into();
+        let entries = self
+            .dependencies
+            .entry(package)
+            .or_default()
+            .entry(v)
+            .or_default();
+        for (package, constraint) in dependencies.into_iter() {
+            entries.insert(package, Requirement::Constrained(constraint));
+        }
+    }
+
+    /// Registers the dependencies of a package and version pair.
+    /// Dependencies must be added with a single call to
+    /// [add_dependencies](OfflineDependencyProvider::add_dependencies),
+    /// [add_constraints](OfflineDependencyProvider::add_constraints), or
+    /// [add_requirements](OfflineDependencyProvider::add_requirements).
+    /// All subsequent calls to any of those functions for a given package version pair will replace the
+    /// dependencies by the new ones.
+    ///
+    /// The API does not allow to add dependencies one at a time to uphold an assumption that
+    /// [OfflineDependencyProvider.get_dependencies(p, v)](OfflineDependencyProvider::get_dependencies)
+    /// provides all dependencies of a given package (p) and version (v) pair.
+    pub fn add_requirements<I: IntoIterator<Item = (P, Requirement<VS>)>>(
+        &mut self,
+        package: P,
+        version: impl Into<VS::V>,
+        dependencies: I,
+    ) {
+        let v = version.into();
+        let entries = self
+            .dependencies
+            .entry(package)
+            .or_default()
+            .entry(v)
+            .or_default();
+        for (package, req) in dependencies.into_iter() {
+            entries.insert(package, req);
+        }
     }
 
     /// Lists packages that have been saved.
@@ -361,7 +437,11 @@ impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
 
     /// Lists dependencies of a given package and version.
     /// Returns [None] if no information is available regarding that package and version pair.
-    fn dependencies(&self, package: &P, version: &VS::V) -> Option<DependencyConstraints<P, VS>> {
+    fn dependencies(
+        &self,
+        package: &P,
+        version: &VS::V,
+    ) -> Option<DependencyConstraints<P, Requirement<VS>>> {
         self.dependencies.get(package)?.get(version).cloned()
     }
 }

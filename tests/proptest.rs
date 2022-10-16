@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use proptest::bool::weighted;
 use std::{collections::BTreeSet as Set, error::Error};
 
 use pubgrub::error::PubGrubError;
@@ -8,7 +9,7 @@ use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, Reporter};
 use pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies, DependencyProvider,
-    OfflineDependencyProvider,
+    OfflineDependencyProvider, Requirement,
 };
 use pubgrub::version::{NumberVersion, SemanticVersion};
 use pubgrub::version_set::VersionSet;
@@ -146,7 +147,12 @@ pub fn registry_strategy<N: Package + Ord>(
     let max_deps = max_versions * (max_crates * (max_crates - 1)) / shrinkage;
 
     let raw_version_range = (any::<Index>(), any::<Index>());
-    let raw_dependency = (any::<Index>(), any::<Index>(), raw_version_range);
+    let raw_dependency = (
+        any::<Index>(),
+        any::<Index>(),
+        weighted(0.9),
+        raw_version_range,
+    );
 
     fn order_index(a: Index, b: Index, size: usize) -> (usize, usize) {
         use std::cmp::{max, min};
@@ -169,20 +175,22 @@ pub fn registry_strategy<N: Package + Ord>(
     )
         .prop_map(
             move |(crate_vers_by_name, raw_dependencies, reverse_alphabetical, complicated_len)| {
-                let mut list_of_pkgid: Vec<((N, NumberVersion), Option<Vec<(N, NumVS)>>)> =
-                    crate_vers_by_name
-                        .iter()
-                        .flat_map(|(name, vers)| {
-                            vers.iter().map(move |x| {
-                                (
-                                    (name.clone(), NumberVersion::from(x.0)),
-                                    if x.1 { Some(vec![]) } else { None },
-                                )
-                            })
+                let mut list_of_pkgid: Vec<(
+                    (N, NumberVersion),
+                    Option<Vec<(N, Requirement<NumVS>)>>,
+                )> = crate_vers_by_name
+                    .iter()
+                    .flat_map(|(name, vers)| {
+                        vers.iter().map(move |x| {
+                            (
+                                (name.clone(), NumberVersion::from(x.0)),
+                                if x.1 { Some(vec![]) } else { None },
+                            )
                         })
-                        .collect();
+                    })
+                    .collect();
                 let len_all_pkgid = list_of_pkgid.len();
-                for (a, b, (c, d)) in raw_dependencies {
+                for (a, b, required, (c, d)) in raw_dependencies {
                     let (a, b) = order_index(a, b, len_all_pkgid);
                     let (a, b) = if reverse_alphabetical { (b, a) } else { (a, b) };
                     let ((dep_name, _), _) = list_of_pkgid[a].to_owned();
@@ -194,18 +202,23 @@ pub fn registry_strategy<N: Package + Ord>(
                     let (c, d) = order_index(c, d, s.len());
 
                     if let (_, Some(deps)) = &mut list_of_pkgid[b] {
+                        let range = if c == 0 && d == s_last_index {
+                            Range::full()
+                        } else if c == 0 {
+                            Range::strictly_lower_than(s[d].0 + 1)
+                        } else if d == s_last_index {
+                            Range::higher_than(s[c].0)
+                        } else if c == d {
+                            Range::singleton(s[c].0)
+                        } else {
+                            Range::between(s[c].0, s[d].0 + 1)
+                        };
                         deps.push((
                             dep_name,
-                            if c == 0 && d == s_last_index {
-                                Range::full()
-                            } else if c == 0 {
-                                Range::strictly_lower_than(s[d].0 + 1)
-                            } else if d == s_last_index {
-                                Range::higher_than(s[c].0)
-                            } else if c == d {
-                                Range::singleton(s[c].0)
+                            if required {
+                                Requirement::Required(range)
                             } else {
-                                Range::between(s[c].0, s[d].0 + 1)
+                                Requirement::Constrained(range)
                             },
                         ))
                     }
@@ -224,10 +237,12 @@ pub fn registry_strategy<N: Package + Ord>(
                 .collect();
 
                 for ((name, ver), deps) in list_of_pkgid {
-                    dependency_provider.add_dependencies(
+                    dependency_provider.add_requirements(
                         name,
                         ver,
-                        deps.unwrap_or_else(|| vec![(bad_name.clone(), Range::full())]),
+                        deps.unwrap_or_else(|| {
+                            vec![(bad_name.clone(), Requirement::Required(Range::full()))]
+                        }),
                     );
                 }
 
@@ -374,7 +389,7 @@ proptest! {
                 .versions(package)
                 .unwrap().collect();
             let version = version_idx.get(&versions);
-            let dependencies: Vec<(u16, NumVS)> = match dependency_provider
+            let dependencies: Vec<_> = match dependency_provider
                 .get_dependencies(package, version)
                 .unwrap()
             {
@@ -383,7 +398,7 @@ proptest! {
             };
             if !dependencies.is_empty() {
                 let dependency = dep_idx.get(&dependencies).0;
-                removed_provider.add_dependencies(
+                removed_provider.add_requirements(
                     **package,
                     **version,
                     dependencies.into_iter().filter(|x| x.0 != dependency),
@@ -442,7 +457,7 @@ proptest! {
                                 Dependencies::Unknown => panic!(),
                                 Dependencies::Known(deps) => deps,
                             };
-                            smaller_dependency_provider.add_dependencies(n, v, deps)
+                            smaller_dependency_provider.add_requirements(n, v, deps)
                         }
                     }
                     prop_assert!(
@@ -464,7 +479,7 @@ proptest! {
                                 Dependencies::Unknown => panic!(),
                                 Dependencies::Known(deps) => deps,
                             };
-                            smaller_dependency_provider.add_dependencies(n, v, deps)
+                            smaller_dependency_provider.add_requirements(n, v, deps)
                         }
                     }
                     prop_assert!(
