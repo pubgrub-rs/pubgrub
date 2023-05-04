@@ -17,18 +17,20 @@ keywords = ["dependency", "pubgrub", "semver", "solver", "version"]
 categories = ["algorithms"]
 include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples/**", "benches/**"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 thiserror = "1.0"
 rustc-hash = "1.1.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
+async-trait = { version = "0.1.68", optional = true }
 
 [dev-dependencies]
 proptest = "0.10.1"
 ron = "0.6"
 varisat = "0.2.2"
 criterion = "0.3"
+
+[features]
+async = ["async-trait"]
 
 [[bench]]
 name = "large_case"

@@ -74,8 +74,12 @@ use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
 use crate::range::Range;
+use crate::term::Term;
 use crate::type_aliases::{Map, SelectedDependencies};
 use crate::version::Version;
+
+#[cfg(feature = "async")]
+pub use async_trait::async_trait;
 
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
@@ -94,20 +98,19 @@ pub fn resolve<P: Package, V: Version>(
 
         state.unit_propagation(next)?;
 
-        let potential_packages = state.partial_solution.potential_packages();
-        if potential_packages.is_none() {
-            drop(potential_packages);
-            // The borrow checker did not like using a match on potential_packages.
-            // This `if ... is_none ... drop` is a workaround.
-            // I believe this is a case where Polonius could help, when and if it lands in rustc.
-            return state.partial_solution.extract_solution().ok_or_else(|| {
-                PubGrubError::Failure(
-                    "How did we end up with no package to choose but no solution?".into(),
-                )
-            });
-        }
+        let potential_packages = match state.partial_solution.potential_packages() {
+            Some(packages) => packages,
+            None => {
+                return state.partial_solution.extract_solution().ok_or_else(|| {
+                    PubGrubError::Failure(
+                        "How did we end up with no package to choose but no solution?".into(),
+                    )
+                });
+            }
+        };
+
         let decision = dependency_provider
-            .choose_package_version(potential_packages.unwrap())
+            .choose_package_version(potential_packages)
             .map_err(PubGrubError::ErrorChoosingPackageVersion)?;
         next = decision.0.clone();
 
@@ -116,6 +119,7 @@ pub fn resolve<P: Package, V: Version>(
             .partial_solution
             .term_intersection_for_package(&next)
             .expect("a package was chosen but we don't have a term.");
+
         let v = match decision.1 {
             None => {
                 let inc = Incompatibility::no_versions(next.clone(), term_intersection.clone());
@@ -124,79 +128,215 @@ pub fn resolve<P: Package, V: Version>(
             }
             Some(x) => x,
         };
+
         if !term_intersection.contains(&v) {
             return Err(PubGrubError::ErrorChoosingPackageVersion(
                 "choose_package_version picked an incompatible version".into(),
             ));
         }
 
-        if added_dependencies
+        let new_added_dependency = added_dependencies
             .entry(next.clone())
             .or_default()
-            .insert(v.clone())
-        {
-            // Retrieve that package dependencies.
-            let p = &next;
-            let dependencies =
-                match dependency_provider
-                    .get_dependencies(&p, &v)
-                    .map_err(|err| PubGrubError::ErrorRetrievingDependencies {
-                        package: p.clone(),
-                        version: v.clone(),
-                        source: err,
-                    })? {
-                    Dependencies::Unknown => {
-                        state.add_incompatibility(Incompatibility::unavailable_dependencies(
-                            p.clone(),
-                            v.clone(),
-                        ));
-                        continue;
-                    }
-                    Dependencies::Known(x) => {
-                        if x.contains_key(&p) {
-                            return Err(PubGrubError::SelfDependency {
-                                package: p.clone(),
-                                version: v.clone(),
-                            });
-                        }
-                        if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
-                            return Err(PubGrubError::DependencyOnTheEmptySet {
-                                package: p.clone(),
-                                version: v.clone(),
-                                dependent: dependent.clone(),
-                            });
-                        }
-                        x
-                    }
-                };
+            .insert(v.clone());
 
-            // Add that package and version if the dependencies are not problematic.
-            let dep_incompats =
-                state.add_incompatibility_from_dependencies(p.clone(), v.clone(), &dependencies);
-
-            // TODO: I don't think this check can actually happen.
-            // We might want to put it under #[cfg(debug_assertions)].
-            if state.incompatibility_store[dep_incompats.clone()]
-                .iter()
-                .any(|incompat| state.is_terminal(incompat))
-            {
-                // For a dependency incompatibility to be terminal,
-                // it can only mean that root depend on not root?
-                return Err(PubGrubError::Failure(
-                    "Root package depends on itself at a different version?".into(),
-                ));
-            }
-            state.partial_solution.add_version(
-                p.clone(),
-                v,
-                dep_incompats,
-                &state.incompatibility_store,
-            );
-        } else {
+        if !new_added_dependency {
             // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
             // terms and can add the decision directly.
             state.partial_solution.add_decision(next.clone(), v);
+            continue;
         }
+
+        // Retrieve that package dependencies.
+        let p = &next;
+        let dependencies = dependency_provider
+            .get_dependencies(&p, &v)
+            .map_err(|err| PubGrubError::ErrorRetrievingDependencies {
+                package: p.clone(),
+                version: v.clone(),
+                source: err,
+            })?;
+        let dependencies = match dependencies {
+            Dependencies::Unknown => {
+                state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                    p.clone(),
+                    v.clone(),
+                ));
+                continue;
+            }
+            Dependencies::Known(x) if x.contains_key(&p) => {
+                return Err(PubGrubError::SelfDependency {
+                    package: p.clone(),
+                    version: v.clone(),
+                });
+            }
+            Dependencies::Known(x) => {
+                if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
+                    return Err(PubGrubError::DependencyOnTheEmptySet {
+                        package: p.clone(),
+                        version: v.clone(),
+                        dependent: dependent.clone(),
+                    });
+                }
+
+                x
+            }
+        };
+
+        // Add that package and version if the dependencies are not problematic.
+        let dep_incompats =
+            state.add_incompatibility_from_dependencies(p.clone(), v.clone(), &dependencies);
+
+        // TODO: I don't think this check can actually happen.
+        // We might want to put it under #[cfg(debug_assertions)].
+        if state.incompatibility_store[dep_incompats.clone()]
+            .iter()
+            .any(|incompat| state.is_terminal(incompat))
+        {
+            // For a dependency incompatibility to be terminal,
+            // it can only mean that root depend on not root?
+            return Err(PubGrubError::Failure(
+                "Root package depends on itself at a different version?".into(),
+            ));
+        }
+
+        state.partial_solution.add_version(
+            p.clone(),
+            v,
+            dep_incompats,
+            &state.incompatibility_store,
+        );
+    }
+}
+
+/// Main function of the library.
+/// Finds a set of packages satisfying dependency bounds for a given package + version pair.
+#[cfg(feature = "async")]
+pub async fn resolve_async<P: Package, V: Version>(
+    dependency_provider: &impl AsyncDependencyProvider<P, V>,
+    package: P,
+    version: impl Into<V>,
+) -> Result<SelectedDependencies<P, V>, PubGrubError<P, V>> {
+    let mut state = State::init(package.clone(), version.into());
+    let mut added_dependencies: Map<P, Set<V>> = Map::default();
+    let mut next = package;
+    loop {
+        dependency_provider
+            .should_cancel()
+            .map_err(|err| PubGrubError::ErrorInShouldCancel(err))?;
+
+        state.unit_propagation(next)?;
+
+        let potential_packages = match state.partial_solution.potential_packages() {
+            Some(packages) => packages,
+            None => {
+                return state.partial_solution.extract_solution().ok_or_else(|| {
+                    PubGrubError::Failure(
+                        "How did we end up with no package to choose but no solution?".into(),
+                    )
+                });
+            }
+        };
+
+        let decision = dependency_provider
+            .choose_package_version(potential_packages)
+            .await
+            .map_err(PubGrubError::ErrorChoosingPackageVersion)?;
+        next = decision.0.clone();
+
+        // Pick the next compatible version.
+        let term_intersection = state
+            .partial_solution
+            .term_intersection_for_package(&next)
+            .expect("a package was chosen but we don't have a term.");
+
+        let v = match decision.1 {
+            None => {
+                let inc = Incompatibility::no_versions(next.clone(), term_intersection.clone());
+                state.add_incompatibility(inc);
+                continue;
+            }
+            Some(x) => x,
+        };
+
+        if !term_intersection.contains(&v) {
+            return Err(PubGrubError::ErrorChoosingPackageVersion(
+                "choose_package_version picked an incompatible version".into(),
+            ));
+        }
+
+        let new_added_dependency = added_dependencies
+            .entry(next.clone())
+            .or_default()
+            .insert(v.clone());
+
+        if !new_added_dependency {
+            // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
+            // terms and can add the decision directly.
+            state.partial_solution.add_decision(next.clone(), v);
+            continue;
+        }
+
+        // Retrieve that package dependencies.
+        let p = &next;
+        let dependencies = dependency_provider
+            .get_dependencies(&p, &v)
+            .await
+            .map_err(|err| PubGrubError::ErrorRetrievingDependencies {
+                package: p.clone(),
+                version: v.clone(),
+                source: err,
+            })?;
+        let dependencies = match dependencies {
+            Dependencies::Unknown => {
+                state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                    p.clone(),
+                    v.clone(),
+                ));
+                continue;
+            }
+            Dependencies::Known(x) if x.contains_key(&p) => {
+                return Err(PubGrubError::SelfDependency {
+                    package: p.clone(),
+                    version: v.clone(),
+                });
+            }
+            Dependencies::Known(x) => {
+                if let Some((dependent, _)) = x.iter().find(|(_, r)| r == &&Range::none()) {
+                    return Err(PubGrubError::DependencyOnTheEmptySet {
+                        package: p.clone(),
+                        version: v.clone(),
+                        dependent: dependent.clone(),
+                    });
+                }
+
+                x
+            }
+        };
+
+        // Add that package and version if the dependencies are not problematic.
+        let dep_incompats =
+            state.add_incompatibility_from_dependencies(p.clone(), v.clone(), &dependencies);
+
+        // TODO: I don't think this check can actually happen.
+        // We might want to put it under #[cfg(debug_assertions)].
+        if state.incompatibility_store[dep_incompats.clone()]
+            .iter()
+            .any(|incompat| state.is_terminal(incompat))
+        {
+            // For a dependency incompatibility to be terminal,
+            // it can only mean that root depend on not root?
+            return Err(PubGrubError::Failure(
+                "Root package depends on itself at a different version?".into(),
+            ));
+        }
+
+        state.partial_solution.add_version(
+            p.clone(),
+            v,
+            dep_incompats,
+            &state.incompatibility_store,
+        );
     }
 }
 
@@ -254,6 +394,59 @@ pub trait DependencyProvider<P: Package, V: Version> {
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
     fn get_dependencies(
+        &self,
+        package: &P,
+        version: &V,
+    ) -> Result<Dependencies<P, V>, Box<dyn Error>>;
+
+    /// This is called fairly regularly during the resolution,
+    /// if it returns an Err then resolution will be terminated.
+    /// This is helpful if you want to add some form of early termination like a timeout,
+    /// or you want to add some form of user feedback if things are taking a while.
+    /// If not provided the resolver will run as long as needed.
+    fn should_cancel(&self) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+}
+
+/// Trait that allows the algorithm to retrieve available packages and their dependencies.
+/// An implementor needs to be supplied to the [resolve] function.
+#[cfg(feature = "async")]
+#[async_trait]
+pub trait AsyncDependencyProvider<P: Package, V: Version> {
+    /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
+    /// is the process of choosing the next package
+    /// and version that will be appended to the partial solution.
+    /// Every time such a decision must be made,
+    /// potential valid packages and version ranges are preselected by the resolver,
+    /// and the dependency provider must choose.
+    ///
+    /// The strategy employed to choose such package and version
+    /// cannot change the existence of a solution or not,
+    /// but can drastically change the performances of the solver,
+    /// or the properties of the solution.
+    /// The documentation of Pub (PubGrub implementation for the dart programming language)
+    /// states the following:
+    ///
+    /// > Pub chooses the latest matching version of the package
+    /// > with the fewest versions that match the outstanding constraint.
+    /// > This tends to find conflicts earlier if any exist,
+    /// > since these packages will run out of versions to try more quickly.
+    /// > But there's likely room for improvement in these heuristics.
+    ///
+    /// A helper function [choose_package_with_fewest_versions] is provided to ease
+    /// implementations of this method if you can produce an iterator
+    /// of the available versions in preference order for any package.
+    ///
+    /// Note: the type `T` ensures that this returns an item from the `packages` argument.
+    async fn choose_package_version<T: Borrow<P>, U: Borrow<Range<V>>>(
+        &self,
+        potential_packages: impl Iterator<Item = (T, U)>,
+    ) -> Result<(T, Option<V>), Box<dyn Error>>;
+
+    /// Retrieves the package dependencies.
+    /// Return [Dependencies::Unknown] if its dependencies are unknown.
+    async fn get_dependencies(
         &self,
         package: &P,
         version: &V,
