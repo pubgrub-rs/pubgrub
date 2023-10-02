@@ -507,7 +507,7 @@ fn large_case() {
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {
                 for n in dependency_provider.versions(p).unwrap() {
-                    if let Ok(s) = resolve(&dependency_provider, p.clone(), n.clone()) {
+                    if let Ok(s) = resolve(&dependency_provider, p, n.clone()) {
                         assert!(sat.sat_is_valid_solution(&s));
                     } else {
                         assert!(!sat.sat_resolve(p, &n));

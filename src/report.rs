@@ -197,7 +197,7 @@ impl DefaultStringReporter {
     fn build_recursive<P: Package, VS: VersionSet>(&mut self, derived: &Derived<P, VS>) {
         self.build_recursive_helper(derived);
         if let Some(id) = derived.shared_id {
-            if self.shared_with_ref.get(&id) == None {
+            if self.shared_with_ref.get(&id).is_none() {
                 self.add_line_ref();
                 self.shared_with_ref.insert(id, self.ref_count);
             }
@@ -260,7 +260,7 @@ impl DefaultStringReporter {
                     //     and finally conclude.
                     (None, None) => {
                         self.build_recursive(derived1);
-                        if derived1.shared_id != None {
+                        if derived1.shared_id.is_some() {
                             self.lines.push("".into());
                             self.build_recursive(current);
                         } else {
