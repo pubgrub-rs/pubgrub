@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 //! A Memory acts like a structured partial solution
-//! where terms are regrouped by package in a [Map](crate::type_aliases::Map).
+//! where terms are regrouped by package in a [Map].
 
 use std::fmt::Display;
 
@@ -147,7 +147,7 @@ impl<P: Package, VS: VersionSet> PartialSolution<P, VS> {
             }
         }
         self.current_decision_level = self.current_decision_level.increment();
-        let mut pa = self
+        let pa = self
             .package_assignments
             .get_mut(&package)
             .expect("Derivations must already exist");
@@ -177,7 +177,7 @@ impl<P: Package, VS: VersionSet> PartialSolution<P, VS> {
         self.next_global_index += 1;
         match self.package_assignments.entry(package) {
             Entry::Occupied(mut occupied) => {
-                let mut pa = occupied.get_mut();
+                let pa = occupied.get_mut();
                 pa.highest_decision_level = self.current_decision_level;
                 match &mut pa.assignments_intersection {
                     // Check that add_derivation is never called in the wrong context.

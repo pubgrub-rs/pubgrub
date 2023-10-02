@@ -27,8 +27,8 @@
 //!
 //! The algorithm is generic and works for any type of dependency system
 //! as long as packages (P) and versions (V) implement
-//! the [Package](crate::package::Package) and [Version](crate::version::Version) traits.
-//! [Package](crate::package::Package) is strictly equivalent and automatically generated
+//! the [Package] and [Version](crate::version::Version) traits.
+//! [Package] is strictly equivalent and automatically generated
 //! for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
 //! [Version](crate::version::Version) simply states that versions are ordered,
 //! that there should be
@@ -298,13 +298,13 @@ where
 {
     let count_valid = |(p, set): &(T, U)| {
         list_available_versions(p.borrow())
-            .filter(|v| set.borrow().contains(v.borrow()))
+            .filter(|v| set.borrow().contains(v))
             .count()
     };
     let (pkg, set) = potential_packages
         .min_by_key(count_valid)
         .expect("potential_packages gave us an empty iterator");
-    let version = list_available_versions(pkg.borrow()).find(|v| set.borrow().contains(v.borrow()));
+    let version = list_available_versions(pkg.borrow()).find(|v| set.borrow().contains(v));
     (pkg, version)
 }
 
