@@ -259,7 +259,7 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
     fn choose_package_version<T: Borrow<P>, U: Borrow<VS>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<VS::V>), Box<dyn Error>>;
+    ) -> Result<(T, Option<VS::V>), Box<dyn Error + Send + Sync>>;
 
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
@@ -267,14 +267,14 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Box<dyn Error>>;
+    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
     /// This is helpful if you want to add some form of early termination like a timeout,
     /// or you want to add some form of user feedback if things are taking a while.
     /// If not provided the resolver will run as long as needed.
-    fn should_cancel(&self) -> Result<(), Box<dyn Error>> {
+    fn should_cancel(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
         Ok(())
     }
 }
@@ -384,7 +384,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependency
     fn choose_package_version<T: Borrow<P>, U: Borrow<VS>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<VS::V>), Box<dyn Error>> {
+    ) -> Result<(T, Option<VS::V>), Box<dyn Error + Send + Sync>> {
         Ok(choose_package_with_fewest_versions(
             |p| {
                 self.dependencies
@@ -402,7 +402,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependency
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Box<dyn Error>> {
+    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>> {
         Ok(match self.dependencies(package, version) {
             None => Dependencies::Unknown,
             Some(dependencies) => Dependencies::Known(dependencies),

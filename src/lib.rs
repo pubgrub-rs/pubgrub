@@ -89,7 +89,7 @@
 //! type SemVS = Range<SemanticVersion>;
 //!
 //! impl DependencyProvider<String, SemVS> for MyDependencyProvider {
-//!     fn choose_package_version<T: Borrow<String>, U: Borrow<SemVS>>(&self,packages: impl Iterator<Item=(T, U)>) -> Result<(T, Option<SemanticVersion>), Box<dyn Error>> {
+//!     fn choose_package_version<T: Borrow<String>, U: Borrow<SemVS>>(&self,packages: impl Iterator<Item=(T, U)>) -> Result<(T, Option<SemanticVersion>), Box<dyn Error + Send + Sync>> {
 //!         unimplemented!()
 //!     }
 //!
@@ -97,7 +97,7 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Dependencies<String, SemVS>, Box<dyn Error>> {
+//!     ) -> Result<Dependencies<String, SemVS>, Box<dyn Error + Send + Sync>> {
 //!         unimplemented!()
 //!     }
 //! }
