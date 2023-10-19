@@ -35,14 +35,18 @@ impl<P: Package, VS: VersionSet> DependencyProvider<P, VS>
     fn choose_package_version<T: std::borrow::Borrow<P>, U: std::borrow::Borrow<VS>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<VS::V>), Box<dyn Error>> {
+    ) -> Result<(T, Option<VS::V>), Box<dyn Error + Send + Sync>> {
         Ok(choose_package_with_fewest_versions(
             |p| self.0.versions(p).into_iter().flatten().cloned(),
             potential_packages,
         ))
     }
 
-    fn get_dependencies(&self, p: &P, v: &VS::V) -> Result<Dependencies<P, VS>, Box<dyn Error>> {
+    fn get_dependencies(
+        &self,
+        p: &P,
+        v: &VS::V,
+    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>> {
         self.0.get_dependencies(p, v)
     }
 }
@@ -73,15 +77,19 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
     fn choose_package_version<T: std::borrow::Borrow<P>, U: std::borrow::Borrow<VS>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<VS::V>), Box<dyn Error>> {
+    ) -> Result<(T, Option<VS::V>), Box<dyn Error + Send + Sync>> {
         self.dp.choose_package_version(potential_packages)
     }
 
-    fn get_dependencies(&self, p: &P, v: &VS::V) -> Result<Dependencies<P, VS>, Box<dyn Error>> {
+    fn get_dependencies(
+        &self,
+        p: &P,
+        v: &VS::V,
+    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>> {
         self.dp.get_dependencies(p, v)
     }
 
-    fn should_cancel(&self) -> Result<(), Box<dyn Error>> {
+    fn should_cancel(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
         assert!(self.start_time.elapsed().as_secs() < 60);
         let calls = self.call_count.get();
         assert!(calls < self.max_calls);

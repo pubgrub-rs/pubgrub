@@ -35,7 +35,7 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
     fn choose_package_version<T: std::borrow::Borrow<P>, U: std::borrow::Borrow<VS>>(
         &self,
         packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<VS::V>), Box<dyn Error>> {
+    ) -> Result<(T, Option<VS::V>), Box<dyn Error + Send + Sync>> {
         self.remote_dependencies.choose_package_version(packages)
     }
 
@@ -44,7 +44,7 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Box<dyn Error>> {
+    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
             Ok(Dependencies::Unknown) => {
