@@ -8,7 +8,7 @@ authors = [
     "Alex Tokarev <aleksator@gmail.com>",
     "Jacob Finkelman <Eh2406@wayne.edu>",
 ]
-edition = "2018"
+edition = "2021"
 description = "PubGrub version solving algorithm"
 readme = "README.md"
 repository = "https://github.com/pubgrub-rs/pubgrub"
