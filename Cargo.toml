@@ -20,6 +20,8 @@ include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+indexmap = "2.0.2"
+priority-queue = "1.1.1"
 thiserror = "1.0"
 rustc-hash = "1.1.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
