@@ -1,6 +1,7 @@
 name: CI
 on:
   pull_request:
+  merge_group:
   push:
     branches: [ release, dev ]
   schedule: [ cron: "0 6 * * 4" ]
@@ -103,6 +104,7 @@ jobs:
   check_commit_conventions:
     name: Commit messages follow project guidelines
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.action == 'enqueued'
     steps:
       - uses: actions/checkout@v2
         with:
