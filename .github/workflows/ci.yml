@@ -1,8 +1,9 @@
 name: CI
 on:
   pull_request:
+  merge_group:
   push:
-    branches: [ release, dev ]
+    branches: [ release, dev, test_merge_queue, test ]
   schedule: [ cron: "0 6 * * 4" ]
 
 env:
@@ -103,6 +104,7 @@ jobs:
   check_commit_conventions:
     name: Commit messages follow project guidelines
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'merge_group' }}
     steps:
       - uses: actions/checkout@v2
         with:
