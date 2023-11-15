@@ -31,20 +31,22 @@ use crate::version_set::VersionSet;
 #[derive(Debug, Clone)]
 pub struct Incompatibility<P: Package, VS: VersionSet> {
     package_terms: SmallMap<P, Term<VS>>,
-    kind: Kind<P, VS>,
+    pub kind: Kind<P, VS>,
 }
 
 /// Type alias of unique identifiers for incompatibilities.
 pub type IncompId<P, VS> = Id<Incompatibility<P, VS>>;
 
 #[derive(Debug, Clone)]
-enum Kind<P: Package, VS: VersionSet> {
+pub enum Kind<P: Package, VS: VersionSet> {
     /// Initial incompatibility aiming at picking the root package for the first decision.
     NotRoot(P, VS::V),
     /// There are no versions in the given range for this package.
     NoVersions(P, VS),
     /// Dependencies of the package are unavailable for versions in that range.
     UnavailableDependencies(P, VS),
+    /// Dependencies of the package are unusable for versions in that range.
+    UnusableDependencies(P, VS),
     /// Incompatibility coming from the dependencies of a given package.
     FromDependencyOf(P, VS, P, VS),
     /// Derived from two causes. Stores cause ids.
@@ -101,6 +103,17 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
         Self {
             package_terms: SmallMap::One([(package.clone(), Term::Positive(set.clone()))]),
             kind: Kind::UnavailableDependencies(package, set),
+        }
+    }
+
+    /// Create an incompatibility to remember
+    /// that a package version is not selectable
+    /// because its dependencies are not usable.
+    pub fn unusable_dependencies(package: P, version: VS::V) -> Self {
+        let set = VS::singleton(version);
+        Self {
+            package_terms: SmallMap::One([(package.clone(), Term::Positive(set.clone()))]),
+            kind: Kind::UnusableDependencies(package, set),
         }
     }
 
@@ -205,6 +218,9 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
             }
             Kind::UnavailableDependencies(package, set) => DerivationTree::External(
                 External::UnavailableDependencies(package.clone(), set.clone()),
+            ),
+            Kind::UnusableDependencies(package, set) => DerivationTree::External(
+                External::UnusableDependencies(package.clone(), set.clone()),
             ),
             Kind::FromDependencyOf(package, set, dep_package, dep_set) => {
                 DerivationTree::External(External::FromDependencyOf(

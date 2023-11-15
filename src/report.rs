@@ -41,6 +41,8 @@ pub enum External<P: Package, VS: VersionSet> {
     NoVersions(P, VS),
     /// Dependencies of the package are unavailable for versions in that set.
     UnavailableDependencies(P, VS),
+    /// Dependencies of the package are unusable for versions in that set.
+    UnusableDependencies(P, VS),
     /// Incompatibility coming from the dependencies of a given package.
     FromDependencyOf(P, VS, P, VS),
 }
@@ -113,6 +115,9 @@ impl<P: Package, VS: VersionSet> DerivationTree<P, VS> {
             DerivationTree::External(External::UnavailableDependencies(_, r)) => Some(
                 DerivationTree::External(External::UnavailableDependencies(package, set.union(&r))),
             ),
+            DerivationTree::External(External::UnusableDependencies(_, r)) => Some(
+                DerivationTree::External(External::UnusableDependencies(package, set.union(&r))),
+            ),
             DerivationTree::External(External::FromDependencyOf(p1, r1, p2, r2)) => {
                 if p1 == package {
                     Some(DerivationTree::External(External::FromDependencyOf(
@@ -154,6 +159,17 @@ impl<P: Package, VS: VersionSet> fmt::Display for External<P, VS> {
                     write!(
                         f,
                         "dependencies of {} at version {} are unavailable",
+                        package, set
+                    )
+                }
+            }
+            Self::UnusableDependencies(package, set) => {
+                if set == &VS::full() {
+                    write!(f, "dependencies of {} are unusable", package)
+                } else {
+                    write!(
+                        f,
+                        "dependencies of {} at version {} are unusable",
                         package, set
                     )
                 }

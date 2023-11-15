@@ -52,6 +52,7 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
                         Ok(Dependencies::Known(dependencies))
                     }
                     Ok(Dependencies::Unknown) => Ok(Dependencies::Unknown),
+                    Ok(Dependencies::Unusable) => Ok(Dependencies::Unusable),
                     error @ Err(_) => error,
                 }
             }

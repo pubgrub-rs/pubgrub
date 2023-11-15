@@ -162,6 +162,13 @@ pub fn resolve<P: Package, VS: VersionSet>(
                     ));
                     continue;
                 }
+                Dependencies::Unusable => {
+                    state.add_incompatibility(Incompatibility::unusable_dependencies(
+                        p.clone(),
+                        v.clone(),
+                    ));
+                    continue;
+                }
                 Dependencies::Known(x) if x.contains_key(p) => {
                     return Err(PubGrubError::SelfDependency {
                         package: p.clone(),
@@ -199,6 +206,8 @@ pub fn resolve<P: Package, VS: VersionSet>(
 pub enum Dependencies<P: Package, VS: VersionSet> {
     /// Package dependencies are unavailable.
     Unknown,
+    /// Package dependencies are unusable.
+    Unusable,
     /// Container for all available package versions.
     Known(DependencyConstraints<P, VS>),
 }

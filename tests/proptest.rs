@@ -316,6 +316,7 @@ fn retain_versions<N: Package + Ord, VS: VersionSet>(
             }
             let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
                 Dependencies::Unknown => panic!(),
+                Dependencies::Unusable => panic!(),
                 Dependencies::Known(deps) => deps,
             };
             smaller_dependency_provider.add_dependencies(n.clone(), v.clone(), deps)
@@ -340,6 +341,7 @@ fn retain_dependencies<N: Package + Ord, VS: VersionSet>(
         for v in dependency_provider.versions(n).unwrap() {
             let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
                 Dependencies::Unknown => panic!(),
+                Dependencies::Unusable => panic!(),
                 Dependencies::Known(deps) => deps,
             };
             smaller_dependency_provider.add_dependencies(
@@ -511,6 +513,7 @@ proptest! {
                 .unwrap()
             {
                 Dependencies::Unknown => panic!(),
+                Dependencies::Unusable => panic!(),
                 Dependencies::Known(d) => d.into_iter().collect(),
             };
             if !dependencies.is_empty() {
