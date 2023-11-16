@@ -1,0 +1,40 @@
+# Automatically creates a tag for each commit to `main` so when we rebase
+# changes on top of the upstream, we retain permanent references to each
+# previous commit so they are not orphaned and eventually deleted.
+name: Create permanent reference
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get the permanent ref number
+        id: get_version
+        run: |
+          # Enable pipefail so git command failures do not result in null versions downstream
+          set -x
+
+          echo ::set-output name=LAST_PERMA_NUMBER::$(\
+            git ls-remote --tags --refs --sort="v:refname" \
+            https://github.com/zanieb/pubgrub.git | grep "tags/perma-" | tail -n1 | sed 's/.*\/perma-//' \
+          )
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Create and push the new tag
+        run: |
+          TAG="perma-$((LAST_PERMA_NUMBER + 1))"
+          git tag -a "$TAG" -m "Automatically created on push to `main`"
+          git push origin "$TAG"
+        env:
+          LAST_PERMA_NUMBER: ${{ steps.get_version.outputs.LAST_PERMA_NUMBER }}
