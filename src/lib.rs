@@ -178,7 +178,7 @@
 //! You may use it as follows:
 //! ```
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
-//! # use pubgrub::report::{DefaultStringReporter, Reporter};
+//! # use pubgrub::report::basic_string_reporter;
 //! # use pubgrub::error::PubGrubError;
 //! # use pubgrub::version::NumberVersion;
 //! # use pubgrub::range::Range;
@@ -193,7 +193,7 @@
 //!     Ok(solution) => println!("{:?}", solution),
 //!     Err(PubGrubError::NoSolution(mut derivation_tree)) => {
 //!         derivation_tree.collapse_no_versions();
-//!         eprintln!("{}", DefaultStringReporter::report(&derivation_tree));
+//!         eprintln!("{}", basic_string_reporter(&derivation_tree));
 //!     }
 //!     Err(err) => panic!("{:?}", err),
 //! };

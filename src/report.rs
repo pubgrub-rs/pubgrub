@@ -5,6 +5,7 @@
 
 use std::fmt;
 use std::ops::{Deref, DerefMut};
+use std::fmt::Write;
 
 use crate::package::Package;
 use crate::term::Term;
@@ -176,251 +177,49 @@ pub struct DefaultStringReporter {
 
 impl DefaultStringReporter {
     /// Initialize the reporter.
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             ref_count: 0,
             shared_with_ref: Map::default(),
             lines: Vec::new(),
         }
     }
+}
 
-    fn build_recursive<P: Package, VS: VersionSet>(&mut self, derived: &Derived<P, VS>) {
-        self.build_recursive_helper(derived);
-        if let Some(id) = derived.shared_id {
-            if self.shared_with_ref.get(&id).is_none() {
-                self.add_line_ref();
-                self.shared_with_ref.insert(id, self.ref_count);
-            }
-        };
-    }
+pub trait Reporter<P: Package, VS: VersionSet> {
+    fn register_shared_id(&mut self, id: usize);
+    fn print_ln(&mut self, line: String);
+    fn add_line_ref(&mut self) -> usize;
+    fn line_ref_of(&mut self, shared_id: Option<usize>) -> Option<usize>;
+    fn string_terms(&mut self, terms: &Map<P, Term<VS>>) -> String;
+    fn string_external(&mut self, terms: &External<P, VS>) -> String;
+}
 
-    fn build_recursive_helper<P: Package, VS: VersionSet>(&mut self, current: &Derived<P, VS>) {
-        match (current.cause1.deref(), current.cause2.deref()) {
-            (DerivationTree::External(external1), DerivationTree::External(external2)) => {
-                // Simplest case, we just combine two external incompatibilities.
-                self.lines.push(Self::explain_both_external(
-                    external1,
-                    external2,
-                    &current.terms,
-                ));
-            }
-            (DerivationTree::Derived(derived), DerivationTree::External(external)) => {
-                // One cause is derived, so we explain this first
-                // then we add the one-line external part
-                // and finally conclude with the current incompatibility.
-                self.report_one_each(derived, external, &current.terms);
-            }
-            (DerivationTree::External(external), DerivationTree::Derived(derived)) => {
-                self.report_one_each(derived, external, &current.terms);
-            }
-            (DerivationTree::Derived(derived1), DerivationTree::Derived(derived2)) => {
-                // This is the most complex case since both causes are also derived.
-                match (
-                    self.line_ref_of(derived1.shared_id),
-                    self.line_ref_of(derived2.shared_id),
-                ) {
-                    // If both causes already have been referenced (shared_id),
-                    // the explanation simply uses those references.
-                    (Some(ref1), Some(ref2)) => self.lines.push(Self::explain_both_ref(
-                        ref1,
-                        derived1,
-                        ref2,
-                        derived2,
-                        &current.terms,
-                    )),
-                    // Otherwise, if one only has a line number reference,
-                    // we recursively call the one without reference and then
-                    // add the one with reference to conclude.
-                    (Some(ref1), None) => {
-                        self.build_recursive(derived2);
-                        self.lines
-                            .push(Self::and_explain_ref(ref1, derived1, &current.terms));
-                    }
-                    (None, Some(ref2)) => {
-                        self.build_recursive(derived1);
-                        self.lines
-                            .push(Self::and_explain_ref(ref2, derived2, &current.terms));
-                    }
-                    // Finally, if no line reference exists yet,
-                    // we call recursively the first one and then,
-                    //   - if this was a shared node, it will get a line ref
-                    //     and we can simply recall this with the current node.
-                    //   - otherwise, we add a line reference to it,
-                    //     recursively call on the second node,
-                    //     and finally conclude.
-                    (None, None) => {
-                        self.build_recursive(derived1);
-                        if derived1.shared_id.is_some() {
-                            self.lines.push("".into());
-                            self.build_recursive(current);
-                        } else {
-                            self.add_line_ref();
-                            let ref1 = self.ref_count;
-                            self.lines.push("".into());
-                            self.build_recursive(derived2);
-                            self.lines
-                                .push(Self::and_explain_ref(ref1, derived1, &current.terms));
-                        }
-                    }
-                }
-            }
+impl<P: Package, VS: VersionSet> Reporter<P, VS> for DefaultStringReporter {
+    fn register_shared_id(&mut self, id: usize) {
+        if self.shared_with_ref.get(&id).is_none() {
+            let ref_count = Reporter::<P, VS>::add_line_ref(self);
+            self.shared_with_ref.insert(id, ref_count);
         }
     }
 
-    /// Report a derived and an external incompatibility.
-    ///
-    /// The result will depend on the fact that the derived incompatibility
-    /// has already been explained or not.
-    fn report_one_each<P: Package, VS: VersionSet>(
-        &mut self,
-        derived: &Derived<P, VS>,
-        external: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-    ) {
-        match self.line_ref_of(derived.shared_id) {
-            Some(ref_id) => self.lines.push(Self::explain_ref_and_external(
-                ref_id,
-                derived,
-                external,
-                current_terms,
-            )),
-            None => self.report_recurse_one_each(derived, external, current_terms),
+    fn print_ln(&mut self, line: String) {
+        self.lines.push(line)
+    }
+
+    fn add_line_ref(&mut self) -> usize {
+        self.ref_count += 1;
+        if let Some(line) = self.lines.last_mut() {
+            write!(line, " ({})", self.ref_count).unwrap();
         }
+        self.ref_count
     }
 
-    /// Report one derived (without a line ref yet) and one external.
-    fn report_recurse_one_each<P: Package, VS: VersionSet>(
-        &mut self,
-        derived: &Derived<P, VS>,
-        external: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-    ) {
-        match (derived.cause1.deref(), derived.cause2.deref()) {
-            // If the derived cause has itself one external prior cause,
-            // we can chain the external explanations.
-            (DerivationTree::Derived(prior_derived), DerivationTree::External(prior_external)) => {
-                self.build_recursive(prior_derived);
-                self.lines.push(Self::and_explain_prior_and_external(
-                    prior_external,
-                    external,
-                    current_terms,
-                ));
-            }
-            // If the derived cause has itself one external prior cause,
-            // we can chain the external explanations.
-            (DerivationTree::External(prior_external), DerivationTree::Derived(prior_derived)) => {
-                self.build_recursive(prior_derived);
-                self.lines.push(Self::and_explain_prior_and_external(
-                    prior_external,
-                    external,
-                    current_terms,
-                ));
-            }
-            _ => {
-                self.build_recursive(derived);
-                self.lines
-                    .push(Self::and_explain_external(external, current_terms));
-            }
-        }
+    fn line_ref_of(&mut self, shared_id: Option<usize>) -> Option<usize> {
+        shared_id.and_then(|id| self.shared_with_ref.get(&id).cloned())
     }
 
-    // String explanations #####################################################
-
-    /// Simplest case, we just combine two external incompatibilities.
-    fn explain_both_external<P: Package, VS: VersionSet>(
-        external1: &External<P, VS>,
-        external2: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-    ) -> String {
-        // TODO: order should be chosen to make it more logical.
-        format!(
-            "Because {} and {}, {}.",
-            external1,
-            external2,
-            Self::string_terms(current_terms)
-        )
-    }
-
-    /// Both causes have already been explained so we use their refs.
-    fn explain_both_ref<P: Package, VS: VersionSet>(
-        ref_id1: usize,
-        derived1: &Derived<P, VS>,
-        ref_id2: usize,
-        derived2: &Derived<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-    ) -> String {
-        // TODO: order should be chosen to make it more logical.
-        format!(
-            "Because {} ({}) and {} ({}), {}.",
-            Self::string_terms(&derived1.terms),
-            ref_id1,
-            Self::string_terms(&derived2.terms),
-            ref_id2,
-            Self::string_terms(current_terms)
-        )
-    }
-
-    /// One cause is derived (already explained so one-line),
-    /// the other is a one-line external cause,
-    /// and finally we conclude with the current incompatibility.
-    fn explain_ref_and_external<P: Package, VS: VersionSet>(
-        ref_id: usize,
-        derived: &Derived<P, VS>,
-        external: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-    ) -> String {
-        // TODO: order should be chosen to make it more logical.
-        format!(
-            "Because {} ({}) and {}, {}.",
-            Self::string_terms(&derived.terms),
-            ref_id,
-            external,
-            Self::string_terms(current_terms)
-        )
-    }
-
-    /// Add an external cause to the chain of explanations.
-    fn and_explain_external<P: Package, VS: VersionSet>(
-        external: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-    ) -> String {
-        format!(
-            "And because {}, {}.",
-            external,
-            Self::string_terms(current_terms)
-        )
-    }
-
-    /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_ref<P: Package, VS: VersionSet>(
-        ref_id: usize,
-        derived: &Derived<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-    ) -> String {
-        format!(
-            "And because {} ({}), {}.",
-            Self::string_terms(&derived.terms),
-            ref_id,
-            Self::string_terms(current_terms)
-        )
-    }
-
-    /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_prior_and_external<P: Package, VS: VersionSet>(
-        prior_external: &External<P, VS>,
-        external: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-    ) -> String {
-        format!(
-            "And because {} and {}, {}.",
-            prior_external,
-            external,
-            Self::string_terms(current_terms)
-        )
-    }
-
-    /// Try to print terms of an incompatibility in a human-readable way.
-    pub fn string_terms<P: Package, VS: VersionSet>(terms: &Map<P, Term<VS>>) -> String {
+    fn string_terms(&mut self, terms: &Map<P, Term<VS>>) -> String {
         let terms_vec: Vec<_> = terms.iter().collect();
         match terms_vec.as_slice() {
             [] => "version solving failed".into(),
@@ -440,30 +239,252 @@ impl DefaultStringReporter {
         }
     }
 
-    // Helper functions ########################################################
+    fn string_external(&mut self, terms: &External<P, VS>) -> String {
+        terms.to_string()
+    }
+}
 
-    fn add_line_ref(&mut self) {
-        let new_count = self.ref_count + 1;
-        self.ref_count = new_count;
-        if let Some(line) = self.lines.last_mut() {
-            *line = format!("{} ({})", line, new_count);
+fn build_recursive<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    derived: &Derived<P, VS>,
+) {
+    build_recursive_helper(reporter, derived);
+    if let Some(id) = derived.shared_id {
+        reporter.register_shared_id(id);
+    };
+}
+
+fn build_recursive_helper<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    current: &Derived<P, VS>,
+) {
+    match (current.cause1.deref(), current.cause2.deref()) {
+        (DerivationTree::External(external1), DerivationTree::External(external2)) => {
+            // Simplest case, we just combine two external incompatibilities.
+            let line = explain_both_external(reporter, external1, external2, &current.terms);
+            reporter.print_ln(line);
+        }
+        (DerivationTree::Derived(derived), DerivationTree::External(external)) => {
+            // One cause is derived, so we explain this first
+            // then we add the one-line external part
+            // and finally conclude with the current incompatibility.
+            report_one_each(reporter, derived, external, &current.terms);
+        }
+        (DerivationTree::External(external), DerivationTree::Derived(derived)) => {
+            report_one_each(reporter, derived, external, &current.terms);
+        }
+        (DerivationTree::Derived(derived1), DerivationTree::Derived(derived2)) => {
+            // This is the most complex case since both causes are also derived.
+            match (
+                reporter.line_ref_of(derived1.shared_id),
+                reporter.line_ref_of(derived2.shared_id),
+            ) {
+                // If both causes already have been referenced (shared_id),
+                // the explanation simply uses those references.
+                (Some(ref1), Some(ref2)) => {
+                    let line =
+                        explain_both_ref(reporter, ref1, derived1, ref2, derived2, &current.terms);
+                    reporter.print_ln(line);
+                }
+                // Otherwise, if one only has a line number reference,
+                // we recursively call the one without reference and then
+                // add the one with reference to conclude.
+                (Some(ref1), None) => {
+                    build_recursive(reporter, derived2);
+                    let line = and_explain_ref(reporter, ref1, derived1, &current.terms);
+                    reporter.print_ln(line);
+                }
+                (None, Some(ref2)) => {
+                    build_recursive(reporter, derived1);
+                    let line = and_explain_ref(reporter, ref2, derived2, &current.terms);
+                    reporter.print_ln(line);
+                }
+                // Finally, if no line reference exists yet,
+                // we call recursively the first one and then,
+                //   - if this was a shared node, it will get a line ref
+                //     and we can simply recall this with the current node.
+                //   - otherwise, we add a line reference to it,
+                //     recursively call on the second node,
+                //     and finally conclude.
+                (None, None) => {
+                    build_recursive(reporter, derived1);
+                    if derived1.shared_id.is_some() {
+                        reporter.print_ln("".into());
+                        build_recursive(reporter, current);
+                    } else {
+                        let ref1 = reporter.add_line_ref();
+                        reporter.print_ln("".into());
+                        build_recursive(reporter, derived2);
+                        let line = and_explain_ref(reporter, ref1, derived1, &current.terms);
+                        reporter.print_ln(line);
+                    }
+                }
+            }
         }
     }
+}
 
-    fn line_ref_of(&self, shared_id: Option<usize>) -> Option<usize> {
-        shared_id.and_then(|id| self.shared_with_ref.get(&id).cloned())
+/// Report a derived and an external incompatibility.
+///
+/// The result will depend on the fact that the derived incompatibility
+/// has already been explained or not.
+fn report_one_each<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    derived: &Derived<P, VS>,
+    external: &External<P, VS>,
+    current_terms: &Map<P, Term<VS>>,
+) {
+    match reporter.line_ref_of(derived.shared_id) {
+        Some(ref_id) => {
+            let line = explain_ref_and_external(reporter, ref_id, derived, external, current_terms);
+            reporter.print_ln(line)
+        }
+        None => report_recurse_one_each(reporter, derived, external, current_terms),
     }
+}
+
+/// Report one derived (without a line ref yet) and one external.
+fn report_recurse_one_each<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    derived: &Derived<P, VS>,
+    external: &External<P, VS>,
+    current_terms: &Map<P, Term<VS>>,
+) {
+    match (derived.cause1.deref(), derived.cause2.deref()) {
+        // If the derived cause has itself one external prior cause,
+        // we can chain the external explanations.
+        (DerivationTree::Derived(prior_derived), DerivationTree::External(prior_external)) => {
+            build_recursive(reporter, prior_derived);
+            let line =
+                and_explain_prior_and_external(reporter, prior_external, external, current_terms);
+            reporter.print_ln(line);
+        }
+        // If the derived cause has itself one external prior cause,
+        // we can chain the external explanations.
+        (DerivationTree::External(prior_external), DerivationTree::Derived(prior_derived)) => {
+            build_recursive(reporter, prior_derived);
+            let line =
+                and_explain_prior_and_external(reporter, prior_external, external, current_terms);
+            reporter.print_ln(line);
+        }
+        _ => {
+            build_recursive(reporter, derived);
+            let line = and_explain_external(reporter, external, current_terms);
+            reporter.print_ln(line);
+        }
+    }
+}
+
+// String explanations #####################################################
+
+/// Simplest case, we just combine two external incompatibilities.
+fn explain_both_external<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    external1: &External<P, VS>,
+    external2: &External<P, VS>,
+    current_terms: &Map<P, Term<VS>>,
+) -> String {
+    // TODO: order should be chosen to make it more logical.
+    format!(
+        "Because {} and {}, {}.",
+        reporter.string_external(external1),
+        reporter.string_external(external2),
+        reporter.string_terms(current_terms)
+    )
+}
+
+/// Both causes have already been explained so we use their refs.
+fn explain_both_ref<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    ref_id1: usize,
+    derived1: &Derived<P, VS>,
+    ref_id2: usize,
+    derived2: &Derived<P, VS>,
+    current_terms: &Map<P, Term<VS>>,
+) -> String {
+    // TODO: order should be chosen to make it more logical.
+    format!(
+        "Because {} ({}) and {} ({}), {}.",
+        reporter.string_terms(&derived1.terms),
+        ref_id1,
+        reporter.string_terms(&derived2.terms),
+        ref_id2,
+        reporter.string_terms(current_terms)
+    )
+}
+
+/// One cause is derived (already explained so one-line),
+/// the other is a one-line external cause,
+/// and finally we conclude with the current incompatibility.
+fn explain_ref_and_external<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    ref_id: usize,
+    derived: &Derived<P, VS>,
+    external: &External<P, VS>,
+    current_terms: &Map<P, Term<VS>>,
+) -> String {
+    // TODO: order should be chosen to make it more logical.
+    format!(
+        "Because {} ({}) and {}, {}.",
+        reporter.string_terms(&derived.terms),
+        ref_id,
+        reporter.string_external(external),
+        reporter.string_terms(current_terms)
+    )
+}
+
+/// Add an external cause to the chain of explanations.
+fn and_explain_external<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    external: &External<P, VS>,
+    current_terms: &Map<P, Term<VS>>,
+) -> String {
+    format!(
+        "And because {}, {}.",
+        reporter.string_external(external),
+        reporter.string_terms(current_terms)
+    )
+}
+
+/// Add an already explained incompat to the chain of explanations.
+fn and_explain_ref<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    ref_id: usize,
+    derived: &Derived<P, VS>,
+    current_terms: &Map<P, Term<VS>>,
+) -> String {
+    format!(
+        "And because {} ({}), {}.",
+        reporter.string_terms(&derived.terms),
+        ref_id,
+        reporter.string_terms(current_terms)
+    )
+}
+
+/// Add an already explained incompat to the chain of explanations.
+fn and_explain_prior_and_external<P: Package, VS: VersionSet>(
+    reporter: &mut impl Reporter<P, VS>,
+    prior_external: &External<P, VS>,
+    external: &External<P, VS>,
+    current_terms: &Map<P, Term<VS>>,
+) -> String {
+    format!(
+        "And because {} and {}, {}.",
+        reporter.string_external(prior_external),
+        reporter.string_external(external),
+        reporter.string_terms(current_terms)
+    )
 }
 
 /// A straightforward way to convert a [`DerivationTree`] into a string for presenting to a user.
 pub fn basic_string_reporter<P: Package, VS: VersionSet>(
     derivation_tree: &DerivationTree<P, VS>,
 ) -> String {
+    let mut reporter = DefaultStringReporter::new();
     match derivation_tree {
-        DerivationTree::External(external) => external.to_string(),
+        DerivationTree::External(external) => reporter.string_external(external),
         DerivationTree::Derived(derived) => {
-            let mut reporter = DefaultStringReporter::new();
-            reporter.build_recursive(derived);
+            build_recursive(&mut reporter, derived);
             reporter.lines.join("\n")
         }
     }
