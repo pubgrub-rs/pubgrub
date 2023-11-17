@@ -2,7 +2,7 @@
 
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
-use pubgrub::report::{DefaultStringReporter, Reporter};
+use pubgrub::report::basic_string_reporter;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::SemanticVersion;
 
@@ -59,7 +59,7 @@ fn main() {
         Ok(sol) => println!("{:?}", sol),
         Err(PubGrubError::NoSolution(mut derivation_tree)) => {
             derivation_tree.collapse_no_versions();
-            eprintln!("{}", DefaultStringReporter::report(&derivation_tree));
+            eprintln!("{}", basic_string_reporter(&derivation_tree));
             std::process::exit(1);
         }
         Err(err) => panic!("{:?}", err),

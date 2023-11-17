@@ -5,7 +5,7 @@ use std::{collections::BTreeSet as Set, error::Error};
 use pubgrub::error::PubGrubError;
 use pubgrub::package::Package;
 use pubgrub::range::Range;
-use pubgrub::report::{DefaultStringReporter, DerivationTree, External, Reporter};
+use pubgrub::report::{basic_string_reporter, DerivationTree, External};
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
 use pubgrub::type_aliases::SelectedDependencies;
 use pubgrub::version::{NumberVersion, SemanticVersion};
@@ -466,8 +466,8 @@ proptest! {
                     (Ok(l), Ok(r)) => assert_eq!(l, r),
                     (Err(PubGrubError::NoSolution(derivation_l)), Err(PubGrubError::NoSolution(derivation_r))) => {
                         prop_assert_eq!(
-                            DefaultStringReporter::report(derivation_l),
-                            DefaultStringReporter::report(derivation_r)
+                            basic_string_reporter(derivation_l),
+                            basic_string_reporter(derivation_r)
                         )},
                     _ => panic!("not the same result")
                 }

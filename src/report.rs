@@ -11,16 +11,6 @@ use crate::term::Term;
 use crate::type_aliases::Map;
 use crate::version_set::VersionSet;
 
-/// Reporter trait.
-pub trait Reporter<P: Package, VS: VersionSet> {
-    /// Output type of the report.
-    type Output;
-
-    /// Generate a report from the derivation tree
-    /// describing the resolution failure.
-    fn report(derivation_tree: &DerivationTree<P, VS>) -> Self::Output;
-}
-
 /// Derivation tree resulting in the impossibility
 /// to solve the dependencies of our root package.
 #[derive(Debug, Clone)]
@@ -465,17 +455,16 @@ impl DefaultStringReporter {
     }
 }
 
-impl<P: Package, VS: VersionSet> Reporter<P, VS> for DefaultStringReporter {
-    type Output = String;
-
-    fn report(derivation_tree: &DerivationTree<P, VS>) -> Self::Output {
-        match derivation_tree {
-            DerivationTree::External(external) => external.to_string(),
-            DerivationTree::Derived(derived) => {
-                let mut reporter = Self::new();
-                reporter.build_recursive(derived);
-                reporter.lines.join("\n")
-            }
+/// A straightforward way to convert a [`DerivationTree`] into a string for presenting to a user.
+pub fn basic_string_reporter<P: Package, VS: VersionSet>(
+    derivation_tree: &DerivationTree<P, VS>,
+) -> String {
+    match derivation_tree {
+        DerivationTree::External(external) => external.to_string(),
+        DerivationTree::Derived(derived) => {
+            let mut reporter = DefaultStringReporter::new();
+            reporter.build_recursive(derived);
+            reporter.lines.join("\n")
         }
     }
 }
