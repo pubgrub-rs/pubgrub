@@ -51,6 +51,7 @@
 //! If we do not see practical bugs, or we get a formal proof that the code cannot lead to error states, then we may remove this warning.
 
 use crate::{internal::small_vec::SmallVec, version_set::VersionSet};
+use std::cmp::Ordering;
 use std::ops::RangeBounds;
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -202,21 +203,44 @@ impl<V: Ord> Range<V> {
     /// Returns true if the this Range contains the specified value.
     pub fn contains(&self, v: &V) -> bool {
         for segment in self.segments.iter() {
-            if match segment {
-                (Unbounded, Unbounded) => true,
-                (Unbounded, Included(end)) => v <= end,
-                (Unbounded, Excluded(end)) => v < end,
-                (Included(start), Unbounded) => v >= start,
-                (Included(start), Included(end)) => v >= start && v <= end,
-                (Included(start), Excluded(end)) => v >= start && v < end,
-                (Excluded(start), Unbounded) => v > start,
-                (Excluded(start), Included(end)) => v > start && v <= end,
-                (Excluded(start), Excluded(end)) => v > start && v < end,
-            } {
-                return true;
+            match within_bounds(v, segment) {
+                Ordering::Less => return false,
+                Ordering::Equal => return true,
+                Ordering::Greater => (),
             }
         }
         false
+    }
+
+    /// Returns true if the this Range contains the specified values.
+    ///
+    /// The `versions` iterator must be sorted.
+    /// Functionally equivalent to `versions.map(|v| self.contains(v))`.
+    /// Except it runs in `O(size_of_range + len_of_versions)` not `O(size_of_range * len_of_versions)`
+    pub fn contains_many<'s, I>(&'s self, versions: I) -> impl Iterator<Item = bool> + 's
+    where
+        I: Iterator<Item = &'s V> + 's,
+        V: 's,
+    {
+        self.locate_versions(versions).map(|m| m.is_some())
+    }
+
+    /// Return the segment index in the range for each version in the range, None otherwise
+    fn locate_versions<'s, I>(&'s self, versions: I) -> impl Iterator<Item = Option<usize>> + 's
+    where
+        I: Iterator<Item = &'s V> + 's,
+        V: 's,
+    {
+        versions.scan(0, |i, v| {
+            while let Some(segment) = self.segments.get(*i) {
+                match within_bounds(v, segment) {
+                    Ordering::Less => return Some(None),
+                    Ordering::Equal => return Some(Some(*i)),
+                    Ordering::Greater => *i += 1,
+                }
+            }
+            Some(None)
+        })
     }
 
     /// Construct a simple range from anything that impls [RangeBounds] like `v1..v2`.
@@ -264,6 +288,26 @@ impl<V: Ord> Range<V> {
     }
 }
 
+fn within_bounds<V: PartialOrd>(v: &V, segment: &Interval<V>) -> Ordering {
+    let below_lower_bound = match segment {
+        (Excluded(start), _) => v <= start,
+        (Included(start), _) => v < start,
+        (Unbounded, _) => false,
+    };
+    if below_lower_bound {
+        return Ordering::Less;
+    }
+    let below_upper_bound = match segment {
+        (_, Unbounded) => true,
+        (_, Included(end)) => v <= end,
+        (_, Excluded(end)) => v < end,
+    };
+    if below_upper_bound {
+        return Ordering::Equal;
+    }
+    Ordering::Greater
+}
+
 fn valid_segment<T: PartialOrd>(start: &Bound<T>, end: &Bound<T>) -> bool {
     match (start, end) {
         (Included(s), Included(e)) => s <= e,
@@ -272,6 +316,33 @@ fn valid_segment<T: PartialOrd>(start: &Bound<T>, end: &Bound<T>) -> bool {
         (Excluded(s), Excluded(e)) => s < e,
         (Unbounded, _) | (_, Unbounded) => true,
     }
+}
+
+/// group adjacent versions locations
+/// [None, 3, 6, 7, None] -> [(3, 7)]
+/// [3, 6, 7, None] -> [(None, 7)]
+/// [3, 6, 7] -> [(None, None)]
+/// [None, 1, 4, 7, None, None, None, 8, None, 9] -> [(1, 7), (8, 8), (9, None)]
+fn group_adjacent_locations(
+    mut locations: impl Iterator<Item = Option<usize>>,
+) -> impl Iterator<Item = (Option<usize>, Option<usize>)> {
+    // If the first version matched, then the lower bound of that segment is not needed
+    let mut seg = locations.next().flatten().map(|ver| (None, Some(ver)));
+    std::iter::from_fn(move || {
+        for ver in locations.by_ref() {
+            if let Some(ver) = ver {
+                // As long as were still matching versions, we keep merging into the currently matching segment
+                seg = Some((seg.map_or(Some(ver), |(s, _)| s), Some(ver)));
+            } else {
+                // If we have found a version that doesn't match, then right the merge segment and prepare for a new one.
+                if seg.is_some() {
+                    return seg.take();
+                }
+            }
+        }
+        // If the last version matched, then write out the merged segment but the upper bound is not needed.
+        seg.take().map(|(s, _)| (s, None))
+    })
 }
 
 impl<V: Ord + Clone> Range<V> {
@@ -319,6 +390,41 @@ impl<V: Ord + Clone> Range<V> {
             }
         }
 
+        Self { segments }.check_invariants()
+    }
+
+    /// Returns a simpler Range that contains the same versions
+    ///
+    /// For every one of the Versions provided in versions the existing range and
+    /// the simplified range will agree on whether it is contained.
+    /// The simplified version may include or exclude versions that are not in versions as the implementation wishes.
+    /// For example:
+    ///  - If all the versions are contained in the original than the range will be simplified to `full`.
+    ///  - If none of the versions are contained in the original than the range will be simplified to `empty`.
+    ///
+    /// If versions are not sorted the correctness of this function is not guaranteed.
+    pub fn simplify<'s, I>(&'s self, versions: I) -> Self
+    where
+        I: Iterator<Item = &'s V> + 's,
+        V: 's,
+    {
+        let version_locations = self.locate_versions(versions);
+        let kept_segments = group_adjacent_locations(version_locations);
+        self.keep_segments(kept_segments)
+    }
+
+    /// simplify range with segments at given location bounds.
+    fn keep_segments(
+        &self,
+        kept_segments: impl Iterator<Item = (Option<usize>, Option<usize>)>,
+    ) -> Range<V> {
+        let mut segments = SmallVec::Empty;
+        for (s, e) in kept_segments {
+            segments.push((
+                s.map_or(Unbounded, |s| self.segments[s].0.clone()),
+                e.map_or(Unbounded, |e| self.segments[e].1.clone()),
+            ));
+        }
         Self { segments }.check_invariants()
     }
 }
@@ -599,6 +705,33 @@ pub mod tests {
             let rv: Range<u32> = Range::from_range_bounds(range);
             let rv2: Range<u32> = rv.bounding_range().map(Range::from_range_bounds::<_, u32>).unwrap_or_else(Range::empty);
             assert_eq!(rv, rv2);
+        }
+
+        #[test]
+        fn contains(range in strategy(), versions in proptest::collection::vec(version_strat(), ..30)) {
+            for v in versions {
+                assert_eq!(range.contains(&v), range.segments.iter().any(|s| RangeBounds::contains(s, &v)));
+            }
+        }
+
+        #[test]
+        fn contains_many(range in strategy(), mut versions in proptest::collection::vec(version_strat(), ..30)) {
+            versions.sort();
+            assert_eq!(versions.len(), range.contains_many(versions.iter()).count());
+            for (a, b) in versions.iter().zip(range.contains_many(versions.iter())) {
+                assert_eq!(range.contains(a), b);
+            }
+        }
+
+        #[test]
+        fn simplify(range in strategy(), mut versions in proptest::collection::vec(version_strat(), ..30)) {
+            versions.sort();
+            let simp = range.simplify(versions.iter());
+
+            for v in versions {
+                assert_eq!(range.contains(&v), simp.contains(&v));
+            }
+            assert!(simp.segments.len() <= range.segments.len())
         }
     }
 }
