@@ -289,34 +289,43 @@ impl<V: Ord + Clone> Range<V> {
         let mut left_iter = self.segments.iter().peekable();
         let mut right_iter = other.segments.iter().peekable();
 
-        while let (Some((left_start, left_end)), Some((right_start, right_end))) =
-            (left_iter.peek(), right_iter.peek())
+        while let Some(((left_start, left_end), (right_start, right_end))) =
+            left_iter.peek().zip(right_iter.peek())
         {
+            let left_end_is_smaller = match (left_end, right_end) {
+                (Included(l), Included(r))
+                | (Excluded(l), Excluded(r))
+                | (Excluded(l), Included(r)) => l <= r,
+
+                (Included(l), Excluded(r)) => l < r,
+                (_, Unbounded) => true,
+                (Unbounded, _) => false,
+            };
+            let (other_start, end) = if left_end_is_smaller {
+                left_iter.next();
+                (right_start, left_end)
+            } else {
+                right_iter.next();
+                (left_start, right_end)
+            };
+            if !valid_segment(other_start, end) {
+                continue;
+            }
             let start = match (left_start, right_start) {
                 (Included(l), Included(r)) => Included(std::cmp::max(l, r)),
                 (Excluded(l), Excluded(r)) => Excluded(std::cmp::max(l, r)),
 
-                (Included(i), Excluded(e)) | (Excluded(e), Included(i)) if i <= e => Excluded(e),
-                (Included(i), Excluded(e)) | (Excluded(e), Included(i)) if e < i => Included(i),
+                (Included(i), Excluded(e)) | (Excluded(e), Included(i)) => {
+                    if i <= e {
+                        Excluded(e)
+                    } else {
+                        Included(i)
+                    }
+                }
                 (s, Unbounded) | (Unbounded, s) => s.as_ref(),
-                _ => unreachable!(),
-            }
-            .cloned();
-            let end = match (left_end, right_end) {
-                (Included(l), Included(r)) => Included(std::cmp::min(l, r)),
-                (Excluded(l), Excluded(r)) => Excluded(std::cmp::min(l, r)),
+            };
 
-                (Included(i), Excluded(e)) | (Excluded(e), Included(i)) if i >= e => Excluded(e),
-                (Included(i), Excluded(e)) | (Excluded(e), Included(i)) if e > i => Included(i),
-                (s, Unbounded) | (Unbounded, s) => s.as_ref(),
-                _ => unreachable!(),
-            }
-            .cloned();
-            left_iter.next_if(|(_, e)| e == &end);
-            right_iter.next_if(|(_, e)| e == &end);
-            if valid_segment(&start, &end) {
-                segments.push((start, end))
-            }
+            segments.push((start.cloned(), end.clone()))
         }
 
         Self { segments }.check_invariants()
