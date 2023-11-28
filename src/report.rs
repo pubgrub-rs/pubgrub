@@ -199,14 +199,14 @@ impl<P: Package, VS: VersionSet> fmt::Display for External<P, VS> {
                 write!(f, "we are solving dependencies of {} {}", package, version)
             }
             Self::NoVersions(package, set) => {
-                if set == &VS::full() {
+                if set == &VS::full() || set == &VS::empty() {
                     write!(f, "there is no available version for {}", package)
                 } else {
                     write!(f, "there is no version of {} in {}", package, set)
                 }
             }
             Self::UnavailableDependencies(package, set) => {
-                if set == &VS::full() {
+                if set == &VS::full() || set == &VS::empty() {
                     write!(f, "dependencies of {} are unavailable", package)
                 } else {
                     write!(
@@ -240,11 +240,13 @@ impl<P: Package, VS: VersionSet> fmt::Display for External<P, VS> {
                 }
             }
             Self::FromDependencyOf(p, set_p, dep, set_dep) => {
-                if set_p == &VS::full() && set_dep == &VS::full() {
+                if (set_p == &VS::full() || set_p == &VS::empty())
+                    && (set_dep == &VS::full() || set_dep == &VS::empty())
+                {
                     write!(f, "{} depends on {}", p, dep)
-                } else if set_p == &VS::full() {
+                } else if set_p == &VS::full() || set_p == &VS::empty() {
                     write!(f, "{} depends on {} {}", p, dep, set_dep)
-                } else if set_dep == &VS::full() {
+                } else if set_dep == &VS::full() || set_dep == &VS::empty() {
                     write!(f, "{} {} depends on {}", p, set_p, dep)
                 } else {
                     write!(f, "{} {} depends on {} {}", p, set_p, dep, set_dep)
