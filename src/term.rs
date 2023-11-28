@@ -101,6 +101,17 @@ impl<VS: VersionSet> Term<VS> {
     pub(crate) fn subset_of(&self, other: &Self) -> bool {
         self == &self.intersection(other)
     }
+
+    pub(crate) fn simplify<'s, I>(&'s self, versions: I) -> Self
+    where
+        I: Iterator<Item = &'s VS::V> + 's,
+        VS::V: 's,
+    {
+        match self {
+            Self::Positive(set) => Self::Positive(set.simplify(versions)),
+            Self::Negative(set) => Self::Negative(set.simplify(versions)),
+        }
+    }
 }
 
 /// Describe a relation between a set of terms S and another term t.
