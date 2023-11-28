@@ -173,7 +173,17 @@ impl<P: Package, VS: VersionSet> DerivationTree<P, VS> {
                 DerivationTree::External(external)
             }
             DerivationTree::Derived(derived) => DerivationTree::Derived(Derived {
-                terms: derived.terms.clone(),
+                terms: derived
+                    .terms
+                    .iter()
+                    .map(|(p, t)| {
+                        (
+                            p.clone(),
+                            t.simplify(versions.get(&p).unwrap_or(&Vec::new()).into_iter()),
+                        )
+                    })
+                    .collect(),
+
                 shared_id: derived.shared_id,
                 cause1: Box::new(derived.cause1.simplify_versions(versions)),
                 cause2: Box::new(derived.cause2.simplify_versions(versions)),
