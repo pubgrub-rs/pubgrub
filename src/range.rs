@@ -222,24 +222,15 @@ impl<V: Ord> Range<V> {
         I: Iterator<Item = &'s V> + 's,
         V: 's,
     {
-        self.locate_versions(versions).map(|m| m.is_some())
-    }
-
-    /// Return the segment index in the range for each version in the range, None otherwise
-    fn locate_versions<'s, I>(&'s self, versions: I) -> impl Iterator<Item = Option<usize>> + 's
-    where
-        I: Iterator<Item = &'s V> + 's,
-        V: 's,
-    {
-        versions.scan(0, |i, v| {
+        versions.scan(0, move |i, v| {
             while let Some(segment) = self.segments.get(*i) {
                 match within_bounds(v, segment) {
-                    Ordering::Less => return Some(None),
-                    Ordering::Equal => return Some(Some(*i)),
+                    Ordering::Less => return Some(false),
+                    Ordering::Equal => return Some(true),
                     Ordering::Greater => *i += 1,
                 }
             }
-            Some(None)
+            Some(false)
         })
     }
 
@@ -405,12 +396,22 @@ impl<V: Ord + Clone> Range<V> {
     ///  - If none of the versions are contained in the original than the range will be simplified to `empty`.
     ///
     /// If versions are not sorted the correctness of this function is not guaranteed.
-    pub fn simplify<'s, I>(&'s self, versions: I) -> Self
+    pub fn simplify<'v, I>(&self, versions: I) -> Self
     where
-        I: Iterator<Item = &'s V> + 's,
-        V: 's,
+        I: Iterator<Item = &'v V> + 'v,
+        V: 'v,
     {
-        let version_locations = self.locate_versions(versions);
+        // Return the segment index in the range for each version in the range, None otherwise
+        let version_locations = versions.scan(0, move |i, v| {
+            while let Some(segment) = self.segments.get(*i) {
+                match within_bounds(v, segment) {
+                    Ordering::Less => return Some(None),
+                    Ordering::Equal => return Some(Some(*i)),
+                    Ordering::Greater => *i += 1,
+                }
+            }
+            Some(None)
+        });
         let kept_segments = group_adjacent_locations(version_locations);
         self.keep_segments(kept_segments)
     }
