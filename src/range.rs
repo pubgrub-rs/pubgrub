@@ -319,10 +319,12 @@ fn valid_segment<T: PartialOrd>(start: &Bound<T>, end: &Bound<T>) -> bool {
 }
 
 /// group adjacent versions locations
+/// ```text
 /// [None, 3, 6, 7, None] -> [(3, 7)]
 /// [3, 6, 7, None] -> [(None, 7)]
 /// [3, 6, 7] -> [(None, None)]
 /// [None, 1, 4, 7, None, None, None, 8, None, 9] -> [(1, 7), (8, 8), (9, None)]
+/// ```
 fn group_adjacent_locations(
     mut locations: impl Iterator<Item = Option<usize>>,
 ) -> impl Iterator<Item = (Option<usize>, Option<usize>)> {
