@@ -309,7 +309,8 @@ fn valid_segment<T: PartialOrd>(start: &Bound<T>, end: &Bound<T>) -> bool {
     }
 }
 
-/// group adjacent versions locations
+/// Group adjacent versions locations.
+///
 /// ```text
 /// [None, 3, 6, 7, None] -> [(3, 7)]
 /// [3, 6, 7, None] -> [(None, 7)]
