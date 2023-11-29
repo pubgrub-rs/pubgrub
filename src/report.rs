@@ -169,6 +169,14 @@ impl<P: Package, VS: VersionSet> DerivationTree<P, VS> {
                         vs.clone()
                             .simplify(versions.get(&p).unwrap_or(&Vec::new()).into_iter()),
                     ),
+                    External::UnusableDependencies(p, vs, reason) => {
+                        External::UnusableDependencies(
+                            p.clone(),
+                            vs.clone()
+                                .simplify(versions.get(&p).unwrap_or(&Vec::new()).into_iter()),
+                            reason.clone(),
+                        )
+                    }
                 };
                 DerivationTree::External(external)
             }
