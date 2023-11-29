@@ -417,7 +417,10 @@ impl<V: Ord + Clone> Range<V> {
         self.keep_segments(kept_segments)
     }
 
-    /// simplify range with segments at given location bounds.
+    /// Create a new range with a subset of segments at given location bounds.
+    ///
+    /// Each new segment is constructed from a pair of segments, taking the
+    /// start of the first and the end of the second.
     fn keep_segments(
         &self,
         kept_segments: impl Iterator<Item = (Option<usize>, Option<usize>)>,
