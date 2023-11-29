@@ -6,6 +6,8 @@
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
+use rustc_hash::FxHashMap;
+
 use crate::package::Package;
 use crate::term::Term;
 use crate::type_aliases::Map;
@@ -130,6 +132,43 @@ impl<P: Package, VS: VersionSet> DerivationTree<P, VS> {
                     )))
                 }
             }
+        }
+    }
+
+    /// Simplify version ranges in the deriviation tree using the available
+    /// versions for each package.
+    pub fn simplify_versions(&self, versions: &FxHashMap<P, Vec<VS::V>>) -> Self {
+        match self {
+            DerivationTree::External(external) => {
+                let external = match external {
+                    External::NotRoot(..) => external.clone(),
+                    External::FromDependencyOf(l_p, l_vs, r_p, r_vs) => External::FromDependencyOf(
+                        l_p.clone(),
+                        l_vs.clone()
+                            .simplify(versions.get(&l_p).unwrap_or(&Vec::new()).into_iter()),
+                        r_p.clone(),
+                        r_vs.clone()
+                            .simplify(versions.get(&r_p).unwrap_or(&Vec::new()).into_iter()),
+                    ),
+                    External::NoVersions(p, vs) => External::NoVersions(
+                        p.clone(),
+                        vs.clone()
+                            .simplify(versions.get(&p).unwrap_or(&Vec::new()).into_iter()),
+                    ),
+                    External::UnavailableDependencies(p, vs) => External::UnavailableDependencies(
+                        p.clone(),
+                        vs.clone()
+                            .simplify(versions.get(&p).unwrap_or(&Vec::new()).into_iter()),
+                    ),
+                };
+                DerivationTree::External(external)
+            }
+            DerivationTree::Derived(derived) => DerivationTree::Derived(Derived {
+                terms: derived.terms.clone(),
+                shared_id: derived.shared_id,
+                cause1: Box::new(derived.cause1.simplify_versions(versions)),
+                cause2: Box::new(derived.cause2.simplify_versions(versions)),
+            }),
         }
     }
 }

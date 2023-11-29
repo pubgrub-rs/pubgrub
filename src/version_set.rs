@@ -37,6 +37,11 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
     /// Compute the intersection with another set.
     fn intersection(&self, other: &Self) -> Self;
 
+    fn simplify<'s, I>(&'s self, versions: I) -> Self
+    where
+        I: Iterator<Item = &'s Self::V> + 's,
+        Self::V: 's;
+
     // Membership
     /// Evaluate membership of a version in this set.
     fn contains(&self, v: &Self::V) -> bool;

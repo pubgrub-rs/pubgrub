@@ -387,36 +387,6 @@ impl<V: Ord + Clone> Range<V> {
         Self { segments }.check_invariants()
     }
 
-    /// Returns a simpler Range that contains the same versions
-    ///
-    /// For every one of the Versions provided in versions the existing range and
-    /// the simplified range will agree on whether it is contained.
-    /// The simplified version may include or exclude versions that are not in versions as the implementation wishes.
-    /// For example:
-    ///  - If all the versions are contained in the original than the range will be simplified to `full`.
-    ///  - If none of the versions are contained in the original than the range will be simplified to `empty`.
-    ///
-    /// If versions are not sorted the correctness of this function is not guaranteed.
-    pub fn simplify<'v, I>(&self, versions: I) -> Self
-    where
-        I: Iterator<Item = &'v V> + 'v,
-        V: 'v,
-    {
-        // Return the segment index in the range for each version in the range, None otherwise
-        let version_locations = versions.scan(0, move |i, v| {
-            while let Some(segment) = self.segments.get(*i) {
-                match within_bounds(v, segment) {
-                    Ordering::Less => return Some(None),
-                    Ordering::Equal => return Some(Some(*i)),
-                    Ordering::Greater => *i += 1,
-                }
-            }
-            Some(None)
-        });
-        let kept_segments = group_adjacent_locations(version_locations);
-        self.keep_segments(kept_segments)
-    }
-
     /// Create a new range with a subset of segments at given location bounds.
     ///
     /// Each new segment is constructed from a pair of segments, taking the
@@ -465,6 +435,36 @@ impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
 
     fn union(&self, other: &Self) -> Self {
         Range::union(self, other)
+    }
+
+    /// Returns a simpler Range that contains the same versions
+    ///
+    /// For every one of the Versions provided in versions the existing range and
+    /// the simplified range will agree on whether it is contained.
+    /// The simplified version may include or exclude versions that are not in versions as the implementation wishes.
+    /// For example:
+    ///  - If all the versions are contained in the original than the range will be simplified to `full`.
+    ///  - If none of the versions are contained in the original than the range will be simplified to `empty`.
+    ///
+    /// If versions are not sorted the correctness of this function is not guaranteed.
+    fn simplify<'s, I>(&self, versions: I) -> Self
+    where
+        I: Iterator<Item = &'s Self::V> + 's,
+        Self::V: 's,
+    {
+        // Return the segment index in the range for each version in the range, None otherwise
+        let version_locations = versions.scan(0, move |i, v| {
+            while let Some(segment) = self.segments.get(*i) {
+                match within_bounds(v, segment) {
+                    Ordering::Less => return Some(None),
+                    Ordering::Equal => return Some(Some(*i)),
+                    Ordering::Greater => *i += 1,
+                }
+            }
+            Some(None)
+        });
+        let kept_segments = group_adjacent_locations(version_locations);
+        self.keep_segments(kept_segments)
     }
 }
 
