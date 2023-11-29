@@ -37,6 +37,7 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
     /// Compute the intersection with another set.
     fn intersection(&self, other: &Self) -> Self;
 
+    /// Return a simplified version set, collapsing redundancies.
     fn simplify<'s, I>(&'s self, versions: I) -> Self
     where
         I: Iterator<Item = &'s Self::V> + 's,
