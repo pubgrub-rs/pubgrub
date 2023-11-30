@@ -17,9 +17,11 @@ pub trait Reporter<P: Package, VS: VersionSet> {
     type Output;
 
     /// Generate a report from the derivation tree
-    /// describing the resolution failure.
+    /// describing the resolution failure using the default formatter.
     fn report(derivation_tree: &DerivationTree<P, VS>) -> Self::Output;
 
+    /// Generate a report from the derivation tree
+    /// describing the resolution failure using a custom formatter.
     fn report_with_formatter(
         derivation_tree: &DerivationTree<P, VS>,
         formatter: &impl ReportFormatter<P, VS, Output = Self::Output>,
