@@ -245,10 +245,10 @@ impl DefaultStringReporter {
         }
     }
 
-    fn build_recursive<P: Package, VS: VersionSet>(
+    fn build_recursive<P: Package, VS: VersionSet, F: ReportFormatter<P, VS, Output = String>>(
         &mut self,
         derived: &Derived<P, VS>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) {
         self.build_recursive_helper(derived, formatter);
         if let Some(id) = derived.shared_id {
@@ -259,10 +259,14 @@ impl DefaultStringReporter {
         };
     }
 
-    fn build_recursive_helper<P: Package, VS: VersionSet>(
+    fn build_recursive_helper<
+        P: Package,
+        VS: VersionSet,
+        F: ReportFormatter<P, VS, Output = String>,
+    >(
         &mut self,
         current: &Derived<P, VS>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) {
         match (current.cause1.deref(), current.cause2.deref()) {
             (DerivationTree::External(external1), DerivationTree::External(external2)) => {
@@ -354,12 +358,12 @@ impl DefaultStringReporter {
     ///
     /// The result will depend on the fact that the derived incompatibility
     /// has already been explained or not.
-    fn report_one_each<P: Package, VS: VersionSet>(
+    fn report_one_each<P: Package, VS: VersionSet, F: ReportFormatter<P, VS, Output = String>>(
         &mut self,
         derived: &Derived<P, VS>,
         external: &External<P, VS>,
         current_terms: &Map<P, Term<VS>>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) {
         match self.line_ref_of(derived.shared_id) {
             Some(ref_id) => self.lines.push(Self::explain_ref_and_external(
@@ -374,12 +378,16 @@ impl DefaultStringReporter {
     }
 
     /// Report one derived (without a line ref yet) and one external.
-    fn report_recurse_one_each<P: Package, VS: VersionSet>(
+    fn report_recurse_one_each<
+        P: Package,
+        VS: VersionSet,
+        F: ReportFormatter<P, VS, Output = String>,
+    >(
         &mut self,
         derived: &Derived<P, VS>,
         external: &External<P, VS>,
         current_terms: &Map<P, Term<VS>>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) {
         match (derived.cause1.deref(), derived.cause2.deref()) {
             // If the derived cause has itself one external prior cause,
@@ -418,11 +426,15 @@ impl DefaultStringReporter {
     // String explanations #####################################################
 
     /// Simplest case, we just combine two external incompatibilities.
-    fn explain_both_external<P: Package, VS: VersionSet>(
+    fn explain_both_external<
+        P: Package,
+        VS: VersionSet,
+        F: ReportFormatter<P, VS, Output = String>,
+    >(
         external1: &External<P, VS>,
         external2: &External<P, VS>,
         current_terms: &Map<P, Term<VS>>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) -> String {
         // TODO: order should be chosen to make it more logical.
         format!(
@@ -434,13 +446,13 @@ impl DefaultStringReporter {
     }
 
     /// Both causes have already been explained so we use their refs.
-    fn explain_both_ref<P: Package, VS: VersionSet>(
+    fn explain_both_ref<P: Package, VS: VersionSet, F: ReportFormatter<P, VS, Output = String>>(
         ref_id1: usize,
         derived1: &Derived<P, VS>,
         ref_id2: usize,
         derived2: &Derived<P, VS>,
         current_terms: &Map<P, Term<VS>>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) -> String {
         // TODO: order should be chosen to make it more logical.
         format!(
@@ -456,12 +468,16 @@ impl DefaultStringReporter {
     /// One cause is derived (already explained so one-line),
     /// the other is a one-line external cause,
     /// and finally we conclude with the current incompatibility.
-    fn explain_ref_and_external<P: Package, VS: VersionSet>(
+    fn explain_ref_and_external<
+        P: Package,
+        VS: VersionSet,
+        F: ReportFormatter<P, VS, Output = String>,
+    >(
         ref_id: usize,
         derived: &Derived<P, VS>,
         external: &External<P, VS>,
         current_terms: &Map<P, Term<VS>>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) -> String {
         // TODO: order should be chosen to make it more logical.
         format!(
@@ -474,10 +490,14 @@ impl DefaultStringReporter {
     }
 
     /// Add an external cause to the chain of explanations.
-    fn and_explain_external<P: Package, VS: VersionSet>(
+    fn and_explain_external<
+        P: Package,
+        VS: VersionSet,
+        F: ReportFormatter<P, VS, Output = String>,
+    >(
         external: &External<P, VS>,
         current_terms: &Map<P, Term<VS>>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) -> String {
         format!(
             "And because {}, {}.",
@@ -487,11 +507,11 @@ impl DefaultStringReporter {
     }
 
     /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_ref<P: Package, VS: VersionSet>(
+    fn and_explain_ref<P: Package, VS: VersionSet, F: ReportFormatter<P, VS, Output = String>>(
         ref_id: usize,
         derived: &Derived<P, VS>,
         current_terms: &Map<P, Term<VS>>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) -> String {
         format!(
             "And because {} ({}), {}.",
@@ -502,11 +522,15 @@ impl DefaultStringReporter {
     }
 
     /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_prior_and_external<P: Package, VS: VersionSet>(
+    fn and_explain_prior_and_external<
+        P: Package,
+        VS: VersionSet,
+        F: ReportFormatter<P, VS, Output = String>,
+    >(
         prior_external: &External<P, VS>,
         external: &External<P, VS>,
         current_terms: &Map<P, Term<VS>>,
-        formatter: &impl ReportFormatter<P, VS, Output = String>,
+        formatter: &F,
     ) -> String {
         format!(
             "And because {} and {}, {}.",
