@@ -9,7 +9,9 @@ use std::fmt;
 use crate::internal::arena::{Arena, Id};
 use crate::internal::small_map::SmallMap;
 use crate::package::Package;
-use crate::report::{DefaultStringReporter, DerivationTree, Derived, External};
+use crate::report::{
+    DefaultStringReportFormatter, DerivationTree, Derived, External, ReportFormatter,
+};
 use crate::term::{self, Term};
 use crate::version_set::VersionSet;
 
@@ -251,7 +253,7 @@ impl<P: Package, VS: VersionSet> fmt::Display for Incompatibility<P, VS> {
         write!(
             f,
             "{}",
-            DefaultStringReporter::string_terms(&self.package_terms.as_map())
+            DefaultStringReportFormatter.format_terms(&self.package_terms.as_map())
         )
     }
 }
