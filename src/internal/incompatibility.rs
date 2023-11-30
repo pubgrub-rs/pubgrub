@@ -253,7 +253,7 @@ impl<P: Package, VS: VersionSet> fmt::Display for Incompatibility<P, VS> {
         write!(
             f,
             "{}",
-            DefaultStringReportFormatter::default().format_terms(&self.package_terms.as_map())
+            DefaultStringReportFormatter.format_terms(&self.package_terms.as_map())
         )
     }
 }
