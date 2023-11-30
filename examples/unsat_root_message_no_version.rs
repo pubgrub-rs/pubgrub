@@ -36,7 +36,6 @@ impl ReportFormatter<Package, Range<SemanticVersion>> for CustomReportFormatter 
         let terms_vec: Vec<_> = terms.iter().collect();
         match terms_vec.as_slice() {
             [] => "version solving failed".into(),
-            // TODO: special case when that unique package is root.
             [(package @ Package::Root, Term::Positive(_))] => {
                 format!("{package} is forbidden")
             }
