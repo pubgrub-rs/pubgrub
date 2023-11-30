@@ -5,6 +5,7 @@
 
 use std::fmt;
 use std::ops::{Deref, DerefMut};
+use std::process::Output;
 
 use crate::package::Package;
 use crate::term::Term;
@@ -19,6 +20,12 @@ pub trait Reporter<P: Package, VS: VersionSet> {
     /// Generate a report from the derivation tree
     /// describing the resolution failure.
     fn report(derivation_tree: &DerivationTree<P, VS>) -> Self::Output;
+
+    /// Generate a report with the given formatter
+    fn report_with_formatter(
+        derivation_tree: &DerivationTree<P, VS>,
+        formatter: impl ReportFormatter<P, VS, Output = Self::Output>,
+    ) -> Self::Output;
 }
 
 /// Derivation tree resulting in the impossibility
@@ -205,8 +212,28 @@ impl<P: Package, VS: VersionSet> fmt::Display for External<P, VS> {
     }
 }
 
+/// Trait for formatting outputs in the reporter.
+pub trait ReportFormatter<P: Package, VS: VersionSet> {
+    /// Output type of the report.
+    type Output;
+
+    /// Format an external.
+    fn format_external(external: External<P, VS>) -> Output;
+}
+
+/// Default formatter for the default reporter.
+pub struct DefaultStringReportFormatter<P: Package, VS: VersionSet>;
+
+impl<P: Package, VS: VersionSet> ReportFormatter<P, VS> for DefaultStringReportFormatter<P, VS> {
+    type Output = String;
+
+    fn format_external(external: External<P, VS>) -> String {
+        external.to_string()
+    }
+}
+
 /// Default reporter able to generate an explanation as a [String].
-pub struct DefaultStringReporter {
+pub struct DefaultStringReporter<P: Package, VS: VersionSet, F: ReportFormatter<P, VS>> {
     /// Number of explanations already with a line reference.
     ref_count: usize,
     /// Shared nodes that have already been marked with a line reference.
@@ -214,9 +241,10 @@ pub struct DefaultStringReporter {
     shared_with_ref: Map<usize, usize>,
     /// Accumulated lines of the report already generated.
     lines: Vec<String>,
+    formatter: F,
 }
 
-impl DefaultStringReporter {
+impl<P: Package, VS: VersionSet, F: ReportFormatter<P, VS>> DefaultReporter<P, VS, F> {
     /// Initialize the reporter.
     fn new() -> Self {
         Self {
@@ -226,7 +254,7 @@ impl DefaultStringReporter {
         }
     }
 
-    fn build_recursive<P: Package, VS: VersionSet>(&mut self, derived: &Derived<P, VS>) {
+    fn build_recursive(&mut self, derived: &Derived<P, VS>) {
         self.build_recursive_helper(derived);
         if let Some(id) = derived.shared_id {
             if self.shared_with_ref.get(&id).is_none() {
@@ -236,7 +264,7 @@ impl DefaultStringReporter {
         };
     }
 
-    fn build_recursive_helper<P: Package, VS: VersionSet>(&mut self, current: &Derived<P, VS>) {
+    fn build_recursive_helper(&mut self, current: &Derived<P, VS>) {
         match (current.cause1.deref(), current.cause2.deref()) {
             (DerivationTree::External(external1), DerivationTree::External(external2)) => {
                 // Simplest case, we just combine two external incompatibilities.
@@ -313,7 +341,7 @@ impl DefaultStringReporter {
     ///
     /// The result will depend on the fact that the derived incompatibility
     /// has already been explained or not.
-    fn report_one_each<P: Package, VS: VersionSet>(
+    fn report_one_each(
         &mut self,
         derived: &Derived<P, VS>,
         external: &External<P, VS>,
@@ -331,7 +359,7 @@ impl DefaultStringReporter {
     }
 
     /// Report one derived (without a line ref yet) and one external.
-    fn report_recurse_one_each<P: Package, VS: VersionSet>(
+    fn report_recurse_one_each(
         &mut self,
         derived: &Derived<P, VS>,
         external: &External<P, VS>,
@@ -369,7 +397,7 @@ impl DefaultStringReporter {
     // String explanations #####################################################
 
     /// Simplest case, we just combine two external incompatibilities.
-    fn explain_both_external<P: Package, VS: VersionSet>(
+    fn explain_both_external(
         external1: &External<P, VS>,
         external2: &External<P, VS>,
         current_terms: &Map<P, Term<VS>>,
@@ -384,7 +412,7 @@ impl DefaultStringReporter {
     }
 
     /// Both causes have already been explained so we use their refs.
-    fn explain_both_ref<P: Package, VS: VersionSet>(
+    fn explain_both_ref(
         ref_id1: usize,
         derived1: &Derived<P, VS>,
         ref_id2: usize,
@@ -405,7 +433,7 @@ impl DefaultStringReporter {
     /// One cause is derived (already explained so one-line),
     /// the other is a one-line external cause,
     /// and finally we conclude with the current incompatibility.
-    fn explain_ref_and_external<P: Package, VS: VersionSet>(
+    fn explain_ref_and_external(
         ref_id: usize,
         derived: &Derived<P, VS>,
         external: &External<P, VS>,
@@ -422,7 +450,7 @@ impl DefaultStringReporter {
     }
 
     /// Add an external cause to the chain of explanations.
-    fn and_explain_external<P: Package, VS: VersionSet>(
+    fn and_explain_external(
         external: &External<P, VS>,
         current_terms: &Map<P, Term<VS>>,
     ) -> String {
@@ -434,7 +462,7 @@ impl DefaultStringReporter {
     }
 
     /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_ref<P: Package, VS: VersionSet>(
+    fn and_explain_ref(
         ref_id: usize,
         derived: &Derived<P, VS>,
         current_terms: &Map<P, Term<VS>>,
@@ -448,7 +476,7 @@ impl DefaultStringReporter {
     }
 
     /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_prior_and_external<P: Package, VS: VersionSet>(
+    fn and_explain_prior_and_external(
         prior_external: &External<P, VS>,
         external: &External<P, VS>,
         current_terms: &Map<P, Term<VS>>,
@@ -462,7 +490,7 @@ impl DefaultStringReporter {
     }
 
     /// Try to print terms of an incompatibility in a human-readable way.
-    pub fn string_terms<P: Package, VS: VersionSet>(terms: &Map<P, Term<VS>>) -> String {
+    pub fn string_terms(terms: &Map<P, Term<VS>>) -> String {
         let terms_vec: Vec<_> = terms.iter().collect();
         match terms_vec.as_slice() {
             [] => "version solving failed".into(),
@@ -497,12 +525,26 @@ impl DefaultStringReporter {
     }
 }
 
-impl<P: Package, VS: VersionSet> Reporter<P, VS> for DefaultStringReporter {
+impl<P: Package, VS: VersionSet> Reporter<P, VS> for DefaultStringReporter<P, VS> {
     type Output = String;
 
     fn report(derivation_tree: &DerivationTree<P, VS>) -> Self::Output {
         match derivation_tree {
             DerivationTree::External(external) => external.to_string(),
+            DerivationTree::Derived(derived) => {
+                let mut reporter = Self::new();
+                reporter.build_recursive(derived);
+                reporter.lines.join("\n")
+            }
+        }
+    }
+
+    fn report_with_formatter(
+        derivation_tree: &DerivationTree<P, VS>,
+        formatter: impl ReportFormatter<P, VS, Output = Self::Output>,
+    ) -> Self::Output {
+        match derivation_tree {
+            DerivationTree::External(external) => formatter.format_external(external),
             DerivationTree::Derived(derived) => {
                 let mut reporter = Self::new();
                 reporter.build_recursive(derived);
