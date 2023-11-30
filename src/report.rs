@@ -209,10 +209,10 @@ impl<P: Package, VS: VersionSet> ReportFormatter<P, VS> for DefaultStringReportF
             [(package, Term::Positive(range))] => format!("{} {} is forbidden", package, range),
             [(package, Term::Negative(range))] => format!("{} {} is mandatory", package, range),
             [(p1, Term::Positive(r1)), (p2, Term::Negative(r2))] => {
-                External::FromDependencyOf(p1, r1.clone(), p2, r2.clone()).to_string()
+                self.format_external(&External::FromDependencyOf(p1, r1.clone(), p2, r2.clone()))
             }
             [(p1, Term::Negative(r1)), (p2, Term::Positive(r2))] => {
-                External::FromDependencyOf(p2, r2.clone(), p1, r1.clone()).to_string()
+                self.format_external(&External::FromDependencyOf(p2, r2.clone(), p1, r1.clone()))
             }
             slice => {
                 let str_terms: Vec<_> = slice.iter().map(|(p, t)| format!("{} {}", p, t)).collect();
