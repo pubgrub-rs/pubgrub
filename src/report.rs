@@ -191,6 +191,7 @@ pub trait ReportFormatter<P: Package, VS: VersionSet> {
 }
 
 /// Default formatter for the default reporter.
+#[derive(Default, Debug)]
 pub struct DefaultStringReportFormatter;
 
 impl<P: Package, VS: VersionSet> ReportFormatter<P, VS> for DefaultStringReportFormatter {
@@ -532,7 +533,7 @@ impl<P: Package, VS: VersionSet> Reporter<P, VS> for DefaultStringReporter {
     type Output = String;
 
     fn report(derivation_tree: &DerivationTree<P, VS>) -> Self::Output {
-        let formatter = DefaultStringReportFormatter {};
+        let formatter = DefaultStringReportFormatter::default();
         match derivation_tree {
             DerivationTree::External(external) => formatter.format_external(external),
             DerivationTree::Derived(derived) => {
