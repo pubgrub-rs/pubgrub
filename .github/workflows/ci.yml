@@ -46,23 +46,8 @@ jobs:
     name: Documentation builds successfully
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Install nightly Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-
-      - name: Download cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: documentation
-
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
       - name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
