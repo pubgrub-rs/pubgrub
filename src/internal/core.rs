@@ -237,44 +237,24 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     /// (provided that no other version of foo exists between 1.0.0 and 2.0.0).
     /// We could collapse them into { foo (1.0.0 ∪ 1.1.0), not bar ^1.0.0 }
     /// without having to check the existence of other versions though.
-    ///
-    /// Here we do the simple stupid thing of just growing the Vec.
-    /// It may not be trivial since those incompatibilities
-    /// may already have derived others.
     fn merge_incompatibility(&mut self, mut id: IncompId<P, VS>) {
         if let Some((p1, p2)) = self.incompatibility_store[id].as_dependency() {
-            let vs = self.incompatibility_store[id].get(p2);
+            // If we are a dependency, there's a good chance we can be merged with a previous dependency
             let deps_lookup = self
                 .dependencies
                 .entry((p1.clone(), p2.clone()))
                 .or_default();
-            if let Some(past) = deps_lookup
-                .as_mut_slice()
-                .iter_mut()
-                .find(|past| self.incompatibility_store[**past].get(p2) == vs)
-            {
-                let incompat = &self.incompatibility_store[id];
-                let new = self
-                    .incompatibility_store
-                    .alloc(Incompatibility::from_dependency(
-                        p1.clone(),
-                        self.incompatibility_store[*past]
-                            .get(p1)
-                            .unwrap()
-                            .unwrap_positive()
-                            .union(incompat.get(p1).unwrap().unwrap_positive()), // It is safe to `simplify` here
-                        (
-                            &p2,
-                            incompat
-                                .get(p2)
-                                .map_or(&VS::empty(), |v| v.unwrap_negative()),
-                        ),
-                    ));
+            if let Some((past, mergeed)) = deps_lookup.as_mut_slice().iter_mut().find_map(|past| {
+                self.incompatibility_store[id]
+                    .merge_dependency(&self.incompatibility_store[*past])
+                    .map(|m| (past, m))
+            }) {
+                let new = self.incompatibility_store.alloc(mergeed);
                 for (pkg, _) in self.incompatibility_store[new].iter() {
-                    let ids = self.incompatibilities.entry(pkg.clone()).or_default();
-                    if let Some(slot) = ids.iter().position(|id| id == past) {
-                        ids.remove(slot);
-                    }
+                    self.incompatibilities
+                        .entry(pkg.clone())
+                        .or_default()
+                        .retain(|id| id != past);
                 }
                 *past = new;
                 id = new;

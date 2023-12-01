@@ -129,6 +129,35 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
         }
     }
 
+    /// Merge two dependencies into one incompatibility.
+    ///
+    /// When there are two (or more) versions of a package that depend in the same way on a nother package,
+    /// both constraints can be stored in one incompatibility.
+    /// This can be thought of as a alternative constructor like [`Self::from_dependency`].
+    /// Alternatively this can be thought of as a way to combine the two incompatibilities,
+    /// as a specialization of [`Self::prior_cause`].
+    pub fn merge_dependency(&self, other: &Self) -> Option<Self> {
+        // It is almost certainly a bug to call this method without checking that self is a dependency
+        debug_assert!(self.as_dependency().is_some());
+        let self_pkgs = self.as_dependency()?;
+        if self_pkgs != other.as_dependency()? {
+            return None;
+        }
+        let (p1, p2) = self_pkgs;
+        let dep_term = self.get(p2);
+        if dep_term != other.get(p2) {
+            return None;
+        }
+        return Some(Self::from_dependency(
+            p1.clone(),
+            self.get(p1)
+                .unwrap()
+                .unwrap_positive()
+                .union(other.get(p1).unwrap().unwrap_positive()), // It is safe to `simplify` here
+            (&p2, dep_term.map_or(&VS::empty(), |v| v.unwrap_negative())),
+        ));
+    }
+
     /// Prior cause of two incompatibilities using the rule of resolution.
     pub fn prior_cause(
         incompat: Id<Self>,
