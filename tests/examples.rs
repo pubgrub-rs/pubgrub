@@ -231,27 +231,12 @@ fn confusing_with_lots_of_holes() {
     };
     assert_eq!(
         &DefaultStringReporter::report(&derivation_tree),
-        r#"Because there is no available version for bar and foo 1 depends on bar, foo 1 is forbidden.
-And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5 | >5, foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 is forbidden. (1)
-
-Because there is no available version for bar and foo 2 depends on bar, foo 2 is forbidden.
-And because foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 is forbidden (1), foo <3 | >3, <4 | >4, <5 | >5 is forbidden. (2)
-
-Because there is no available version for bar and foo 3 depends on bar, foo 3 is forbidden.
-And because foo <3 | >3, <4 | >4, <5 | >5 is forbidden (2), foo <4 | >4, <5 | >5 is forbidden. (3)
-
-Because there is no available version for bar and foo 4 depends on bar, foo 4 is forbidden.
-And because foo <4 | >4, <5 | >5 is forbidden (3), foo <5 | >5 is forbidden. (4)
-
-Because there is no available version for bar and foo 5 depends on bar, foo 5 is forbidden.
-And because foo <5 | >5 is forbidden (4), foo * is forbidden.
-And because root 1 depends on foo, root 1 is forbidden."#
+        r#"Because there is no available version for bar and foo 1 | 2 | 3 | 4 | 5 depends on bar, foo 1 | 2 | 3 | 4 | 5 is forbidden.
+And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5 | >5 and root 1 depends on foo, root 1 is forbidden."#
     );
     derivation_tree.collapse_no_versions();
     assert_eq!(
         &DefaultStringReporter::report(&derivation_tree),
-        r#"Because foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 depends on bar and foo 2 depends on bar, foo <3 | >3, <4 | >4, <5 | >5 is forbidden.
-And because foo 3 depends on bar and foo 4 depends on bar, foo <5 | >5 is forbidden.
-And because foo 5 depends on bar and root 1 depends on foo, root 1 is forbidden."#
+        "Because foo depends on bar and root 1 depends on foo, root 1 is forbidden."
     );
 }

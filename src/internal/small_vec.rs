@@ -28,6 +28,15 @@ impl<T> SmallVec<T> {
         }
     }
 
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        match self {
+            Self::Empty => &mut [],
+            Self::One(v) => v,
+            Self::Two(v) => v,
+            Self::Flexible(v) => v,
+        }
+    }
+
     pub fn push(&mut self, new: T) {
         *self = match std::mem::take(self) {
             Self::Empty => Self::One([new]),
