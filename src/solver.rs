@@ -126,7 +126,7 @@ pub fn resolve<P: Package, VS: VersionSet>(
         let v = match decision {
             None => {
                 let inc = Incompatibility::no_versions(next.clone(), term_intersection.clone());
-                state.add_incompatibility(inc);
+                state.add_incompatibility(inc)?;
                 continue;
             }
             Some(x) => x,
@@ -156,10 +156,8 @@ pub fn resolve<P: Package, VS: VersionSet>(
 
             let known_dependencies = match dependencies {
                 Dependencies::Unknown => {
-                    state.add_incompatibility(Incompatibility::unavailable_dependencies(
-                        p.clone(),
-                        v.clone(),
-                    ));
+                    let inpat = Incompatibility::unavailable_dependencies(p.clone(), v.clone());
+                    state.add_incompatibility(inpat)?;
                     continue;
                 }
                 Dependencies::Known(x) if x.contains_key(p) => {

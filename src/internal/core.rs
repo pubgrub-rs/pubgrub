@@ -65,9 +65,14 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     }
 
     /// Add an incompatibility to the state.
-    pub fn add_incompatibility(&mut self, incompat: Incompatibility<P, VS>) {
+    pub fn add_incompatibility(
+        &mut self,
+        incompat: Incompatibility<P, VS>,
+    ) -> Result<(), PubGrubError<P, VS>> {
         let id = self.incompatibility_store.alloc(incompat);
+        self.check_terminal(id)?;
         self.merge_incompatibility(id);
+        Ok(())
     }
 
     /// Add an incompatibility to the state.
@@ -161,40 +166,33 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
         let mut current_incompat_id = incompatibility;
         let mut current_incompat_changed = false;
         loop {
-            if self.incompatibility_store[current_incompat_id]
-                .is_terminal(&self.root_package, &self.root_version)
-            {
-                return Err(PubGrubError::NoSolution(
-                    self.build_derivation_tree(current_incompat_id),
-                ));
-            } else {
-                let (package, satisfier_search_result) = self.partial_solution.satisfier_search(
-                    &self.incompatibility_store[current_incompat_id],
-                    &self.incompatibility_store,
-                );
-                match satisfier_search_result {
-                    DifferentDecisionLevels {
+            let (package, satisfier_search_result) = self.partial_solution.satisfier_search(
+                &self.incompatibility_store[current_incompat_id],
+                &self.incompatibility_store,
+            );
+            match satisfier_search_result {
+                DifferentDecisionLevels {
+                    previous_satisfier_level,
+                } => {
+                    self.backtrack(
+                        current_incompat_id,
+                        current_incompat_changed,
                         previous_satisfier_level,
-                    } => {
-                        self.backtrack(
-                            current_incompat_id,
-                            current_incompat_changed,
-                            previous_satisfier_level,
-                        );
-                        log::info!("backtrack to {:?}", previous_satisfier_level);
-                        return Ok((package, current_incompat_id));
-                    }
-                    SameDecisionLevels { satisfier_cause } => {
-                        let prior_cause = Incompatibility::prior_cause(
-                            current_incompat_id,
-                            satisfier_cause,
-                            &package,
-                            &self.incompatibility_store,
-                        );
-                        log::info!("prior cause: {}", prior_cause);
-                        current_incompat_id = self.incompatibility_store.alloc(prior_cause);
-                        current_incompat_changed = true;
-                    }
+                    );
+                    log::info!("backtrack to {:?}", previous_satisfier_level);
+                    return Ok((package, current_incompat_id));
+                }
+                SameDecisionLevels { satisfier_cause } => {
+                    let prior_cause = Incompatibility::prior_cause(
+                        current_incompat_id,
+                        satisfier_cause,
+                        &package,
+                        &self.incompatibility_store,
+                    );
+                    log::info!("prior cause: {}", prior_cause);
+                    current_incompat_id = self.incompatibility_store.alloc(prior_cause);
+                    self.check_terminal(current_incompat_id)?;
+                    current_incompat_changed = true;
                 }
             }
         }
@@ -247,6 +245,17 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     }
 
     // Error reporting #########################################################
+
+    fn check_terminal(&self, incompat: IncompId<P, VS>) -> Result<(), PubGrubError<P, VS>> {
+        if self.incompatibility_store[incompat].is_terminal(
+            &self.root_package,
+            &self.root_version,
+        ) {
+            Err(PubGrubError::NoSolution(self.build_derivation_tree(incompat)))
+        } else {
+            Ok(())
+        }
+    }
 
     fn build_derivation_tree(&self, incompat: IncompId<P, VS>) -> DerivationTree<P, VS> {
         let shared_ids = self.find_shared_ids(incompat);
