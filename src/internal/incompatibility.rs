@@ -161,6 +161,19 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
         }
     }
 
+    /// If this incompatibility only refers to one package then return the package.
+    ///
+    /// A incompatibility that only refers to one package is always relevant.
+    /// It is at least partially satisfied independent of any other decisions we have made.
+    /// Lots of places in the code need to handle these incompatibilities specially.
+    pub fn get_as_unitary(&self) -> Option<&P> {
+        if self.package_terms.len() == 1 {
+            Some(self.package_terms.iter().next().unwrap().0)
+        } else {
+            None
+        }
+    }
+
     /// Get the term related to a given package (if it exists).
     pub fn get(&self, package: &P) -> Option<&Term<VS>> {
         self.package_terms.get(package)

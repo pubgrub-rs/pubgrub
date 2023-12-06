@@ -174,7 +174,7 @@ pub fn resolve<P: Package, VS: VersionSet>(
                 p.clone(),
                 v.clone(),
                 &known_dependencies,
-            );
+            )?;
 
             state.partial_solution.add_version(
                 p.clone(),
