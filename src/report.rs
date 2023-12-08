@@ -7,6 +7,8 @@ use std::fmt::{self, Debug, Display};
 use std::ops::Deref;
 use std::sync::Arc;
 
+use rustc_hash::FxHashSet;
+
 use crate::package::Package;
 use crate::term::Term;
 use crate::type_aliases::Map;
@@ -71,6 +73,30 @@ pub struct Derived<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> 
 }
 
 impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree<P, VS, M> {
+    /// Get all packages referred to in the derivation tree.
+    pub fn packages(&self) -> FxHashSet<&P> {
+        let mut packages = FxHashSet::default();
+        match self {
+            Self::External(external) => match external {
+                External::FromDependencyOf(p, _, p2, _) => {
+                    packages.insert(p);
+                    packages.insert(p2);
+                }
+                External::NoVersions(p, _)
+                | External::NotRoot(p, _)
+                | External::Custom(p, _, _) => {
+                    packages.insert(p);
+                }
+            },
+            Self::Derived(derived) => {
+                packages.extend(derived.terms.keys());
+                packages.extend(derived.cause1.packages().iter());
+                packages.extend(derived.cause2.packages().iter());
+            }
+        }
+        packages
+    }
+
     /// Merge the [NoVersions](External::NoVersions) external incompatibilities
     /// with the other one they are matched with
     /// in a derived incompatibility.
