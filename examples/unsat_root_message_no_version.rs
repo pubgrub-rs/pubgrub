@@ -80,6 +80,13 @@ impl ReportFormatter<Package, Range<SemanticVersion>> for CustomReportFormatter 
                     format!("dependencies of {package} at version {set} are unavailable")
                 }
             }
+            External::UnusableDependencies(package, set, ..) => {
+                if set == &Range::full() {
+                    format!("dependencies of {package} are unusable")
+                } else {
+                    format!("dependencies of {package} at version {set} are unusable")
+                }
+            }
             External::FromDependencyOf(package, package_set, dependency, dependency_set) => {
                 if package_set == &Range::full() && dependency_set == &Range::full() {
                     format!("{package} depends on {dependency}")
