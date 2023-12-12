@@ -419,21 +419,26 @@ impl<V: Ord + Clone> Range<V> {
         Self { segments: output }.check_invariants()
     }
 
-    /// Returns a simpler Range that contains the same versions
+    /// Returns a simpler Range that contains the same versions.
     ///
-    /// For every one of the Versions provided in versions the existing range and
-    /// the simplified range will agree on whether it is contained.
+    /// For every one of the Versions provided in versions the existing range and the simplified range will agree on whether it is contained.
     /// The simplified version may include or exclude versions that are not in versions as the implementation wishes.
-    /// For example:
-    ///  - If all the versions are contained in the original than the range will be simplified to `full`.
-    ///  - If none of the versions are contained in the original than the range will be simplified to `empty`.
     ///
-    /// If versions are not sorted the correctness of this function is not guaranteed.
+    /// If none of the versions are contained in the original than the range will be returned unmodified.
+    /// If the range includes a single version, it will be returned unmodified.
+    /// If all the versions are contained in the original than the range will be simplified to `full`.
+    ///
+    /// If the given versions are not sorted the correctness of this function is not guaranteed.
     pub fn simplify<'v, I>(&self, versions: I) -> Self
     where
         I: Iterator<Item = &'v V> + 'v,
         V: 'v,
     {
+        // Do not simplify singletons
+        if self.is_singleton() {
+            return self.clone();
+        }
+
         // Return the segment index in the range for each version in the range, None otherwise
         let version_locations = versions.scan(0, move |i, v| {
             while let Some(segment) = self.segments.get(*i) {
@@ -445,7 +450,13 @@ impl<V: Ord + Clone> Range<V> {
             }
             Some(None)
         });
-        let kept_segments = group_adjacent_locations(version_locations);
+        let mut kept_segments = group_adjacent_locations(version_locations).peekable();
+
+        // Do not return null sets
+        if kept_segments.peek().is_none() {
+            return self.clone();
+        }
+
         self.keep_segments(kept_segments)
     }
 
@@ -465,6 +476,13 @@ impl<V: Ord + Clone> Range<V> {
             ));
         }
         Self { segments }.check_invariants()
+    }
+
+    pub fn is_singleton(&self) -> bool {
+        match self.segments.as_slice() {
+            [(Included(v1), Included(v2))] => v1 == v2,
+            _ => false,
+        }
     }
 }
 
