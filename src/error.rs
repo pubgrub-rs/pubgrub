@@ -10,7 +10,7 @@ use crate::version_set::VersionSet;
 
 /// Errors that may occur while solving dependencies.
 #[derive(Error, Debug)]
-pub enum PubGrubError<P: Package, VS: VersionSet> {
+pub enum PubGrubError<P: Package, VS: VersionSet, E: std::error::Error> {
     /// There is no solution for this set of dependencies.
     #[error("No solution")]
     NoSolution(DerivationTree<P, VS>),
@@ -27,7 +27,7 @@ pub enum PubGrubError<P: Package, VS: VersionSet> {
         version: VS::V,
         /// Error raised by the implementer of
         /// [DependencyProvider](crate::solver::DependencyProvider).
-        source: Box<dyn std::error::Error + Send + Sync>,
+        source: E,
     },
 
     /// Error arising when the implementer of
@@ -48,12 +48,12 @@ pub enum PubGrubError<P: Package, VS: VersionSet> {
     /// returned an error in the method
     /// [choose_version](crate::solver::DependencyProvider::choose_version).
     #[error("Decision making failed")]
-    ErrorChoosingPackageVersion(Box<dyn std::error::Error + Send + Sync>),
+    ErrorChoosingPackageVersion(E),
 
     /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
     /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
     #[error("We should cancel")]
-    ErrorInShouldCancel(Box<dyn std::error::Error + Send + Sync>),
+    ErrorInShouldCancel(E),
 
     /// Something unexpected happened.
     #[error("{0}")]

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use std::convert::Infallible;
+
 use pubgrub::error::PubGrubError;
 use pubgrub::package::Package;
 use pubgrub::solver::{Dependencies, DependencyProvider, OfflineDependencyProvider};
@@ -135,7 +137,7 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
 
     pub fn check_resolve(
         &mut self,
-        res: &Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS>>,
+        res: &Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS, Infallible>>,
         p: &P,
         v: &VS::V,
     ) {

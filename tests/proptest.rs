@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use std::{collections::BTreeSet as Set, error::Error};
+use std::collections::BTreeSet as Set;
+use std::convert::Infallible;
 
 use pubgrub::error::PubGrubError;
 use pubgrub::package::Package;
@@ -30,19 +31,11 @@ struct OldestVersionsDependencyProvider<P: Package, VS: VersionSet>(
 impl<P: Package, VS: VersionSet> DependencyProvider<P, VS>
     for OldestVersionsDependencyProvider<P, VS>
 {
-    fn get_dependencies(
-        &self,
-        p: &P,
-        v: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>> {
+    fn get_dependencies(&self, p: &P, v: &VS::V) -> Result<Dependencies<P, VS>, Infallible> {
         self.0.get_dependencies(p, v)
     }
 
-    fn choose_version(
-        &self,
-        package: &P,
-        range: &VS,
-    ) -> Result<Option<VS::V>, Box<dyn Error + Send + Sync>> {
+    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, Infallible> {
         Ok(self
             .0
             .versions(package)
@@ -57,6 +50,8 @@ impl<P: Package, VS: VersionSet> DependencyProvider<P, VS>
     fn prioritize(&self, package: &P, range: &VS) -> Self::Priority {
         self.0.prioritize(package, range)
     }
+
+    type Err = Infallible;
 }
 
 /// The same as DP but it has a timeout.
@@ -82,15 +77,11 @@ impl<DP> TimeoutDependencyProvider<DP> {
 impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvider<P, VS>
     for TimeoutDependencyProvider<DP>
 {
-    fn get_dependencies(
-        &self,
-        p: &P,
-        v: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>> {
+    fn get_dependencies(&self, p: &P, v: &VS::V) -> Result<Dependencies<P, VS>, DP::Err> {
         self.dp.get_dependencies(p, v)
     }
 
-    fn should_cancel(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn should_cancel(&self) -> Result<(), DP::Err> {
         assert!(self.start_time.elapsed().as_secs() < 60);
         let calls = self.call_count.get();
         assert!(calls < self.max_calls);
@@ -98,11 +89,7 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
         Ok(())
     }
 
-    fn choose_version(
-        &self,
-        package: &P,
-        range: &VS,
-    ) -> Result<Option<VS::V>, Box<dyn Error + Send + Sync>> {
+    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, DP::Err> {
         self.dp.choose_version(package, range)
     }
 
@@ -111,13 +98,15 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
     fn prioritize(&self, package: &P, range: &VS) -> Self::Priority {
         self.dp.prioritize(package, range)
     }
+
+    type Err = DP::Err;
 }
 
 fn timeout_resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
     dependency_provider: DP,
     name: P,
     version: impl Into<VS::V>,
-) -> Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS>> {
+) -> Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS, DP::Err>> {
     resolve(
         &TimeoutDependencyProvider::new(dependency_provider, 50_000),
         name,
