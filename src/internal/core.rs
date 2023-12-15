@@ -246,7 +246,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                 .or_default();
             if let Some((past, mergeed)) = deps_lookup.as_mut_slice().iter_mut().find_map(|past| {
                 self.incompatibility_store[id]
-                    .merge_dependants(&self.incompatibility_store[*past])
+                    .merge_dependents(&self.incompatibility_store[*past])
                     .map(|m| (past, m))
             }) {
                 let new = self.incompatibility_store.alloc(mergeed);
