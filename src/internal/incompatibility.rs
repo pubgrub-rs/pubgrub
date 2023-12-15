@@ -138,7 +138,7 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
     ///
     /// It is a special case of prior cause computation where the unified package
     /// is the common dependant in the two incompatibilities expressing dependencies.
-    pub fn merge_dependency(&self, other: &Self) -> Option<Self> {
+    pub fn merge_dependants(&self, other: &Self) -> Option<Self> {
         // It is almost certainly a bug to call this method without checking that self is a dependency
         debug_assert!(self.as_dependency().is_some());
         // Check that both incompatibilities are of the shape p1 depends on p2,
