@@ -129,22 +129,28 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
         }
     }
 
-    /// Merge two dependencies into one incompatibility.
+    /// Merge dependant versions with the same dependency.
     ///
-    /// When there are two (or more) versions of a package that depend in the same way on a nother package,
-    /// both constraints can be stored in one incompatibility.
-    /// This can be thought of as a alternative constructor like [`Self::from_dependency`].
-    /// Alternatively this can be thought of as a way to combine the two incompatibilities,
-    /// as a specialization of [`Self::prior_cause`].
+    /// When multiple versions of a package depend on the same range of another package,
+    /// we can merge the two into a single incompatibility.
+    /// For example, if a@1 depends on b and a@2 depends on b, we can say instead
+    /// a@1 and a@b depend on b.
+    ///
+    /// It is a special case of prior cause computation where the unified package
+    /// is the common dependant in the two incompatibilities expressing dependencies.
     pub fn merge_dependency(&self, other: &Self) -> Option<Self> {
         // It is almost certainly a bug to call this method without checking that self is a dependency
         debug_assert!(self.as_dependency().is_some());
+        // Check that both incompatibilities are of the shape p1 depends on p2,
+        // with the same p1 and p2.
         let self_pkgs = self.as_dependency()?;
         if self_pkgs != other.as_dependency()? {
             return None;
         }
         let (p1, p2) = self_pkgs;
         let dep_term = self.get(p2);
+        // The dependency range for p2 must be the same in both case
+        // to be able to merge multiple p1 ranges.
         if dep_term != other.get(p2) {
             return None;
         }
