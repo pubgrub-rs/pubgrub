@@ -246,12 +246,12 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                 .merged_dependencies
                 .entry((p1.clone(), p2.clone()))
                 .or_default();
-            if let Some((past, mergeed)) = deps_lookup.as_mut_slice().iter_mut().find_map(|past| {
+            if let Some((past, merged)) = deps_lookup.as_mut_slice().iter_mut().find_map(|past| {
                 self.incompatibility_store[id]
                     .merge_dependents(&self.incompatibility_store[*past])
                     .map(|m| (past, m))
             }) {
-                let new = self.incompatibility_store.alloc(mergeed);
+                let new = self.incompatibility_store.alloc(merged);
                 for (pkg, _) in self.incompatibility_store[new].iter() {
                     self.incompatibilities
                         .entry(pkg.clone())
