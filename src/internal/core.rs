@@ -30,7 +30,9 @@ pub struct State<P: Package, VS: VersionSet, Priority: Ord + Clone> {
     /// and will stay that way until the next conflict and backtrack is operated.
     contradicted_incompatibilities: rustc_hash::FxHashSet<IncompId<P, VS>>,
 
-    dependencies: Map<(P, P), SmallVec<IncompId<P, VS>>>,
+    /// All incompatibilities expressing dependencies,
+    /// with common dependents merged.
+    merged_dependencies: Map<(P, P), SmallVec<IncompId<P, VS>>>,
 
     /// Partial solution.
     /// TODO: remove pub.
@@ -63,7 +65,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
             partial_solution: PartialSolution::empty(),
             incompatibility_store,
             unit_propagation_buffer: SmallVec::Empty,
-            dependencies: Map::default(),
+            merged_dependencies: Map::default(),
         }
     }
 
@@ -241,7 +243,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
         if let Some((p1, p2)) = self.incompatibility_store[id].as_dependency() {
             // If we are a dependency, there's a good chance we can be merged with a previous dependency
             let deps_lookup = self
-                .dependencies
+                .merged_dependencies
                 .entry((p1.clone(), p2.clone()))
                 .or_default();
             if let Some((past, mergeed)) = deps_lookup.as_mut_slice().iter_mut().find_map(|past| {
