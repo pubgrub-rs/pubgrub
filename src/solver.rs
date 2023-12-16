@@ -41,6 +41,7 @@
 //! ## API
 //!
 //! ```
+//! # use std::convert::Infallible;
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
 //! # use pubgrub::version::NumberVersion;
 //! # use pubgrub::error::PubGrubError;
@@ -48,7 +49,7 @@
 //! #
 //! # type NumVS = Range<NumberVersion>;
 //! #
-//! # fn try_main() -> Result<(), PubGrubError<&'static str, NumVS>> {
+//! # fn try_main() -> Result<(), PubGrubError<&'static str, NumVS, Infallible>> {
 //! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! #     let package = "root";
 //! #     let version = 1;
@@ -70,6 +71,7 @@
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet as Set};
+use std::convert::Infallible;
 use std::error::Error;
 
 use crate::error::PubGrubError;
@@ -82,11 +84,12 @@ use log::{debug, info};
 
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
-pub fn resolve<P: Package, VS: VersionSet>(
-    dependency_provider: &impl DependencyProvider<P, VS>,
+#[allow(clippy::type_complexity)]
+pub fn resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
+    dependency_provider: &DP,
     package: P,
     version: impl Into<VS::V>,
-) -> Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS>> {
+) -> Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS, DP::Err>> {
     let mut state = State::init(package.clone(), version.into());
     let mut added_dependencies: Map<P, Set<VS::V>> = Map::default();
     let mut next = package;
@@ -133,7 +136,7 @@ pub fn resolve<P: Package, VS: VersionSet>(
         };
 
         if !term_intersection.contains(&v) {
-            return Err(PubGrubError::ErrorChoosingPackageVersion(
+            return Err(PubGrubError::Failure(
                 "choose_package_version picked an incompatible version".into(),
             ));
         }
@@ -240,14 +243,15 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
     /// the fewest versions that match the outstanding constraint.
     type Priority: Ord + Clone;
 
+    /// The kind of error returned from these methods.
+    ///
+    /// Returning this signals that resolution should fail with this error.
+    type Err: Error;
+
     /// Once the resolver has found the highest `Priority` package from all potential valid
     /// packages, it needs to know what vertion of that package to use. The most common pattern
     /// is to select the largest vertion that the range contains.
-    fn choose_version(
-        &self,
-        package: &P,
-        range: &VS,
-    ) -> Result<Option<VS::V>, Box<dyn Error + Send + Sync>>;
+    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, Self::Err>;
 
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
@@ -255,14 +259,14 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>>;
+    ) -> Result<Dependencies<P, VS>, Self::Err>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
     /// This is helpful if you want to add some form of early termination like a timeout,
     /// or you want to add some form of user feedback if things are taking a while.
     /// If not provided the resolver will run as long as needed.
-    fn should_cancel(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn should_cancel(&self) -> Result<(), Self::Err> {
         Ok(())
     }
 }
@@ -340,11 +344,9 @@ impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
 /// But, that may change in new versions if better heuristics are found.
 /// Versions are picked with the newest versions first.
 impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependencyProvider<P, VS> {
-    fn choose_version(
-        &self,
-        package: &P,
-        range: &VS,
-    ) -> Result<Option<VS::V>, Box<dyn Error + Send + Sync>> {
+    type Err = Infallible;
+
+    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, Infallible> {
         Ok(self
             .dependencies
             .get(package)
@@ -365,7 +367,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependency
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>> {
+    ) -> Result<Dependencies<P, VS>, Infallible> {
         Ok(match self.dependencies(package, version) {
             None => Dependencies::Unknown,
             Some(dependencies) => Dependencies::Known(dependencies),

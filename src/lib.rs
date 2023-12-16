@@ -83,13 +83,14 @@
 //! # use pubgrub::type_aliases::Map;
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
+//! # use std::convert::Infallible;
 //! #
 //! # struct MyDependencyProvider;
 //! #
 //! type SemVS = Range<SemanticVersion>;
 //!
 //! impl DependencyProvider<String, SemVS> for MyDependencyProvider {
-//!     fn choose_version(&self, package: &String, range: &SemVS) -> Result<Option<SemanticVersion>, Box<dyn Error + Send + Sync>> {
+//!     fn choose_version(&self, package: &String, range: &SemVS) -> Result<Option<SemanticVersion>, Infallible> {
 //!         unimplemented!()
 //!     }
 //!
@@ -102,9 +103,11 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Dependencies<String, SemVS>, Box<dyn Error + Send + Sync>> {
+//!     ) -> Result<Dependencies<String, SemVS>, Infallible> {
 //!         unimplemented!()
 //!     }
+//!
+//!     type Err = Infallible;
 //! }
 //! ```
 //!

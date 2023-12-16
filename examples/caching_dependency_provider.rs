@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use std::cell::RefCell;
-use std::error::Error;
 
 use pubgrub::package::Package;
 use pubgrub::range::Range;
@@ -37,7 +36,7 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Box<dyn Error + Send + Sync>> {
+    ) -> Result<Dependencies<P, VS>, DP::Err> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
             Ok(Dependencies::Unknown) => {
@@ -55,16 +54,12 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
                     error @ Err(_) => error,
                 }
             }
-            dependencies @ Ok(_) => dependencies,
-            error @ Err(_) => error,
+            Ok(dependencies) => Ok(dependencies),
+            Err(_) => unreachable!(),
         }
     }
 
-    fn choose_version(
-        &self,
-        package: &P,
-        range: &VS,
-    ) -> Result<Option<VS::V>, Box<dyn Error + Send + Sync>> {
+    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, DP::Err> {
         self.remote_dependencies.choose_version(package, range)
     }
 
@@ -73,6 +68,8 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
     fn prioritize(&self, package: &P, range: &VS) -> Self::Priority {
         self.remote_dependencies.prioritize(package, range)
     }
+
+    type Err = DP::Err;
 }
 
 fn main() {

@@ -4,6 +4,7 @@
 //! to write a functional PubGrub algorithm.
 
 use std::collections::HashSet as Set;
+use std::error::Error;
 
 use crate::error::PubGrubError;
 use crate::internal::arena::Arena;
@@ -92,7 +93,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
 
     /// Unit propagation is the core mechanism of the solving algorithm.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
-    pub fn unit_propagation(&mut self, package: P) -> Result<(), PubGrubError<P, VS>> {
+    pub fn unit_propagation<E: Error>(&mut self, package: P) -> Result<(), PubGrubError<P, VS, E>> {
         self.unit_propagation_buffer.clear();
         self.unit_propagation_buffer.push(package);
         while let Some(current_package) = self.unit_propagation_buffer.pop() {
@@ -154,10 +155,11 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
 
     /// Return the root cause and the backtracked model.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
-    fn conflict_resolution(
+    #[allow(clippy::type_complexity)]
+    fn conflict_resolution<E: Error>(
         &mut self,
         incompatibility: IncompId<P, VS>,
-    ) -> Result<(P, IncompId<P, VS>), PubGrubError<P, VS>> {
+    ) -> Result<(P, IncompId<P, VS>), PubGrubError<P, VS, E>> {
         let mut current_incompat_id = incompatibility;
         let mut current_incompat_changed = false;
         loop {
