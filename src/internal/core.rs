@@ -31,6 +31,10 @@ pub struct State<P: Package, VS: VersionSet, Priority: Ord + Clone> {
     /// and will stay that way until the next conflict and backtrack is operated.
     contradicted_incompatibilities: rustc_hash::FxHashSet<IncompId<P, VS>>,
 
+    /// All incompatibilities expressing dependencies,
+    /// with common dependents merged.
+    merged_dependencies: Map<(P, P), SmallVec<IncompId<P, VS>>>,
+
     /// Partial solution.
     /// TODO: remove pub.
     pub partial_solution: PartialSolution<P, VS, Priority>,
@@ -62,6 +66,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
             partial_solution: PartialSolution::empty(),
             incompatibility_store,
             unit_propagation_buffer: SmallVec::Empty,
+            merged_dependencies: Map::default(),
         }
     }
 
@@ -79,11 +84,15 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
         deps: &DependencyConstraints<P, VS>,
     ) -> std::ops::Range<IncompId<P, VS>> {
         // Create incompatibilities and allocate them in the store.
-        let new_incompats_id_range = self
-            .incompatibility_store
-            .alloc_iter(deps.iter().map(|dep| {
-                Incompatibility::from_dependency(package.clone(), version.clone(), dep)
-            }));
+        let new_incompats_id_range =
+            self.incompatibility_store
+                .alloc_iter(deps.iter().map(|dep| {
+                    Incompatibility::from_dependency(
+                        package.clone(),
+                        VS::singleton(version.clone()),
+                        dep,
+                    )
+                }));
         // Merge the newly created incompatibilities with the older ones.
         for id in IncompId::range_to_iter(new_incompats_id_range.clone()) {
             self.merge_incompatibility(id);
@@ -232,11 +241,31 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     /// (provided that no other version of foo exists between 1.0.0 and 2.0.0).
     /// We could collapse them into { foo (1.0.0 ∪ 1.1.0), not bar ^1.0.0 }
     /// without having to check the existence of other versions though.
-    ///
-    /// Here we do the simple stupid thing of just growing the Vec.
-    /// It may not be trivial since those incompatibilities
-    /// may already have derived others.
-    fn merge_incompatibility(&mut self, id: IncompId<P, VS>) {
+    fn merge_incompatibility(&mut self, mut id: IncompId<P, VS>) {
+        if let Some((p1, p2)) = self.incompatibility_store[id].as_dependency() {
+            // If we are a dependency, there's a good chance we can be merged with a previous dependency
+            let deps_lookup = self
+                .merged_dependencies
+                .entry((p1.clone(), p2.clone()))
+                .or_default();
+            if let Some((past, merged)) = deps_lookup.as_mut_slice().iter_mut().find_map(|past| {
+                self.incompatibility_store[id]
+                    .merge_dependents(&self.incompatibility_store[*past])
+                    .map(|m| (past, m))
+            }) {
+                let new = self.incompatibility_store.alloc(merged);
+                for (pkg, _) in self.incompatibility_store[new].iter() {
+                    self.incompatibilities
+                        .entry(pkg.clone())
+                        .or_default()
+                        .retain(|id| id != past);
+                }
+                *past = new;
+                id = new;
+            } else {
+                deps_lookup.push(id);
+            }
+        }
         for (pkg, term) in self.incompatibility_store[id].iter() {
             if cfg!(debug_assertions) {
                 assert_ne!(term, &crate::term::Term::any());

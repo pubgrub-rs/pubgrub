@@ -107,20 +107,61 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
     }
 
     /// Build an incompatibility from a given dependency.
-    pub fn from_dependency(package: P, version: VS::V, dep: (&P, &VS)) -> Self {
-        let set1 = VS::singleton(version);
+    pub fn from_dependency(package: P, versions: VS, dep: (&P, &VS)) -> Self {
         let (p2, set2) = dep;
         Self {
             package_terms: if set2 == &VS::empty() {
-                SmallMap::One([(package.clone(), Term::Positive(set1.clone()))])
+                SmallMap::One([(package.clone(), Term::Positive(versions.clone()))])
             } else {
                 SmallMap::Two([
-                    (package.clone(), Term::Positive(set1.clone())),
+                    (package.clone(), Term::Positive(versions.clone())),
                     (p2.clone(), Term::Negative(set2.clone())),
                 ])
             },
-            kind: Kind::FromDependencyOf(package, set1, p2.clone(), set2.clone()),
+            kind: Kind::FromDependencyOf(package, versions, p2.clone(), set2.clone()),
         }
+    }
+
+    pub fn as_dependency(&self) -> Option<(&P, &P)> {
+        match &self.kind {
+            Kind::FromDependencyOf(p1, _, p2, _) => Some((p1, p2)),
+            _ => None,
+        }
+    }
+
+    /// Merge dependant versions with the same dependency.
+    ///
+    /// When multiple versions of a package depend on the same range of another package,
+    /// we can merge the two into a single incompatibility.
+    /// For example, if a@1 depends on b and a@2 depends on b, we can say instead
+    /// a@1 and a@b depend on b.
+    ///
+    /// It is a special case of prior cause computation where the unified package
+    /// is the common dependant in the two incompatibilities expressing dependencies.
+    pub fn merge_dependents(&self, other: &Self) -> Option<Self> {
+        // It is almost certainly a bug to call this method without checking that self is a dependency
+        debug_assert!(self.as_dependency().is_some());
+        // Check that both incompatibilities are of the shape p1 depends on p2,
+        // with the same p1 and p2.
+        let self_pkgs = self.as_dependency()?;
+        if self_pkgs != other.as_dependency()? {
+            return None;
+        }
+        let (p1, p2) = self_pkgs;
+        let dep_term = self.get(p2);
+        // The dependency range for p2 must be the same in both case
+        // to be able to merge multiple p1 ranges.
+        if dep_term != other.get(p2) {
+            return None;
+        }
+        return Some(Self::from_dependency(
+            p1.clone(),
+            self.get(p1)
+                .unwrap()
+                .unwrap_positive()
+                .union(other.get(p1).unwrap().unwrap_positive()), // It is safe to `simplify` here
+            (&p2, dep_term.map_or(&VS::empty(), |v| v.unwrap_negative())),
+        ));
     }
 
     /// Prior cause of two incompatibilities using the rule of resolution.
