@@ -280,7 +280,7 @@ impl<'a, P: Package, VS: VersionSet + 'a> Incompatibility<P, VS> {
                     if relation == Relation::Satisfied {
                         relation = Relation::AlmostSatisfied(package.clone());
                     } else {
-                        relation = Relation::Inconclusive;
+                        return Relation::Inconclusive;
                     }
                 }
             }
