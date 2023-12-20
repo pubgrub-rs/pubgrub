@@ -29,7 +29,7 @@ pub struct State<P: Package, VS: VersionSet, Priority: Ord + Clone> {
 
     /// Store the ids of incompatibilities that are already contradicted
     /// and will stay that way until the next conflict and backtrack is operated.
-    contradicted_incompatibilities: rustc_hash::FxHashSet<IncompId<P, VS>>,
+    contradicted_incompatibilities: Map<IncompId<P, VS>, DecisionLevel>,
 
     /// All incompatibilities expressing dependencies,
     /// with common dependents merged.
@@ -62,7 +62,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
             root_package,
             root_version,
             incompatibilities,
-            contradicted_incompatibilities: rustc_hash::FxHashSet::default(),
+            contradicted_incompatibilities: Map::default(),
             partial_solution: PartialSolution::empty(),
             incompatibility_store,
             unit_propagation_buffer: SmallVec::Empty,
@@ -111,7 +111,10 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
             let mut conflict_id = None;
             // We only care about incompatibilities if it contains the current package.
             for &incompat_id in self.incompatibilities[&current_package].iter().rev() {
-                if self.contradicted_incompatibilities.contains(&incompat_id) {
+                if self
+                    .contradicted_incompatibilities
+                    .contains_key(&incompat_id)
+                {
                     continue;
                 }
                 let current_incompat = &self.incompatibility_store[incompat_id];
@@ -135,10 +138,12 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                             &self.incompatibility_store,
                         );
                         // With the partial solution updated, the incompatibility is now contradicted.
-                        self.contradicted_incompatibilities.insert(incompat_id);
+                        self.contradicted_incompatibilities
+                            .insert(incompat_id, self.partial_solution.current_decision_level());
                     }
                     Relation::Contradicted(_) => {
-                        self.contradicted_incompatibilities.insert(incompat_id);
+                        self.contradicted_incompatibilities
+                            .insert(incompat_id, self.partial_solution.current_decision_level());
                     }
                     _ => {}
                 }
@@ -155,7 +160,8 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                 );
                 // After conflict resolution and the partial solution update,
                 // the root cause incompatibility is now contradicted.
-                self.contradicted_incompatibilities.insert(root_cause);
+                self.contradicted_incompatibilities
+                    .insert(root_cause, self.partial_solution.current_decision_level());
             }
         }
         // If there are no more changed packages, unit propagation is done.
@@ -220,7 +226,8 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     ) {
         self.partial_solution
             .backtrack(decision_level, &self.incompatibility_store);
-        self.contradicted_incompatibilities.clear();
+        self.contradicted_incompatibilities
+            .retain(|_, dl| *dl <= decision_level);
         if incompat_changed {
             self.merge_incompatibility(incompat);
         }
