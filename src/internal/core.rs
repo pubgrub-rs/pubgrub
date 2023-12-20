@@ -27,8 +27,9 @@ pub struct State<P: Package, VS: VersionSet, Priority: Ord + Clone> {
 
     incompatibilities: Map<P, Vec<IncompId<P, VS>>>,
 
-    /// Store the ids of incompatibilities that are already contradicted
-    /// and will stay that way until the next conflict and backtrack is operated.
+    /// Store the ids of incompatibilities that are already contradicted.
+    /// For each one keep track of the decision level when it was found to be contradicted.
+    /// These will stay contradicted until we have backtracked beyond its associated decision level.
     contradicted_incompatibilities: Map<IncompId<P, VS>, DecisionLevel>,
 
     /// All incompatibilities expressing dependencies,
@@ -226,6 +227,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     ) {
         self.partial_solution
             .backtrack(decision_level, &self.incompatibility_store);
+        // Remove contradicted incompatibilities that depend on decisions we just backtracked away.
         self.contradicted_incompatibilities
             .retain(|_, dl| *dl <= decision_level);
         if incompat_changed {
