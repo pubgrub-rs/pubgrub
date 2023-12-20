@@ -493,6 +493,10 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
             .unwrap();
         decision_level.max(DecisionLevel(1))
     }
+
+    pub fn current_decision_level(&self) -> DecisionLevel {
+        self.current_decision_level
+    }
 }
 
 impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
