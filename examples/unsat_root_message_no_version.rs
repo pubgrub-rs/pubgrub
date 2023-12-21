@@ -92,13 +92,11 @@ impl ReportFormatter<Package, Range<SemanticVersion>> for CustomReportFormatter 
                     } else {
                         format!("{package} {package_set} depends on {dependency}")
                     }
+                } else if matches!(package, Package::Root) {
+                    // Exclude the dummy version for root packages
+                    format!("{package} depends on {dependency} {dependency_set}")
                 } else {
-                    if matches!(package, Package::Root) {
-                        // Exclude the dummy version for root packages
-                        format!("{package} depends on {dependency} {dependency_set}")
-                    } else {
-                        format!("{package} {package_set} depends on {dependency} {dependency_set}")
-                    }
+                    format!("{package} {package_set} depends on {dependency} {dependency_set}")
                 }
             }
         }
