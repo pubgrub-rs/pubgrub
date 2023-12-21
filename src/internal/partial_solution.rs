@@ -335,7 +335,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
                 // Update highest_decision_level.
                 pa.highest_decision_level = last.decision_level;
 
-                // Recompute the assignments intersection.
+                // Reset the assignments intersection.
                 pa.assignments_intersection =
                     AssignmentsIntersection::Derivations(last.accumulated_intersection.clone());
                 true
