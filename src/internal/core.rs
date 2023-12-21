@@ -225,8 +225,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
         incompat_changed: bool,
         decision_level: DecisionLevel,
     ) {
-        self.partial_solution
-            .backtrack(decision_level, &self.incompatibility_store);
+        self.partial_solution.backtrack(decision_level);
         // Remove contradicted incompatibilities that depend on decisions we just backtracked away.
         self.contradicted_incompatibilities
             .retain(|_, dl| *dl <= decision_level);
