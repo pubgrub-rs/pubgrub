@@ -208,8 +208,12 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
         store: &Arena<Incompatibility<P, VS>>,
     ) {
         use indexmap::map::Entry;
-        let term = store[cause].get(&package).unwrap().negate();
-        let global_index = self.next_global_index;
+        let mut dated_derivation = DatedDerivation {
+            global_index: self.next_global_index,
+            decision_level: self.current_decision_level,
+            cause,
+            accumulated_intersection: store[cause].get(&package).unwrap().negate(),
+        };
         self.next_global_index += 1;
         let pa_last_index = self.package_assignments.len().saturating_sub(1);
         match self.package_assignments.entry(package) {
@@ -217,15 +221,14 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
                 let idx = occupied.index();
                 let pa = occupied.get_mut();
                 pa.highest_decision_level = self.current_decision_level;
-                let accumulated_intersection;
                 match &mut pa.assignments_intersection {
                     // Check that add_derivation is never called in the wrong context.
                     AssignmentsIntersection::Decision(_) => {
                         panic!("add_derivation should not be called after a decision")
                     }
                     AssignmentsIntersection::Derivations(t) => {
-                        *t = t.intersection(&term);
-                        accumulated_intersection = t.clone();
+                        *t = t.intersection(&dated_derivation.accumulated_intersection);
+                        dated_derivation.accumulated_intersection = t.clone();
                         if t.is_positive() {
                             // we can use `swap_indices` to make `changed_this_decision_level` only go down by 1
                             // but the copying is slower then the larger search
@@ -234,14 +237,10 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
                         }
                     }
                 }
-                pa.dated_derivations.push(DatedDerivation {
-                    global_index,
-                    decision_level: self.current_decision_level,
-                    cause,
-                    accumulated_intersection,
-                });
+                pa.dated_derivations.push(dated_derivation);
             }
             Entry::Vacant(v) => {
+                let term = dated_derivation.accumulated_intersection.clone();
                 if term.is_positive() {
                     self.changed_this_decision_level =
                         std::cmp::min(self.changed_this_decision_level, pa_last_index);
@@ -249,12 +248,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
                 v.insert(PackageAssignments {
                     smallest_decision_level: self.current_decision_level,
                     highest_decision_level: self.current_decision_level,
-                    dated_derivations: SmallVec::One([DatedDerivation {
-                        global_index,
-                        decision_level: self.current_decision_level,
-                        cause,
-                        accumulated_intersection: term.clone(),
-                    }]),
+                    dated_derivations: SmallVec::One([dated_derivation]),
                     assignments_intersection: AssignmentsIntersection::Derivations(term),
                 });
             }
