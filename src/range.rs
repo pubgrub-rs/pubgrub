@@ -119,6 +119,29 @@ impl<V> Range<V> {
             segments: SmallVec::one((Included(v1.into()), Excluded(v2.into()))),
         }
     }
+
+    /// Whether the set is empty, i.e. it has not ranges
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+
+    /// Return all boundary versions of this range.
+    pub fn bounds(&self) -> impl Iterator<Item = &V> {
+        self.segments.iter().flat_map(|segment| {
+            let (v1, v2) = segment;
+            let v1 = match v1 {
+                Included(v) => Some(v),
+                Excluded(v) => Some(v),
+                Unbounded => None,
+            };
+            let v2 = match v2 {
+                Included(v) => Some(v),
+                Excluded(v) => Some(v),
+                Unbounded => None,
+            };
+            v1.into_iter().chain(v2)
+        })
+    }
 }
 
 impl<V: Clone> Range<V> {
