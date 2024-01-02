@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
+#![allow(clippy::type_complexity)]
+
 use std::collections::BTreeSet as Set;
 use std::convert::Infallible;
 
@@ -9,7 +11,9 @@ use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, DerivationTree, External, Reporter};
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
 use pubgrub::type_aliases::SelectedDependencies;
-use pubgrub::version::{NumberVersion, SemanticVersion};
+use pubgrub::version::NumberVersion;
+#[cfg(feature = "serde")]
+use pubgrub::version::SemanticVersion;
 use pubgrub::version_set::VersionSet;
 
 use proptest::collection::{btree_map, btree_set, vec};
@@ -115,6 +119,7 @@ fn timeout_resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
 }
 
 type NumVS = Range<NumberVersion>;
+#[cfg(feature = "serde")]
 type SemVS = Range<SemanticVersion>;
 
 #[test]
@@ -303,7 +308,7 @@ fn retain_versions<N: Package + Ord, VS: VersionSet>(
             if !retain(n, v) {
                 continue;
             }
-            let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
+            let deps = match dependency_provider.get_dependencies(n, v).unwrap() {
                 Dependencies::Unknown => panic!(),
                 Dependencies::Known(deps) => deps,
             };
@@ -327,7 +332,7 @@ fn retain_dependencies<N: Package + Ord, VS: VersionSet>(
     let mut smaller_dependency_provider = OfflineDependencyProvider::new();
     for n in dependency_provider.packages() {
         for v in dependency_provider.versions(n).unwrap() {
-            let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
+            let deps = match dependency_provider.get_dependencies(n, v).unwrap() {
                 Dependencies::Unknown => panic!(),
                 Dependencies::Known(deps) => deps,
             };
@@ -543,7 +548,7 @@ proptest! {
                     // If resolution was successful, then unpublishing a version of a crate
                     // that was not selected should not change that.
                     let smaller_dependency_provider = retain_versions(&dependency_provider, |n, v| {
-                            used.get(&n) == Some(&v) // it was used
+                            used.get(n) == Some(v) // it was used
                             || to_remove.get(&(*n, *v)).is_none() // or it is not one to be removed
                         });
                     prop_assert!(
@@ -588,7 +593,7 @@ fn large_case() {
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {
                 for v in dependency_provider.versions(p).unwrap() {
-                    let res = resolve(&dependency_provider, p.clone(), v);
+                    let res = resolve(&dependency_provider, *p, v);
                     sat.check_resolve(&res, p, v);
                 }
             }
@@ -598,7 +603,7 @@ fn large_case() {
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {
                 for v in dependency_provider.versions(p).unwrap() {
-                    let res = resolve(&dependency_provider, p.clone(), v);
+                    let res = resolve(&dependency_provider, *p, v);
                     sat.check_resolve(&res, p, v);
                 }
             }
