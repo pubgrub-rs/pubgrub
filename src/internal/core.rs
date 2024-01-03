@@ -194,6 +194,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                     DifferentDecisionLevels {
                         previous_satisfier_level,
                     } => {
+                        let package = package.clone();
                         self.backtrack(
                             current_incompat_id,
                             current_incompat_changed,
@@ -206,7 +207,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                         let prior_cause = Incompatibility::prior_cause(
                             current_incompat_id,
                             satisfier_cause,
-                            &package,
+                            package,
                             &self.incompatibility_store,
                         );
                         log::info!("prior cause: {}", prior_cause);

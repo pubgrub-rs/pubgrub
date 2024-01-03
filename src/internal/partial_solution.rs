@@ -390,17 +390,16 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
     }
 
     /// Figure out if the satisfier and previous satisfier are of different decision levels.
-    pub fn satisfier_search(
+    pub fn satisfier_search<'i>(
         &self,
-        incompat: &Incompatibility<P, VS>,
+        incompat: &'i Incompatibility<P, VS>,
         store: &Arena<Incompatibility<P, VS>>,
-    ) -> (P, SatisfierSearch<P, VS>) {
+    ) -> (&'i P, SatisfierSearch<P, VS>) {
         let satisfied_map = Self::find_satisfier(incompat, &self.package_assignments);
-        let (satisfier_package, &(satisfier_index, _, satisfier_decision_level)) = satisfied_map
+        let (&satisfier_package, &(satisfier_index, _, satisfier_decision_level)) = satisfied_map
             .iter()
             .max_by_key(|(_p, (_, global_index, _))| global_index)
             .unwrap();
-        let satisfier_package = satisfier_package.clone();
         let previous_satisfier_level = Self::find_previous_satisfier(
             incompat,
             &satisfier_package,
@@ -414,7 +413,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
             };
             (satisfier_package, search_result)
         } else {
-            let satisfier_pa = self.package_assignments.get(&satisfier_package).unwrap();
+            let satisfier_pa = self.package_assignments.get(satisfier_package).unwrap();
             let dd = &satisfier_pa.dated_derivations[satisfier_index];
             let search_result = SatisfierSearch::SameDecisionLevels {
                 satisfier_cause: dd.cause,
@@ -432,17 +431,14 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
     /// Question: This is possible since we added a "global_index" to every dated_derivation.
     /// It would be nice if we could get rid of it, but I don't know if then it will be possible
     /// to return a coherent previous_satisfier_level.
-    fn find_satisfier(
-        incompat: &Incompatibility<P, VS>,
+    fn find_satisfier<'i>(
+        incompat: &'i Incompatibility<P, VS>,
         package_assignments: &FnvIndexMap<P, PackageAssignments<P, VS>>,
-    ) -> SmallMap<P, (usize, u32, DecisionLevel)> {
+    ) -> SmallMap<&'i P, (usize, u32, DecisionLevel)> {
         let mut satisfied = SmallMap::Empty;
         for (package, incompat_term) in incompat.iter() {
             let pa = package_assignments.get(package).expect("Must exist");
-            satisfied.insert(
-                package.clone(),
-                pa.satisfier(package, &incompat_term.negate()),
-            );
+            satisfied.insert(package, pa.satisfier(package, &incompat_term.negate()));
         }
         satisfied
     }
@@ -450,16 +446,16 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
     /// Earliest assignment in the partial solution before satisfier
     /// such that incompatibility is satisfied by the partial solution up to
     /// and including that assignment plus satisfier.
-    fn find_previous_satisfier(
+    fn find_previous_satisfier<'i>(
         incompat: &Incompatibility<P, VS>,
-        satisfier_package: &P,
-        mut satisfied_map: SmallMap<P, (usize, u32, DecisionLevel)>,
+        satisfier_package: &'i P,
+        mut satisfied_map: SmallMap<&'i P, (usize, u32, DecisionLevel)>,
         package_assignments: &FnvIndexMap<P, PackageAssignments<P, VS>>,
         store: &Arena<Incompatibility<P, VS>>,
     ) -> DecisionLevel {
         // First, let's retrieve the previous derivations and the initial accum_term.
         let satisfier_pa = package_assignments.get(satisfier_package).unwrap();
-        let (satisfier_index, _gidx, _dl) = satisfied_map.get_mut(satisfier_package).unwrap();
+        let (satisfier_index, _gidx, _dl) = satisfied_map.get_mut(&satisfier_package).unwrap();
 
         let accum_term = if *satisfier_index == satisfier_pa.dated_derivations.len() {
             match &satisfier_pa.assignments_intersection {
@@ -476,7 +472,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
             .expect("satisfier package not in incompat");
 
         satisfied_map.insert(
-            satisfier_package.clone(),
+            satisfier_package,
             satisfier_pa.satisfier(
                 satisfier_package,
                 &accum_term.intersection(&incompat_term.negate()),
