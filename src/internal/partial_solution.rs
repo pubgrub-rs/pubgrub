@@ -445,7 +445,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
                     package,
                     incompat_term,
                     &Term::any(),
-                    &Term::any().intersection(&incompat_term.negate()),
+                    &incompat_term.negate(),
                 ),
             );
         }
