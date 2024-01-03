@@ -441,7 +441,12 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
             let pa = package_assignments.get(package).expect("Must exist");
             satisfied.insert(
                 package.clone(),
-                pa.satisfier(package, incompat_term, &Term::any()),
+                pa.satisfier(
+                    package,
+                    incompat_term,
+                    &Term::any(),
+                    &Term::any().intersection(&incompat_term.negate()),
+                ),
             );
         }
         satisfied
@@ -477,7 +482,12 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
 
         satisfied_map.insert(
             satisfier_package.clone(),
-            satisfier_pa.satisfier(satisfier_package, incompat_term, &accum_term),
+            satisfier_pa.satisfier(
+                satisfier_package,
+                incompat_term,
+                &accum_term,
+                &accum_term.intersection(&incompat_term.negate()),
+            ),
         );
 
         // Finally, let's identify the decision level of that previous satisfier.
@@ -499,9 +509,9 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
         package: &P,
         incompat_term: &Term<VS>,
         start_term: &Term<VS>,
+        intersection_term: &Term<VS>,
     ) -> (usize, u32, DecisionLevel) {
         let empty = Term::empty();
-        let intersection_term = start_term.intersection(&incompat_term.negate());
         // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
         let new_idx = self.dated_derivations.as_slice().partition_point(|dd| {
             dd.accumulated_intersection.intersection(&intersection_term) != empty
