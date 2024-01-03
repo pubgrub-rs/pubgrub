@@ -501,12 +501,12 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
         start_term: &Term<VS>,
     ) -> (usize, u32, DecisionLevel) {
         let empty = Term::empty();
+        let intersection_term = start_term.intersection(&incompat_term.negate());
         // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
         for (idx, dated_derivation) in self.dated_derivations.iter().enumerate() {
             let accumulated = dated_derivation
                 .accumulated_intersection
-                .intersection(start_term)
-                .intersection(&incompat_term.negate());
+                .intersection(&intersection_term);
             let new = accumulated == empty;
             #[cfg(debug_assertions)]
             {
