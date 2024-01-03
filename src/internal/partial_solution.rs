@@ -407,19 +407,16 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
             &self.package_assignments,
             store,
         );
-        if previous_satisfier_level < satisfier_decision_level {
-            let search_result = SatisfierSearch::DifferentDecisionLevels {
+        let search_result = if previous_satisfier_level < satisfier_decision_level {
+            SatisfierSearch::DifferentDecisionLevels {
                 previous_satisfier_level,
-            };
-            (satisfier_package, search_result)
+            }
         } else {
-            let satisfier_pa = self.package_assignments.get(satisfier_package).unwrap();
-            let dd = &satisfier_pa.dated_derivations[satisfier_index];
-            let search_result = SatisfierSearch::SameDecisionLevels {
-                satisfier_cause: dd.cause,
-            };
-            (satisfier_package, search_result)
-        }
+            let satisfier_pa = &self.package_assignments[satisfier_package];
+            let satisfier_cause = satisfier_pa.dated_derivations[satisfier_index].cause;
+            SatisfierSearch::SameDecisionLevels { satisfier_cause }
+        };
+        (satisfier_package, search_result)
     }
 
     /// A satisfier is the earliest assignment in partial solution such that the incompatibility
