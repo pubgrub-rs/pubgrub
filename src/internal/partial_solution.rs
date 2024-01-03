@@ -503,26 +503,32 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
         let empty = Term::empty();
         let intersection_term = start_term.intersection(&incompat_term.negate());
         // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
+        let mut new_idx = None;
         for (idx, dated_derivation) in self.dated_derivations.iter().enumerate() {
             let accumulated = dated_derivation
                 .accumulated_intersection
                 .intersection(&intersection_term);
-            let new = accumulated == empty;
-            #[cfg(debug_assertions)]
-            {
-                let old = dated_derivation
-                    .accumulated_intersection
-                    .intersection(start_term)
-                    .subset_of(incompat_term);
-                assert_eq!(old, new);
+            if accumulated == empty {
+                new_idx = Some(idx);
+                break;
             }
-            if new {
-                // We found the derivation causing satisfaction.
-                return (
-                    idx,
-                    dated_derivation.global_index,
-                    dated_derivation.decision_level,
-                );
+        }
+        #[cfg(debug_assertions)]
+        for (idx, dated_derivation) in self.dated_derivations.iter().enumerate() {
+            let old = dated_derivation
+                .accumulated_intersection
+                .intersection(start_term)
+                .subset_of(incompat_term);
+            if old {
+                assert_eq!(new_idx, Some(idx));
+                break;
+            } else {
+                assert!(Some(idx) < new_idx || new_idx.is_none());
+            }
+        }
+        if let Some(idx) = new_idx {
+            if let Some(dd) = self.dated_derivations.get(idx) {
+                return (new_idx.unwrap(), dd.global_index, dd.decision_level);
             }
         }
         // If it wasn't found in the derivations,
