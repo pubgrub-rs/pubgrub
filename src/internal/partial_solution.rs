@@ -441,12 +441,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
             let pa = package_assignments.get(package).expect("Must exist");
             satisfied.insert(
                 package.clone(),
-                pa.satisfier(
-                    package,
-                    incompat_term,
-                    &Term::any(),
-                    &incompat_term.negate(),
-                ),
+                pa.satisfier(package, &incompat_term.negate()),
             );
         }
         satisfied
@@ -484,8 +479,6 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
             satisfier_package.clone(),
             satisfier_pa.satisfier(
                 satisfier_package,
-                incompat_term,
-                &accum_term,
                 &accum_term.intersection(&incompat_term.negate()),
             ),
         );
@@ -504,13 +497,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
 }
 
 impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
-    fn satisfier(
-        &self,
-        package: &P,
-        incompat_term: &Term<VS>,
-        start_term: &Term<VS>,
-        intersection_term: &Term<VS>,
-    ) -> (usize, u32, DecisionLevel) {
+    fn satisfier(&self, package: &P, intersection_term: &Term<VS>) -> (usize, u32, DecisionLevel) {
         let empty = Term::empty();
         // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
         let new_idx = self.dated_derivations.as_slice().partition_point(|dd| {
@@ -535,14 +522,12 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
                 unreachable!(
                     concat!(
                         "while processing package {}: ",
-                        "accum_term = {} isn't a subset of incompat_term = {}, ",
+                        "accum_term = {} has overlap with incompat_term = {}, ",
                         "which means the last assignment should have been a decision, ",
                         "but instead it was a derivation. This shouldn't be possible! ",
                         "(Maybe your Version ordering is broken?)"
                     ),
-                    package,
-                    accumulated_intersection.intersection(start_term),
-                    incompat_term
+                    package, accumulated_intersection, intersection_term
                 )
             }
         }
