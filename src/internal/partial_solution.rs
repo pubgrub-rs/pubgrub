@@ -516,19 +516,6 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
         let new_idx = self.dated_derivations.as_slice().partition_point(|dd| {
             dd.accumulated_intersection.intersection(&intersection_term) != empty
         });
-        #[cfg(debug_assertions)]
-        for (idx, dated_derivation) in self.dated_derivations.iter().enumerate() {
-            let old = dated_derivation
-                .accumulated_intersection
-                .intersection(start_term)
-                .subset_of(incompat_term);
-            if old {
-                assert_eq!(new_idx, idx);
-                break;
-            } else {
-                assert!(idx < new_idx);
-            }
-        }
         if let Some(dd) = self.dated_derivations.get(new_idx) {
             debug_assert_eq!(
                 dd.accumulated_intersection.intersection(&intersection_term),
