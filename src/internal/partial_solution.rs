@@ -504,8 +504,12 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
         for (idx, dated_derivation) in self.dated_derivations.iter().enumerate() {
             let accumulated = dated_derivation
                 .accumulated_intersection
-                .intersection(start_term);
-            let new = accumulated == accumulated.intersection(incompat_term);
+                .intersection(start_term)
+                .intersection(&incompat_term.negate());
+            let new = accumulated
+                == accumulated
+                    .intersection(incompat_term)
+                    .intersection(&incompat_term.negate());
             #[cfg(debug_assertions)]
             {
                 let old = dated_derivation
