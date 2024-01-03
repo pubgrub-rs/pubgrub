@@ -143,6 +143,8 @@ pub enum SatisfierSearch<P: Package, VS: VersionSet> {
     },
 }
 
+type SatisfiedMap<'i, P, VS> = SmallMap<&'i P, (Option<IncompId<P, VS>>, u32, DecisionLevel)>;
+
 impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, Priority> {
     /// Initialize an empty PartialSolution.
     pub fn empty() -> Self {
@@ -402,7 +404,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
             .unwrap();
         let previous_satisfier_level = Self::find_previous_satisfier(
             incompat,
-            &satisfier_package,
+            satisfier_package,
             satisfied_map,
             &self.package_assignments,
             store,
@@ -431,7 +433,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
     fn find_satisfier<'i>(
         incompat: &'i Incompatibility<P, VS>,
         package_assignments: &FnvIndexMap<P, PackageAssignments<P, VS>>,
-    ) -> SmallMap<&'i P, (Option<IncompId<P, VS>>, u32, DecisionLevel)> {
+    ) -> SatisfiedMap<'i, P, VS> {
         let mut satisfied = SmallMap::Empty;
         for (package, incompat_term) in incompat.iter() {
             let pa = package_assignments.get(package).expect("Must exist");
@@ -446,7 +448,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
     fn find_previous_satisfier<'i>(
         incompat: &Incompatibility<P, VS>,
         satisfier_package: &'i P,
-        mut satisfied_map: SmallMap<&'i P, (Option<IncompId<P, VS>>, u32, DecisionLevel)>,
+        mut satisfied_map: SatisfiedMap<'i, P, VS>,
         package_assignments: &FnvIndexMap<P, PackageAssignments<P, VS>>,
         store: &Arena<Incompatibility<P, VS>>,
     ) -> DecisionLevel {
@@ -499,9 +501,9 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
         let idx = self
             .dated_derivations
             .as_slice()
-            .partition_point(|dd| dd.accumulated_intersection.intersection(&start_term) != empty);
+            .partition_point(|dd| dd.accumulated_intersection.intersection(start_term) != empty);
         if let Some(dd) = self.dated_derivations.get(idx) {
-            debug_assert_eq!(dd.accumulated_intersection.intersection(&start_term), empty);
+            debug_assert_eq!(dd.accumulated_intersection.intersection(start_term), empty);
             return (Some(dd.cause), dd.global_index, dd.decision_level);
         }
         // If it wasn't found in the derivations,
