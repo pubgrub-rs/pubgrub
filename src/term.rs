@@ -107,6 +107,7 @@ impl<VS: VersionSet> Term<VS> {
     /// Indicate if this term is a subset of another term.
     /// Just like for sets, we say that t1 is a subset of t2
     /// if and only if t1 ∩ t2 = t1.
+    #[cfg(debug_assertions)]
     pub(crate) fn subset_of(&self, other: &Self) -> bool {
         self == &self.intersection(other)
     }

@@ -502,10 +502,10 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
     ) -> (usize, u32, DecisionLevel) {
         // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
         for (idx, dated_derivation) in self.dated_derivations.iter().enumerate() {
-            let new = dated_derivation
+            let accumulated = dated_derivation
                 .accumulated_intersection
-                .intersection(start_term)
-                .subset_of(incompat_term);
+                .intersection(start_term);
+            let new = accumulated == accumulated.intersection(incompat_term);
             #[cfg(debug_assertions)]
             {
                 let old = dated_derivation
