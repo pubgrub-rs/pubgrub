@@ -497,18 +497,16 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> PartialSolution<P, VS, P
 }
 
 impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
-    fn satisfier(&self, package: &P, intersection_term: &Term<VS>) -> (usize, u32, DecisionLevel) {
+    fn satisfier(&self, package: &P, start_term: &Term<VS>) -> (usize, u32, DecisionLevel) {
         let empty = Term::empty();
         // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
-        let new_idx = self.dated_derivations.as_slice().partition_point(|dd| {
-            dd.accumulated_intersection.intersection(&intersection_term) != empty
-        });
-        if let Some(dd) = self.dated_derivations.get(new_idx) {
-            debug_assert_eq!(
-                dd.accumulated_intersection.intersection(&intersection_term),
-                empty
-            );
-            return (new_idx, dd.global_index, dd.decision_level);
+        let idx = self
+            .dated_derivations
+            .as_slice()
+            .partition_point(|dd| dd.accumulated_intersection.intersection(&start_term) != empty);
+        if let Some(dd) = self.dated_derivations.get(idx) {
+            debug_assert_eq!(dd.accumulated_intersection.intersection(&start_term), empty);
+            return (idx, dd.global_index, dd.decision_level);
         }
         // If it wasn't found in the derivations,
         // it must be the decision which is last (if called in the right context).
@@ -527,7 +525,7 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
                         "but instead it was a derivation. This shouldn't be possible! ",
                         "(Maybe your Version ordering is broken?)"
                     ),
-                    package, accumulated_intersection, intersection_term
+                    package, accumulated_intersection, start_term
                 )
             }
         }
