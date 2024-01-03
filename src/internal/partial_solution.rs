@@ -503,9 +503,9 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
         let empty = Term::empty();
         let intersection_term = start_term.intersection(&incompat_term.negate());
         // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
-        let new_idx = Some(self.dated_derivations.as_slice().partition_point(|dd| {
+        let new_idx = self.dated_derivations.as_slice().partition_point(|dd| {
             dd.accumulated_intersection.intersection(&intersection_term) != empty
-        }));
+        });
         #[cfg(debug_assertions)]
         for (idx, dated_derivation) in self.dated_derivations.iter().enumerate() {
             let old = dated_derivation
@@ -513,20 +513,18 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
                 .intersection(start_term)
                 .subset_of(incompat_term);
             if old {
-                assert_eq!(new_idx, Some(idx));
+                assert_eq!(new_idx, idx);
                 break;
             } else {
-                assert!(Some(idx) < new_idx || new_idx.is_none());
+                assert!(idx < new_idx);
             }
         }
-        if let Some(idx) = new_idx {
-            if let Some(dd) = self.dated_derivations.get(idx) {
-                debug_assert_eq!(
-                    dd.accumulated_intersection.intersection(&intersection_term),
-                    empty
-                );
-                return (new_idx.unwrap(), dd.global_index, dd.decision_level);
-            }
+        if let Some(dd) = self.dated_derivations.get(new_idx) {
+            debug_assert_eq!(
+                dd.accumulated_intersection.intersection(&intersection_term),
+                empty
+            );
+            return (new_idx, dd.global_index, dd.decision_level);
         }
         // If it wasn't found in the derivations,
         // it must be the decision which is last (if called in the right context).
