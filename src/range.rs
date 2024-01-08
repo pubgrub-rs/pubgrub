@@ -453,8 +453,8 @@ impl<V: Ord + Clone> Range<V> {
         V: 'v,
     {
         // Do not simplify singletons
-        if self.is_singleton() {
-            return self.clone();
+        if let Some(version) = self.as_singleton() {
+            return Self::singleton(version);
         }
 
         // Return the segment index in the range for each version in the range, None otherwise
@@ -496,10 +496,18 @@ impl<V: Ord + Clone> Range<V> {
         Self { segments }.check_invariants()
     }
 
-    pub fn is_singleton(&self) -> bool {
+    /// If the range includes a single version, return it.
+    /// Otherwise, returns [None].
+    pub fn as_singleton(&self) -> Option<V> {
         match self.segments.as_slice() {
-            [(Included(v1), Included(v2))] => v1 == v2,
-            _ => false,
+            [(Included(v1), Included(v2))] => {
+                if v1 == v2 {
+                    Some(v1.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
     }
 }
