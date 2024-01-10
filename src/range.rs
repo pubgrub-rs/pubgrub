@@ -510,6 +510,11 @@ impl<V: Ord + Clone> Range<V> {
             _ => None,
         }
     }
+
+    /// Iterate over the parts of the range.
+    pub fn iter(&self) -> impl Iterator<Item = &(Bound<V>, Bound<V>)> {
+        self.segments.iter()
+    }
 }
 
 impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
