@@ -493,6 +493,11 @@ impl<V: Ord + Clone> Range<V> {
         }
         Self { segments }.check_invariants()
     }
+
+    /// Iterate over the parts of the range.
+    pub fn iter(&self) -> impl Iterator<Item = (&Bound<V>, &Bound<V>)> {
+        self.segments.iter().map(|(start, end)| (start, end))
+    }
 }
 
 impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
