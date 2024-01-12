@@ -2,9 +2,8 @@
 
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
-use pubgrub::version::NumberVersion;
 
-type NumVS = Range<NumberVersion>;
+type NumVS = Range<u32>;
 
 // `root` depends on `menu` and `icons`
 // `menu` depends on `dropdown`
@@ -14,13 +13,13 @@ type NumVS = Range<NumberVersion>;
 fn main() {
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
     dependency_provider.add_dependencies(
-        "root", 1, [("menu", Range::full()), ("icons", Range::full())],
+        "root", 1u32, [("menu", Range::full()), ("icons", Range::full())],
     );
-    dependency_provider.add_dependencies("menu", 1, [("dropdown", Range::full())]);
-    dependency_provider.add_dependencies("dropdown", 1, [("icons", Range::full())]);
-    dependency_provider.add_dependencies("icons", 1, []);
+    dependency_provider.add_dependencies("menu", 1u32, [("dropdown", Range::full())]);
+    dependency_provider.add_dependencies("dropdown", 1u32, [("icons", Range::full())]);
+    dependency_provider.add_dependencies("icons", 1u32, []);
 
     // Run the algorithm.
-    let solution = resolve(&dependency_provider, "root", 1);
+    let solution = resolve(&dependency_provider, "root", 1u32);
     println!("Solution: {:?}", solution);
 }

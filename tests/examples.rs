@@ -5,9 +5,9 @@ use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, Reporter as _};
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::type_aliases::Map;
-use pubgrub::version::{NumberVersion, SemanticVersion};
+use pubgrub::version::SemanticVersion;
 
-type NumVS = Range<NumberVersion>;
+type NumVS = Range<u32>;
 type SemVS = Range<SemanticVersion>;
 
 use log::LevelFilter;
@@ -193,22 +193,22 @@ fn conflict_with_partial_satisfier() {
 fn double_choices() {
     init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
-    dependency_provider.add_dependencies("a", 0, [("b", Range::full()), ("c", Range::full())]);
-    dependency_provider.add_dependencies("b", 0, [("d", Range::singleton(0))]);
-    dependency_provider.add_dependencies("b", 1, [("d", Range::singleton(1))]);
-    dependency_provider.add_dependencies("c", 0, []);
-    dependency_provider.add_dependencies("c", 1, [("d", Range::singleton(2))]);
-    dependency_provider.add_dependencies("d", 0, []);
+    dependency_provider.add_dependencies("a", 0u32, [("b", Range::full()), ("c", Range::full())]);
+    dependency_provider.add_dependencies("b", 0u32, [("d", Range::singleton(0u32))]);
+    dependency_provider.add_dependencies("b", 1u32, [("d", Range::singleton(1u32))]);
+    dependency_provider.add_dependencies("c", 0u32, []);
+    dependency_provider.add_dependencies("c", 1u32, [("d", Range::singleton(2u32))]);
+    dependency_provider.add_dependencies("d", 0u32, []);
 
     // Solution.
     let mut expected_solution = Map::default();
-    expected_solution.insert("a", 0.into());
-    expected_solution.insert("b", 0.into());
-    expected_solution.insert("c", 0.into());
-    expected_solution.insert("d", 0.into());
+    expected_solution.insert("a", 0u32);
+    expected_solution.insert("b", 0u32);
+    expected_solution.insert("c", 0u32);
+    expected_solution.insert("d", 0u32);
 
     // Run the algorithm.
-    let computed_solution = resolve(&dependency_provider, "a", 0).unwrap();
+    let computed_solution = resolve(&dependency_provider, "a", 0u32).unwrap();
     assert_eq!(expected_solution, computed_solution);
 }
 
@@ -217,7 +217,7 @@ fn confusing_with_lots_of_holes() {
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 
     // root depends on foo...
-    dependency_provider.add_dependencies("root", 1, vec![("foo", Range::full())]);
+    dependency_provider.add_dependencies("root", 1u32, vec![("foo", Range::full())]);
 
     for i in 1..6 {
         // foo depends on bar...
@@ -225,7 +225,7 @@ fn confusing_with_lots_of_holes() {
     }
 
     let Err(PubGrubError::NoSolution(mut derivation_tree)) =
-        resolve(&dependency_provider, "root", 1)
+        resolve(&dependency_provider, "root", 1u32)
     else {
         unreachable!()
     };

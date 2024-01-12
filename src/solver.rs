@@ -43,16 +43,15 @@
 //! ```
 //! # use std::convert::Infallible;
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
-//! # use pubgrub::version::NumberVersion;
 //! # use pubgrub::error::PubGrubError;
 //! # use pubgrub::range::Range;
 //! #
-//! # type NumVS = Range<NumberVersion>;
+//! # type NumVS = Range<u32>;
 //! #
 //! # fn try_main() -> Result<(), PubGrubError<&'static str, NumVS, Infallible>> {
 //! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! #     let package = "root";
-//! #     let version = 1;
+//! #     let version = 1u32;
 //! let solution = resolve(&dependency_provider, package, version)?;
 //! #     Ok(())
 //! # }

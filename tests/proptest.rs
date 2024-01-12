@@ -11,7 +11,6 @@ use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, DerivationTree, External, Reporter};
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
 use pubgrub::type_aliases::SelectedDependencies;
-use pubgrub::version::NumberVersion;
 #[cfg(feature = "serde")]
 use pubgrub::version::SemanticVersion;
 use pubgrub::version_set::VersionSet;
@@ -118,7 +117,7 @@ fn timeout_resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
     )
 }
 
-type NumVS = Range<NumberVersion>;
+type NumVS = Range<u32>;
 #[cfg(feature = "serde")]
 type SemVS = Range<SemanticVersion>;
 
@@ -126,13 +125,13 @@ type SemVS = Range<SemanticVersion>;
 #[should_panic]
 fn should_cancel_can_panic() {
     let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
-    dependency_provider.add_dependencies(0, 0, [(666, Range::full())]);
+    dependency_provider.add_dependencies(0, 0u32, [(666, Range::full())]);
 
     // Run the algorithm.
     let _ = resolve(
         &TimeoutDependencyProvider::new(dependency_provider, 1),
         0,
-        0,
+        0u32,
     );
 }
 
@@ -152,7 +151,7 @@ fn string_names() -> impl Strategy<Value = String> {
 /// This strategy has a high probability of having valid dependencies
 pub fn registry_strategy<N: Package + Ord>(
     name: impl Strategy<Value = N>,
-) -> impl Strategy<Value = (OfflineDependencyProvider<N, NumVS>, Vec<(N, NumberVersion)>)> {
+) -> impl Strategy<Value = (OfflineDependencyProvider<N, NumVS>, Vec<(N, u32)>)> {
     let max_crates = 40;
     let max_versions = 15;
     let shrinkage = 40;
@@ -193,14 +192,10 @@ pub fn registry_strategy<N: Package + Ord>(
     )
         .prop_map(
             move |(crate_vers_by_name, raw_dependencies, reverse_alphabetical, complicated_len)| {
-                let mut list_of_pkgid: Vec<((N, NumberVersion), Vec<(N, NumVS)>)> =
-                    crate_vers_by_name
-                        .iter()
-                        .flat_map(|(name, vers)| {
-                            vers.iter()
-                                .map(move |x| ((name.clone(), NumberVersion::from(x)), vec![]))
-                        })
-                        .collect();
+                let mut list_of_pkgid: Vec<((N, u32), Vec<(N, NumVS)>)> = crate_vers_by_name
+                    .iter()
+                    .flat_map(|(name, vers)| vers.iter().map(move |&x| ((name.clone(), x), vec![])))
+                    .collect();
                 let len_all_pkgid = list_of_pkgid.len();
                 for (a, b, (c, d)) in raw_dependencies {
                     let (a, b) = order_index(a, b, len_all_pkgid);
@@ -355,7 +350,7 @@ fn retain_dependencies<N: Package + Ord, VS: VersionSet>(
 fn errors_the_same_with_only_report_dependencies<N: Package + Ord>(
     dependency_provider: OfflineDependencyProvider<N, NumVS>,
     name: N,
-    ver: NumberVersion,
+    ver: u32,
 ) {
     let Err(PubGrubError::NoSolution(tree)) =
         timeout_resolve(dependency_provider.clone(), name.clone(), ver)
@@ -532,7 +527,7 @@ proptest! {
         (dependency_provider, cases) in registry_strategy(0u16..665),
         indexes_to_remove in prop::collection::vec(any::<prop::sample::Index>(), 1..10)
     )  {
-        let all_versions: Vec<(u16, NumberVersion)> = dependency_provider
+        let all_versions: Vec<(u16, u32)> = dependency_provider
             .packages()
             .flat_map(|&p| {
                 dependency_provider
@@ -587,14 +582,14 @@ fn large_case() {
         eprint!("{} ", name);
         let data = std::fs::read_to_string(&case).unwrap();
         let start_time = std::time::Instant::now();
-        if name.ends_with("u16_NumberVersion.ron") {
+        if name.ends_with("u16_NumberVersion.ron") || name.ends_with("u16_u32.ron") {
             let dependency_provider: OfflineDependencyProvider<u16, NumVS> =
                 ron::de::from_str(&data).unwrap();
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {
-                for v in dependency_provider.versions(p).unwrap() {
+                for &v in dependency_provider.versions(p).unwrap() {
                     let res = resolve(&dependency_provider, *p, v);
-                    sat.check_resolve(&res, p, v);
+                    sat.check_resolve(&res, p, &v);
                 }
             }
         } else if name.ends_with("str_SemanticVersion.ron") {

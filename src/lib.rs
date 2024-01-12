@@ -19,6 +19,7 @@
 //! [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
 //! So things like [String] will work out of the box.
 //!
+//! TODO! This is all wrong. Need to talk about VS, not Version.
 //! Our [Version](version::Version) trait requires
 //! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display)
 //! and also the definition of two methods,
@@ -27,8 +28,7 @@
 //! strictly higher than the current one.
 //! For convenience, this library already provides
 //! two implementations of [Version](version::Version).
-//! The first one is [NumberVersion](version::NumberVersion), basically a newtype for [u32].
-//! The second one is [SemanticVersion](version::NumberVersion)
+//! The second one is [SemanticVersion](version::SemanticVersion)
 //! that implements semantic versioning rules.
 //!
 //! # Basic example
@@ -47,22 +47,21 @@
 //! We can model that scenario with this library as follows
 //! ```
 //! # use pubgrub::solver::{OfflineDependencyProvider, resolve};
-//! # use pubgrub::version::NumberVersion;
 //! # use pubgrub::range::Range;
 //!
-//! type NumVS = Range<NumberVersion>;
+//! type NumVS = Range<u32>;
 //!
 //! let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //!
 //! dependency_provider.add_dependencies(
-//!     "root", 1, [("menu", Range::full()), ("icons", Range::full())],
+//!     "root", 1u32, [("menu", Range::full()), ("icons", Range::full())],
 //! );
-//! dependency_provider.add_dependencies("menu", 1, [("dropdown", Range::full())]);
-//! dependency_provider.add_dependencies("dropdown", 1, [("icons", Range::full())]);
-//! dependency_provider.add_dependencies("icons", 1, []);
+//! dependency_provider.add_dependencies("menu", 1u32, [("dropdown", Range::full())]);
+//! dependency_provider.add_dependencies("dropdown", 1u32, [("icons", Range::full())]);
+//! dependency_provider.add_dependencies("icons", 1u32, []);
 //!
 //! // Run the algorithm.
-//! let solution = resolve(&dependency_provider, "root", 1).unwrap();
+//! let solution = resolve(&dependency_provider, "root", 1u32).unwrap();
 //! ```
 //!
 //! # DependencyProvider trait
@@ -183,14 +182,13 @@
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
 //! # use pubgrub::report::{DefaultStringReporter, Reporter};
 //! # use pubgrub::error::PubGrubError;
-//! # use pubgrub::version::NumberVersion;
 //! # use pubgrub::range::Range;
 //! #
-//! # type NumVS = Range<NumberVersion>;
+//! # type NumVS = Range<u32>;
 //! #
 //! # let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! # let root_package = "root";
-//! # let root_version = 1;
+//! # let root_version = 1u32;
 //! #
 //! match resolve(&dependency_provider, root_package, root_version) {
 //!     Ok(solution) => println!("{:?}", solution),
