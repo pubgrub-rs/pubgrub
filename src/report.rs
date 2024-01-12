@@ -249,6 +249,58 @@ pub trait ReportFormatter<P: Package, VS: VersionSet> {
 
     /// Format terms of an incompatibility.
     fn format_terms(&self, terms: &Map<P, Term<VS>>) -> Self::Output;
+
+    /// Simplest case, we just combine two external incompatibilities.
+    fn explain_both_external(
+        &self,
+        external1: &External<P, VS>,
+        external2: &External<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> Self::Output;
+
+    /// Both causes have already been explained so we use their refs.
+    fn explain_both_ref(
+        &self,
+        ref_id1: usize,
+        derived1: &Derived<P, VS>,
+        ref_id2: usize,
+        derived2: &Derived<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> Self::Output;
+
+    /// One cause is derived (already explained so one-line),
+    /// the other is a one-line external cause,
+    /// and finally we conclude with the current incompatibility.
+    fn explain_ref_and_external(
+        &self,
+        ref_id: usize,
+        derived: &Derived<P, VS>,
+        external: &External<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> Self::Output;
+
+    /// Add an external cause to the chain of explanations.
+    fn and_explain_external(
+        &self,
+        external: &External<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> Self::Output;
+
+    /// Add an already explained incompat to the chain of explanations.
+    fn and_explain_ref(
+        &self,
+        ref_id: usize,
+        derived: &Derived<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> Self::Output;
+
+    /// Add an already explained incompat to the chain of explanations.
+    fn and_explain_prior_and_external(
+        &self,
+        prior_external: &External<P, VS>,
+        external: &External<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> Self::Output;
 }
 
 /// Default formatter for the default reporter.
@@ -280,6 +332,105 @@ impl<P: Package, VS: VersionSet> ReportFormatter<P, VS> for DefaultStringReportF
                 str_terms.join(", ") + " are incompatible"
             }
         }
+    }
+
+    /// Simplest case, we just combine two external incompatibilities.
+    fn explain_both_external(
+        &self,
+        external1: &External<P, VS>,
+        external2: &External<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> String {
+        // TODO: order should be chosen to make it more logical.
+        format!(
+            "Because {} and {}, {}.",
+            self.format_external(external1),
+            self.format_external(external2),
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// Both causes have already been explained so we use their refs.
+    fn explain_both_ref(
+        &self,
+        ref_id1: usize,
+        derived1: &Derived<P, VS>,
+        ref_id2: usize,
+        derived2: &Derived<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> String {
+        // TODO: order should be chosen to make it more logical.
+        format!(
+            "Because {} ({}) and {} ({}), {}.",
+            self.format_terms(&derived1.terms),
+            ref_id1,
+            self.format_terms(&derived2.terms),
+            ref_id2,
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// One cause is derived (already explained so one-line),
+    /// the other is a one-line external cause,
+    /// and finally we conclude with the current incompatibility.
+    fn explain_ref_and_external(
+        &self,
+        ref_id: usize,
+        derived: &Derived<P, VS>,
+        external: &External<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> String {
+        // TODO: order should be chosen to make it more logical.
+        format!(
+            "Because {} ({}) and {}, {}.",
+            self.format_terms(&derived.terms),
+            ref_id,
+            self.format_external(external),
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// Add an external cause to the chain of explanations.
+    fn and_explain_external(
+        &self,
+        external: &External<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> String {
+        format!(
+            "And because {}, {}.",
+            self.format_external(external),
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// Add an already explained incompat to the chain of explanations.
+    fn and_explain_ref(
+        &self,
+        ref_id: usize,
+        derived: &Derived<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> String {
+        format!(
+            "And because {} ({}), {}.",
+            self.format_terms(&derived.terms),
+            ref_id,
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// Add an already explained incompat to the chain of explanations.
+    fn and_explain_prior_and_external(
+        &self,
+        prior_external: &External<P, VS>,
+        external: &External<P, VS>,
+        current_terms: &Map<P, Term<VS>>,
+    ) -> String {
+        format!(
+            "And because {} and {}, {}.",
+            self.format_external(prior_external),
+            self.format_external(external),
+            self.format_terms(current_terms)
+        )
     }
 }
 
@@ -330,11 +481,10 @@ impl DefaultStringReporter {
         match (current.cause1.deref(), current.cause2.deref()) {
             (DerivationTree::External(external1), DerivationTree::External(external2)) => {
                 // Simplest case, we just combine two external incompatibilities.
-                self.lines.push(Self::explain_both_external(
+                self.lines.push(formatter.explain_both_external(
                     external1,
                     external2,
                     &current.terms,
-                    formatter,
                 ));
             }
             (DerivationTree::Derived(derived), DerivationTree::External(external)) => {
@@ -354,34 +504,25 @@ impl DefaultStringReporter {
                 ) {
                     // If both causes already have been referenced (shared_id),
                     // the explanation simply uses those references.
-                    (Some(ref1), Some(ref2)) => self.lines.push(Self::explain_both_ref(
+                    (Some(ref1), Some(ref2)) => self.lines.push(formatter.explain_both_ref(
                         ref1,
                         derived1,
                         ref2,
                         derived2,
                         &current.terms,
-                        formatter,
                     )),
                     // Otherwise, if one only has a line number reference,
                     // we recursively call the one without reference and then
                     // add the one with reference to conclude.
                     (Some(ref1), None) => {
                         self.build_recursive(derived2, formatter);
-                        self.lines.push(Self::and_explain_ref(
-                            ref1,
-                            derived1,
-                            &current.terms,
-                            formatter,
-                        ));
+                        self.lines
+                            .push(formatter.and_explain_ref(ref1, derived1, &current.terms));
                     }
                     (None, Some(ref2)) => {
                         self.build_recursive(derived1, formatter);
-                        self.lines.push(Self::and_explain_ref(
-                            ref2,
-                            derived2,
-                            &current.terms,
-                            formatter,
-                        ));
+                        self.lines
+                            .push(formatter.and_explain_ref(ref2, derived2, &current.terms));
                     }
                     // Finally, if no line reference exists yet,
                     // we call recursively the first one and then,
@@ -400,11 +541,10 @@ impl DefaultStringReporter {
                             let ref1 = self.ref_count;
                             self.lines.push("".into());
                             self.build_recursive(derived2, formatter);
-                            self.lines.push(Self::and_explain_ref(
+                            self.lines.push(formatter.and_explain_ref(
                                 ref1,
                                 derived1,
                                 &current.terms,
-                                formatter,
                             ));
                         }
                     }
@@ -425,12 +565,11 @@ impl DefaultStringReporter {
         formatter: &F,
     ) {
         match self.line_ref_of(derived.shared_id) {
-            Some(ref_id) => self.lines.push(Self::explain_ref_and_external(
+            Some(ref_id) => self.lines.push(formatter.explain_ref_and_external(
                 ref_id,
                 derived,
                 external,
                 current_terms,
-                formatter,
             )),
             None => self.report_recurse_one_each(derived, external, current_terms, formatter),
         }
@@ -453,150 +592,28 @@ impl DefaultStringReporter {
             // we can chain the external explanations.
             (DerivationTree::Derived(prior_derived), DerivationTree::External(prior_external)) => {
                 self.build_recursive(prior_derived, formatter);
-                self.lines.push(Self::and_explain_prior_and_external(
+                self.lines.push(formatter.and_explain_prior_and_external(
                     prior_external,
                     external,
                     current_terms,
-                    formatter,
                 ));
             }
             // If the derived cause has itself one external prior cause,
             // we can chain the external explanations.
             (DerivationTree::External(prior_external), DerivationTree::Derived(prior_derived)) => {
                 self.build_recursive(prior_derived, formatter);
-                self.lines.push(Self::and_explain_prior_and_external(
+                self.lines.push(formatter.and_explain_prior_and_external(
                     prior_external,
                     external,
                     current_terms,
-                    formatter,
                 ));
             }
             _ => {
                 self.build_recursive(derived, formatter);
-                self.lines.push(Self::and_explain_external(
-                    external,
-                    current_terms,
-                    formatter,
-                ));
+                self.lines
+                    .push(formatter.and_explain_external(external, current_terms));
             }
         }
-    }
-
-    // String explanations #####################################################
-
-    /// Simplest case, we just combine two external incompatibilities.
-    fn explain_both_external<
-        P: Package,
-        VS: VersionSet,
-        F: ReportFormatter<P, VS, Output = String>,
-    >(
-        external1: &External<P, VS>,
-        external2: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-        formatter: &F,
-    ) -> String {
-        // TODO: order should be chosen to make it more logical.
-        format!(
-            "Because {} and {}, {}.",
-            formatter.format_external(external1),
-            formatter.format_external(external2),
-            formatter.format_terms(current_terms)
-        )
-    }
-
-    /// Both causes have already been explained so we use their refs.
-    fn explain_both_ref<P: Package, VS: VersionSet, F: ReportFormatter<P, VS, Output = String>>(
-        ref_id1: usize,
-        derived1: &Derived<P, VS>,
-        ref_id2: usize,
-        derived2: &Derived<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-        formatter: &F,
-    ) -> String {
-        // TODO: order should be chosen to make it more logical.
-        format!(
-            "Because {} ({}) and {} ({}), {}.",
-            formatter.format_terms(&derived1.terms),
-            ref_id1,
-            formatter.format_terms(&derived2.terms),
-            ref_id2,
-            formatter.format_terms(current_terms)
-        )
-    }
-
-    /// One cause is derived (already explained so one-line),
-    /// the other is a one-line external cause,
-    /// and finally we conclude with the current incompatibility.
-    fn explain_ref_and_external<
-        P: Package,
-        VS: VersionSet,
-        F: ReportFormatter<P, VS, Output = String>,
-    >(
-        ref_id: usize,
-        derived: &Derived<P, VS>,
-        external: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-        formatter: &F,
-    ) -> String {
-        // TODO: order should be chosen to make it more logical.
-        format!(
-            "Because {} ({}) and {}, {}.",
-            formatter.format_terms(&derived.terms),
-            ref_id,
-            formatter.format_external(external),
-            formatter.format_terms(current_terms)
-        )
-    }
-
-    /// Add an external cause to the chain of explanations.
-    fn and_explain_external<
-        P: Package,
-        VS: VersionSet,
-        F: ReportFormatter<P, VS, Output = String>,
-    >(
-        external: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-        formatter: &F,
-    ) -> String {
-        format!(
-            "And because {}, {}.",
-            formatter.format_external(external),
-            formatter.format_terms(current_terms)
-        )
-    }
-
-    /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_ref<P: Package, VS: VersionSet, F: ReportFormatter<P, VS, Output = String>>(
-        ref_id: usize,
-        derived: &Derived<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-        formatter: &F,
-    ) -> String {
-        format!(
-            "And because {} ({}), {}.",
-            formatter.format_terms(&derived.terms),
-            ref_id,
-            formatter.format_terms(current_terms)
-        )
-    }
-
-    /// Add an already explained incompat to the chain of explanations.
-    fn and_explain_prior_and_external<
-        P: Package,
-        VS: VersionSet,
-        F: ReportFormatter<P, VS, Output = String>,
-    >(
-        prior_external: &External<P, VS>,
-        external: &External<P, VS>,
-        current_terms: &Map<P, Term<VS>>,
-        formatter: &F,
-    ) -> String {
-        format!(
-            "And because {} and {}, {}.",
-            formatter.format_external(prior_external),
-            formatter.format_external(external),
-            formatter.format_terms(current_terms)
-        )
     }
 
     // Helper functions ########################################################

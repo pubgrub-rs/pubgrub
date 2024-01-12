@@ -2,7 +2,7 @@
 
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
-use pubgrub::report::Reporter;
+use pubgrub::report::{Derived, Reporter};
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
 use pubgrub::version::SemanticVersion;
 
@@ -107,6 +107,105 @@ impl ReportFormatter<Package, Range<SemanticVersion>> for CustomReportFormatter 
                 }
             }
         }
+    }
+
+    /// Simplest case, we just combine two external incompatibilities.
+    fn explain_both_external(
+        &self,
+        external1: &External<Package, Range<SemanticVersion>>,
+        external2: &External<Package, Range<SemanticVersion>>,
+        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+    ) -> String {
+        // TODO: order should be chosen to make it more logical.
+        format!(
+            "Because {} and {}, {}.",
+            self.format_external(external1),
+            self.format_external(external2),
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// Both causes have already been explained so we use their refs.
+    fn explain_both_ref(
+        &self,
+        ref_id1: usize,
+        derived1: &Derived<Package, Range<SemanticVersion>>,
+        ref_id2: usize,
+        derived2: &Derived<Package, Range<SemanticVersion>>,
+        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+    ) -> String {
+        // TODO: order should be chosen to make it more logical.
+        format!(
+            "Because {} ({}) and {} ({}), {}.",
+            self.format_terms(&derived1.terms),
+            ref_id1,
+            self.format_terms(&derived2.terms),
+            ref_id2,
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// One cause is derived (already explained so one-line),
+    /// the other is a one-line external cause,
+    /// and finally we conclude with the current incompatibility.
+    fn explain_ref_and_external(
+        &self,
+        ref_id: usize,
+        derived: &Derived<Package, Range<SemanticVersion>>,
+        external: &External<Package, Range<SemanticVersion>>,
+        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+    ) -> String {
+        // TODO: order should be chosen to make it more logical.
+        format!(
+            "Because {} ({}) and {}, {}.",
+            self.format_terms(&derived.terms),
+            ref_id,
+            self.format_external(external),
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// Add an external cause to the chain of explanations.
+    fn and_explain_external(
+        &self,
+        external: &External<Package, Range<SemanticVersion>>,
+        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+    ) -> String {
+        format!(
+            "And because {}, {}.",
+            self.format_external(external),
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// Add an already explained incompat to the chain of explanations.
+    fn and_explain_ref(
+        &self,
+        ref_id: usize,
+        derived: &Derived<Package, Range<SemanticVersion>>,
+        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+    ) -> String {
+        format!(
+            "And because {} ({}), {}.",
+            self.format_terms(&derived.terms),
+            ref_id,
+            self.format_terms(current_terms)
+        )
+    }
+
+    /// Add an already explained incompat to the chain of explanations.
+    fn and_explain_prior_and_external(
+        &self,
+        prior_external: &External<Package, Range<SemanticVersion>>,
+        external: &External<Package, Range<SemanticVersion>>,
+        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+    ) -> String {
+        format!(
+            "And because {} and {}, {}.",
+            self.format_external(prior_external),
+            self.format_external(external),
+            self.format_terms(current_terms)
+        )
     }
 }
 
