@@ -3,7 +3,6 @@
 //! Core model and functions
 //! to write a functional PubGrub algorithm.
 
-use std::collections::HashSet as Set;
 use std::error::Error;
 
 use crate::error::PubGrubError;
@@ -16,7 +15,7 @@ use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::internal::small_vec::SmallVec;
 use crate::package::Package;
 use crate::report::DerivationTree;
-use crate::type_aliases::{DependencyConstraints, Map};
+use crate::type_aliases::{DependencyConstraints, Map, Set};
 use crate::version_set::VersionSet;
 
 /// Current state of the PubGrub algorithm.
@@ -294,8 +293,8 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     }
 
     fn find_shared_ids(&self, incompat: IncompId<P, VS>) -> Set<IncompId<P, VS>> {
-        let mut all_ids = Set::new();
-        let mut shared_ids = Set::new();
+        let mut all_ids = Set::default();
+        let mut shared_ids = Set::default();
         let mut stack = vec![incompat];
         while let Some(i) = stack.pop() {
             if let Some((id1, id2)) = self.incompatibility_store[i].causes() {
