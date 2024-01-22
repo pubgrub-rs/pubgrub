@@ -1,4 +1,4 @@
-use crate::type_aliases::Map;
+use crate::type_aliases::{Map, MapIter};
 use std::hash::Hash;
 
 #[derive(Debug, Clone)]
@@ -169,10 +169,10 @@ impl<K: Eq + Hash + Clone, V: Clone> SmallMap<K, V> {
 
 enum IterSmallMap<'a, K, V> {
     Inline(std::slice::Iter<'a, (K, V)>),
-    Map(std::collections::hash_map::Iter<'a, K, V>),
+    Map(MapIter<'a, K, V>),
 }
 
-impl<'a, K: 'a, V: 'a> Iterator for IterSmallMap<'a, K, V> {
+impl<'a, K: 'a + Eq + Hash, V: 'a> Iterator for IterSmallMap<'a, K, V> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -185,7 +185,7 @@ impl<'a, K: 'a, V: 'a> Iterator for IterSmallMap<'a, K, V> {
     }
 }
 
-impl<K, V> SmallMap<K, V> {
+impl<K: Eq + Hash, V> SmallMap<K, V> {
     pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         match self {
             Self::Empty => IterSmallMap::Inline([].iter()),

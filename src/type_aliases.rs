@@ -9,14 +9,6 @@ use std::{
     hash::{BuildHasher, BuildHasherDefault, Hash},
 };
 
-// /// Map implementation used by the library.
-// pub type Map<K, V> = rustc_hash::FxHashMap<K, V>;
-
-// /// Set implementation used by the library.
-// pub type Set<V> = rustc_hash::FxHashSet<V>;
-
-pub type Map<K, V> = MapI<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
-
 /// Concrete dependencies picked by the library during [resolve](crate::solver::resolve)
 /// from [DependencyConstraints].
 pub type SelectedDependencies<P, V> = Map<P, V>;
@@ -29,23 +21,31 @@ pub type SelectedDependencies<P, V> = Map<P, V>;
 pub type DependencyConstraints<P, VS> = Map<P, VS>;
 
 #[derive(Debug, Clone)]
-pub struct MapI<K, V, S> {
+pub struct Map<K, V, S = BuildHasherDefault<rustc_hash::FxHasher>> {
     map: std::collections::HashMap<K, V, S>,
 }
 
-impl<K, V, S> MapI<K, V, S> {
-    pub fn with_capacity_and_hasher(capacity: usize, hasher: S) -> MapI<K, V, S> {
-        MapI {
+impl<K, V, S> Map<K, V, S> {
+    pub fn with_capacity_and_hasher(capacity: usize, hasher: S) -> Map<K, V, S> {
+        Map {
             map: std::collections::HashMap::with_capacity_and_hasher(capacity, hasher),
         }
     }
 
-    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, K, V> {
-        self.map.iter()
+    pub fn iter(&self) -> MapIter<'_, K, V, S> {
+        let keys: Vec<&K> = self.map.keys().collect();
+        MapIter {
+            map: self,
+            order: keys.into_iter(),
+        }
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &K> {
-        self.map.keys()
+        let keys: Vec<&K> = self.map.keys().collect();
+        MapKeys {
+            order: keys.into_iter(),
+            _v: std::marker::PhantomData::<&V>,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -57,7 +57,7 @@ impl<K, V, S> MapI<K, V, S> {
     }
 }
 
-impl<K: Hash + Eq, V, S: BuildHasher> MapI<K, V, S> {
+impl<K: Hash + Eq, V, S: BuildHasher> Map<K, V, S> {
     pub fn insert(&mut self, k: K, v: V) -> Option<V> {
         self.map.insert(k, v)
     }
@@ -74,6 +74,10 @@ impl<K: Hash + Eq, V, S: BuildHasher> MapI<K, V, S> {
         self.map.get(k)
     }
 
+    pub fn get_key_value(&self, k: &K) -> Option<(&K, &V)> {
+        self.map.get_key_value(k)
+    }
+
     pub fn get_mut(&mut self, k: &K) -> Option<&mut V> {
         self.map.get_mut(k)
     }
@@ -83,32 +87,113 @@ impl<K: Hash + Eq, V, S: BuildHasher> MapI<K, V, S> {
     }
 }
 
-impl<K, V, S: Default> Default for MapI<K, V, S> {
-    fn default() -> MapI<K, V, S> {
-        MapI {
+impl<K, V, S: Default> Default for Map<K, V, S> {
+    fn default() -> Map<K, V, S> {
+        Map {
             map: std::collections::HashMap::default(),
         }
     }
 }
 
-impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq for MapI<K, V, S> {
-    fn eq(&self, other: &MapI<K, V, S>) -> bool {
+impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq for Map<K, V, S> {
+    fn eq(&self, other: &Map<K, V, S>) -> bool {
         self.map.eq(&other.map)
     }
 }
 
-impl<K: Hash + Eq, V, S: BuildHasher> Extend<(K, V)> for MapI<K, V, S> {
+impl<K: Hash + Eq, V, S: BuildHasher> Extend<(K, V)> for Map<K, V, S> {
     fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, it: T) {
         self.map.extend(it)
     }
 }
 
 impl<'a, K: 'a + Hash + Eq + Clone, V: 'a + Clone, S: BuildHasher> Extend<(&'a K, &'a V)>
-    for MapI<K, V, S>
+    for Map<K, V, S>
 {
     fn extend<T: IntoIterator<Item = (&'a K, &'a V)>>(&mut self, it: T) {
         self.map
             .extend(it.into_iter().map(|(k, v)| (k.clone(), v.clone())))
+    }
+}
+
+impl<K: Hash + Eq, V, S: BuildHasher + Default> FromIterator<(K, V)> for Map<K, V, S> {
+    fn from_iter<I: IntoIterator<Item = (K, V)>>(it: I) -> Map<K, V, S> {
+        Map {
+            map: FromIterator::from_iter(it),
+        }
+    }
+}
+
+impl<K: Eq + Hash + Borrow<Q>, Q: Eq + Hash + ?Sized, V, S: BuildHasher> std::ops::Index<&Q>
+    for Map<K, V, S>
+{
+    type Output = V;
+
+    fn index(&self, key: &Q) -> &V {
+        self.map.index(key)
+    }
+}
+
+impl<K: Clone + Eq + Hash, V, S: BuildHasher> IntoIterator for Map<K, V, S> {
+    type Item = (K, V);
+    type IntoIter = MapIntoIter<K, V, S>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let keys: Vec<K> = self.map.keys().map(|k| k.clone()).collect();
+        MapIntoIter {
+            map: self,
+            order: keys.into_iter(),
+        }
+    }
+}
+
+impl<'a, K: Eq + Hash, V, S: BuildHasher> IntoIterator for &'a Map<K, V, S> {
+    type Item = (&'a K, &'a V);
+    type IntoIter = MapIter<'a, K, V, S>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub struct MapIter<'a, K, V, S = BuildHasherDefault<rustc_hash::FxHasher>> {
+    map: &'a Map<K, V, S>,
+    order: std::vec::IntoIter<&'a K>,
+}
+
+impl<'a, K: Eq + Hash, V, S: BuildHasher> Iterator for MapIter<'a, K, V, S> {
+    type Item = (&'a K, &'a V);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.order
+            .next()
+            .map(|k| self.map.get_key_value(k).unwrap())
+    }
+}
+
+pub struct MapIntoIter<K, V, S = BuildHasherDefault<rustc_hash::FxHasher>> {
+    map: Map<K, V, S>,
+    order: std::vec::IntoIter<K>,
+}
+
+impl<K: Clone + Eq + Hash, V, S: BuildHasher> Iterator for MapIntoIter<K, V, S> {
+    type Item = (K, V);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.order.next().map(|k| {
+            let v = self.map.remove(&k).unwrap();
+            (k, v)
+        })
+    }
+}
+
+pub struct MapKeys<'a, K, V> {
+    order: std::vec::IntoIter<&'a K>,
+    _v: std::marker::PhantomData<&'a V>,
+}
+
+impl<'a, K, V> Iterator for MapKeys<'a, K, V> {
+    type Item = &'a K;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.order.next()
     }
 }
 
@@ -117,8 +202,11 @@ pub struct Set<V> {
 }
 
 impl<V> Set<V> {
-    pub fn iter(&self) -> impl Iterator<Item = &V> {
-        self.set.iter()
+    pub fn iter(&self) -> SetIter<V> {
+        let keys: Vec<&V> = self.set.iter().collect();
+        SetIter {
+            order: keys.into_iter(),
+        }
     }
 }
 
@@ -156,36 +244,36 @@ impl<'a, V: 'a + Hash + Eq + Clone> Extend<&'a V> for Set<V> {
     }
 }
 
-impl<K: Hash + Eq, V, S: BuildHasher + Default> FromIterator<(K, V)> for MapI<K, V, S> {
-    fn from_iter<I: IntoIterator<Item = (K, V)>>(it: I) -> MapI<K, V, S> {
-        MapI {
-            map: FromIterator::from_iter(it),
+impl<V> IntoIterator for Set<V> {
+    type Item = V;
+    type IntoIter = SetIntoIter<V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let keys: Vec<V> = self.set.into_iter().collect();
+        SetIntoIter {
+            order: keys.into_iter(),
         }
     }
 }
 
-impl<K: Eq + Hash + Borrow<Q>, Q: Eq + Hash + ?Sized, V, S: BuildHasher> std::ops::Index<&Q>
-    for MapI<K, V, S>
-{
-    type Output = V;
+pub struct SetIter<'a, V> {
+    order: std::vec::IntoIter<&'a V>,
+}
 
-    fn index(&self, key: &Q) -> &V {
-        self.map.index(key)
+impl<'a, V> Iterator for SetIter<'a, V> {
+    type Item = &'a V;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.order.next()
     }
 }
 
-impl<K, V, S> IntoIterator for MapI<K, V, S> {
-    type Item = (K, V);
-    type IntoIter = std::collections::hash_map::IntoIter<K, V>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.map.into_iter()
-    }
+pub struct SetIntoIter<V> {
+    order: std::vec::IntoIter<V>,
 }
 
-impl<'a, K, V, S> IntoIterator for &'a MapI<K, V, S> {
-    type Item = (&'a K, &'a V);
-    type IntoIter = std::collections::hash_map::Iter<'a, K, V>;
-    fn into_iter(self) -> Self::IntoIter {
-        (&self.map).into_iter()
+impl<'a, V> Iterator for SetIntoIter<V> {
+    type Item = V;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.order.next()
     }
 }
