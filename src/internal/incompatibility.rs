@@ -3,7 +3,6 @@
 //! An incompatibility is a set of terms for different packages
 //! that should never be satisfied all together.
 
-use std::collections::HashSet as Set;
 use std::fmt;
 
 use crate::internal::arena::{Arena, Id};
@@ -13,6 +12,7 @@ use crate::report::{
     DefaultStringReportFormatter, DerivationTree, Derived, External, ReportFormatter,
 };
 use crate::term::{self, Term};
+use crate::type_aliases::Set;
 use crate::version_set::VersionSet;
 
 /// An incompatibility is a set of terms for different packages
