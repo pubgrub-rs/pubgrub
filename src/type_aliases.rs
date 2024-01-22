@@ -36,14 +36,14 @@ impl<K, V, S> Map<K, V, S> {
         let keys: Vec<&K> = self.map.keys().collect();
         MapIter {
             map: self,
-            order: keys.into_iter(),
+            order: shuffle(keys).into_iter(),
         }
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &K> {
         let keys: Vec<&K> = self.map.keys().collect();
         MapKeys {
-            order: keys.into_iter(),
+            order: shuffle(keys).into_iter(),
             _v: std::marker::PhantomData::<&V>,
         }
     }
@@ -142,7 +142,7 @@ impl<K: Clone + Eq + Hash, V, S: BuildHasher> IntoIterator for Map<K, V, S> {
         let keys: Vec<K> = self.map.keys().map(|k| k.clone()).collect();
         MapIntoIter {
             map: self,
-            order: keys.into_iter(),
+            order: shuffle(keys).into_iter(),
         }
     }
 }
@@ -205,7 +205,7 @@ impl<V> Set<V> {
     pub fn iter(&self) -> SetIter<V> {
         let keys: Vec<&V> = self.set.iter().collect();
         SetIter {
-            order: keys.into_iter(),
+            order: shuffle(keys).into_iter(),
         }
     }
 }
@@ -251,7 +251,7 @@ impl<V> IntoIterator for Set<V> {
     fn into_iter(self) -> Self::IntoIter {
         let keys: Vec<V> = self.set.into_iter().collect();
         SetIntoIter {
-            order: keys.into_iter(),
+            order: shuffle(keys).into_iter(),
         }
     }
 }
@@ -276,4 +276,10 @@ impl<'a, V> Iterator for SetIntoIter<V> {
     fn next(&mut self) -> Option<Self::Item> {
         self.order.next()
     }
+}
+
+fn shuffle<T>(mut v: Vec<T>) -> Vec<T> {
+    use rand::seq::SliceRandom;
+    v.shuffle(&mut rand::thread_rng());
+    v
 }

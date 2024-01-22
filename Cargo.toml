@@ -26,6 +26,7 @@ thiserror = "1.0"
 rustc-hash = "1.1.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
 log = "0.4.14" # for debug logs in tests
+rand = "0.8.5"
 
 [dev-dependencies]
 proptest = "0.10.1"
