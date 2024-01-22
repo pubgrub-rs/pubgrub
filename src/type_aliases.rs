@@ -20,14 +20,16 @@ pub type SelectedDependencies<P, V> = Map<P, V>;
 /// while the latter means they could not be fetched by the [DependencyProvider](crate::solver::DependencyProvider).
 pub type DependencyConstraints<P, VS> = Map<P, VS>;
 
+pub type Map<K, V> = MapI<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
+
 #[derive(Debug, Clone)]
-pub struct Map<K, V, S = BuildHasherDefault<rustc_hash::FxHasher>> {
+pub struct MapI<K, V, S> {
     map: std::collections::HashMap<K, V, S>,
 }
 
-impl<K, V, S> Map<K, V, S> {
-    pub fn with_capacity_and_hasher(capacity: usize, hasher: S) -> Map<K, V, S> {
-        Map {
+impl<K, V, S> MapI<K, V, S> {
+    pub fn with_capacity_and_hasher(capacity: usize, hasher: S) -> MapI<K, V, S> {
+        MapI {
             map: std::collections::HashMap::with_capacity_and_hasher(capacity, hasher),
         }
     }
@@ -57,7 +59,7 @@ impl<K, V, S> Map<K, V, S> {
     }
 }
 
-impl<K: Hash + Eq, V, S: BuildHasher> Map<K, V, S> {
+impl<K: Hash + Eq, V, S: BuildHasher> MapI<K, V, S> {
     pub fn insert(&mut self, k: K, v: V) -> Option<V> {
         self.map.insert(k, v)
     }
@@ -87,28 +89,50 @@ impl<K: Hash + Eq, V, S: BuildHasher> Map<K, V, S> {
     }
 }
 
-impl<K, V, S: Default> Default for Map<K, V, S> {
-    fn default() -> Map<K, V, S> {
-        Map {
+#[cfg(feature = "serde")]
+impl<K: serde::Serialize, V: serde::Serialize, S: Default> serde::Serialize for MapI<K, V, S> {
+    fn serialize<SE: serde::Serializer>(&self, s: SE) -> Result<SE::Ok, SE::Error> {
+        self.map.serialize(s)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<
+        'de,
+        K: Hash + Eq + serde::Deserialize<'de>,
+        V: serde::Deserialize<'de>,
+        S: Default + BuildHasher,
+    > serde::Deserialize<'de> for MapI<K, V, S>
+{
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        Ok(MapI {
+            map: std::collections::HashMap::deserialize(de)?,
+        })
+    }
+}
+
+impl<K, V, S: Default> Default for MapI<K, V, S> {
+    fn default() -> MapI<K, V, S> {
+        MapI {
             map: std::collections::HashMap::default(),
         }
     }
 }
 
-impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq for Map<K, V, S> {
-    fn eq(&self, other: &Map<K, V, S>) -> bool {
+impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq for MapI<K, V, S> {
+    fn eq(&self, other: &MapI<K, V, S>) -> bool {
         self.map.eq(&other.map)
     }
 }
 
-impl<K: Hash + Eq, V, S: BuildHasher> Extend<(K, V)> for Map<K, V, S> {
+impl<K: Hash + Eq, V, S: BuildHasher> Extend<(K, V)> for MapI<K, V, S> {
     fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, it: T) {
         self.map.extend(it)
     }
 }
 
 impl<'a, K: 'a + Hash + Eq + Clone, V: 'a + Clone, S: BuildHasher> Extend<(&'a K, &'a V)>
-    for Map<K, V, S>
+    for MapI<K, V, S>
 {
     fn extend<T: IntoIterator<Item = (&'a K, &'a V)>>(&mut self, it: T) {
         self.map
@@ -116,16 +140,16 @@ impl<'a, K: 'a + Hash + Eq + Clone, V: 'a + Clone, S: BuildHasher> Extend<(&'a K
     }
 }
 
-impl<K: Hash + Eq, V, S: BuildHasher + Default> FromIterator<(K, V)> for Map<K, V, S> {
-    fn from_iter<I: IntoIterator<Item = (K, V)>>(it: I) -> Map<K, V, S> {
-        Map {
+impl<K: Hash + Eq, V, S: BuildHasher + Default> FromIterator<(K, V)> for MapI<K, V, S> {
+    fn from_iter<I: IntoIterator<Item = (K, V)>>(it: I) -> MapI<K, V, S> {
+        MapI {
             map: FromIterator::from_iter(it),
         }
     }
 }
 
 impl<K: Eq + Hash + Borrow<Q>, Q: Eq + Hash + ?Sized, V, S: BuildHasher> std::ops::Index<&Q>
-    for Map<K, V, S>
+    for MapI<K, V, S>
 {
     type Output = V;
 
@@ -134,7 +158,7 @@ impl<K: Eq + Hash + Borrow<Q>, Q: Eq + Hash + ?Sized, V, S: BuildHasher> std::op
     }
 }
 
-impl<K: Clone + Eq + Hash, V, S: BuildHasher> IntoIterator for Map<K, V, S> {
+impl<K: Clone + Eq + Hash, V, S: BuildHasher> IntoIterator for MapI<K, V, S> {
     type Item = (K, V);
     type IntoIter = MapIntoIter<K, V, S>;
 
@@ -147,7 +171,7 @@ impl<K: Clone + Eq + Hash, V, S: BuildHasher> IntoIterator for Map<K, V, S> {
     }
 }
 
-impl<'a, K: Eq + Hash, V, S: BuildHasher> IntoIterator for &'a Map<K, V, S> {
+impl<'a, K: Eq + Hash, V, S: BuildHasher> IntoIterator for &'a MapI<K, V, S> {
     type Item = (&'a K, &'a V);
     type IntoIter = MapIter<'a, K, V, S>;
 
@@ -157,7 +181,7 @@ impl<'a, K: Eq + Hash, V, S: BuildHasher> IntoIterator for &'a Map<K, V, S> {
 }
 
 pub struct MapIter<'a, K, V, S = BuildHasherDefault<rustc_hash::FxHasher>> {
-    map: &'a Map<K, V, S>,
+    map: &'a MapI<K, V, S>,
     order: std::vec::IntoIter<&'a K>,
 }
 
@@ -171,7 +195,7 @@ impl<'a, K: Eq + Hash, V, S: BuildHasher> Iterator for MapIter<'a, K, V, S> {
 }
 
 pub struct MapIntoIter<K, V, S = BuildHasherDefault<rustc_hash::FxHasher>> {
-    map: Map<K, V, S>,
+    map: MapI<K, V, S>,
     order: std::vec::IntoIter<K>,
 }
 
