@@ -39,18 +39,18 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
     ) -> Result<Dependencies<P, VS>, DP::Err> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
-            Ok(Dependencies::Unknown) => {
+            Ok(Dependencies::Unavailable) => {
                 let dependencies = self.remote_dependencies.get_dependencies(package, version);
                 match dependencies {
-                    Ok(Dependencies::Known(dependencies)) => {
+                    Ok(Dependencies::Available(dependencies)) => {
                         cache.add_dependencies(
                             package.clone(),
                             version.clone(),
                             dependencies.clone(),
                         );
-                        Ok(Dependencies::Known(dependencies))
+                        Ok(Dependencies::Available(dependencies))
                     }
-                    Ok(Dependencies::Unknown) => Ok(Dependencies::Unknown),
+                    Ok(Dependencies::Unavailable) => Ok(Dependencies::Unavailable),
                     error @ Err(_) => error,
                 }
             }

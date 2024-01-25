@@ -158,20 +158,21 @@ pub fn resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
             })?;
 
             let known_dependencies = match dependencies {
-                Dependencies::Unknown => {
-                    state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                Dependencies::Unavailable => {
+                    state.add_incompatibility(Incompatibility::unavailable(
                         p.clone(),
                         v.clone(),
+                        "its dependencies could not be determined".to_string(),
                     ));
                     continue;
                 }
-                Dependencies::Known(x) if x.contains_key(p) => {
+                Dependencies::Available(x) if x.contains_key(p) => {
                     return Err(PubGrubError::SelfDependency {
                         package: p.clone(),
                         version: v,
                     });
                 }
-                Dependencies::Known(x) => x,
+                Dependencies::Available(x) => x,
             };
 
             // Add that package and version if the dependencies are not problematic.
@@ -201,9 +202,9 @@ pub fn resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
 #[derive(Clone)]
 pub enum Dependencies<P: Package, VS: VersionSet> {
     /// Package dependencies are unavailable.
-    Unknown,
+    Unavailable,
     /// Container for all available package versions.
-    Known(DependencyConstraints<P, VS>),
+    Available(DependencyConstraints<P, VS>),
 }
 
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
@@ -254,7 +255,7 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
     fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, Self::Err>;
 
     /// Retrieves the package dependencies.
-    /// Return [Dependencies::Unknown] if its dependencies are unknown.
+    /// Return [Dependencies::Unavailable] if its dependencies are not available.
     fn get_dependencies(
         &self,
         package: &P,
@@ -369,8 +370,8 @@ impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependency
         version: &VS::V,
     ) -> Result<Dependencies<P, VS>, Infallible> {
         Ok(match self.dependencies(package, version) {
-            None => Dependencies::Unknown,
-            Some(dependencies) => Dependencies::Known(dependencies),
+            None => Dependencies::Unavailable,
+            Some(dependencies) => Dependencies::Available(dependencies),
         })
     }
 }

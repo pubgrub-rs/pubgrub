@@ -48,10 +48,8 @@ pub enum External<P: Package, VS: VersionSet> {
     NotRoot(P, VS::V),
     /// There are no versions in the given set for this package.
     NoVersions(P, VS),
-    /// Dependencies of the package are unavailable for versions in that set.
-    UnavailableDependencies(P, VS),
-    /// Dependencies of the package are unusable for versions in that set.
-    UnusableDependencies(P, VS, Option<String>),
+    /// The package is unusable in the given set. A string reason is included.
+    Unavailable(P, VS, String),
     /// Incompatibility coming from the dependencies of a given package.
     FromDependencyOf(P, VS, P, VS),
 }
@@ -85,8 +83,7 @@ impl<P: Package, VS: VersionSet> DerivationTree<P, VS> {
                 }
                 External::NoVersions(p, _)
                 | External::NotRoot(p, _)
-                | External::UnavailableDependencies(p, _)
-                | External::UnusableDependencies(p, ..) => {
+                | External::Unavailable(p, ..) => {
                     packages.insert(p);
                 }
             },
@@ -146,16 +143,8 @@ impl<P: Package, VS: VersionSet> DerivationTree<P, VS> {
             DerivationTree::External(External::NoVersions(_, r)) => Some(DerivationTree::External(
                 External::NoVersions(package, set.union(&r)),
             )),
-            DerivationTree::External(External::UnavailableDependencies(_, r)) => Some(
-                DerivationTree::External(External::UnavailableDependencies(package, set.union(&r))),
-            ),
-            DerivationTree::External(External::UnusableDependencies(_, r, reason)) => {
-                Some(DerivationTree::External(External::UnusableDependencies(
-                    package,
-                    set.union(&r),
-                    reason,
-                )))
-            }
+            // Cannot be merged because the reason may not match
+            DerivationTree::External(External::Unavailable(_, _, _)) => None,
             DerivationTree::External(External::FromDependencyOf(p1, r1, p2, r2)) => {
                 if p1 == package {
                     Some(DerivationTree::External(External::FromDependencyOf(
@@ -190,38 +179,19 @@ impl<P: Package, VS: VersionSet> fmt::Display for External<P, VS> {
                     write!(f, "there is no version of {} in {}", package, set)
                 }
             }
-            Self::UnavailableDependencies(package, set) => {
+            Self::Unavailable(package, set, reason) => {
                 if set == &VS::full() {
-                    write!(f, "dependencies of {} are unavailable", package)
+                    write!(
+                        f,
+                        "dependencies of {} are unavailable because {reason}",
+                        package
+                    )
                 } else {
                     write!(
                         f,
-                        "dependencies of {} at version {} are unavailable",
+                        "dependencies of {} at version {} are unavailable because {reason}",
                         package, set
                     )
-                }
-            }
-            Self::UnusableDependencies(package, set, reason) => {
-                if let Some(reason) = reason {
-                    if set == &VS::full() {
-                        write!(f, "dependencies of {} are unusable: {reason}", package)
-                    } else {
-                        write!(
-                            f,
-                            "dependencies of {} at version {} are unusable: {reason}",
-                            package, set
-                        )
-                    }
-                } else {
-                    if set == &VS::full() {
-                        write!(f, "dependencies of {} are unusable", package)
-                    } else {
-                        write!(
-                            f,
-                            "dependencies of {} at version {} are unusable",
-                            package, set
-                        )
-                    }
                 }
             }
             Self::FromDependencyOf(p, set_p, dep, set_dep) => {

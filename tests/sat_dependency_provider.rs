@@ -68,8 +68,8 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
         // active packages need each of there `deps` to be satisfied
         for (p, v, var) in &all_versions {
             let deps = match dp.get_dependencies(p, v).unwrap() {
-                Dependencies::Unknown => panic!(),
-                Dependencies::Known(d) => d,
+                Dependencies::Unavailable => panic!(),
+                Dependencies::Available(d) => d,
             };
             for (p1, range) in &deps {
                 let empty_vec = vec![];

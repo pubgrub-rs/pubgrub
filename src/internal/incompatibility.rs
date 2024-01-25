@@ -45,10 +45,8 @@ pub enum Kind<P: Package, VS: VersionSet> {
     NotRoot(P, VS::V),
     /// There are no versions in the given range for this package.
     NoVersions(P, VS),
-    /// Dependencies of the package are unavailable for versions in that range.
-    UnavailableDependencies(P, VS),
-    /// Dependencies of the package are unusable for versions in that range.
-    UnusableDependencies(P, VS, Option<String>),
+    /// The package is unavailable for versions in the range. A string reason is included.
+    Unavailable(P, VS, String),
     /// Incompatibility coming from the dependencies of a given package.
     FromDependencyOf(P, VS, P, VS),
     /// Derived from two causes. Stores cause ids.
@@ -99,23 +97,11 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
 
     /// Create an incompatibility to remember
     /// that a package version is not selectable
-    /// because its list of dependencies is unavailable.
-    pub fn unavailable_dependencies(package: P, version: VS::V) -> Self {
+    pub fn unavailable(package: P, version: VS::V, reason: String) -> Self {
         let set = VS::singleton(version);
         Self {
             package_terms: SmallMap::One([(package.clone(), Term::Positive(set.clone()))]),
-            kind: Kind::UnavailableDependencies(package, set),
-        }
-    }
-
-    /// Create an incompatibility to remember
-    /// that a package version is not selectable
-    /// because its dependencies are not usable.
-    pub fn unusable_dependencies(package: P, version: VS::V, reason: Option<String>) -> Self {
-        let set = VS::singleton(version);
-        Self {
-            package_terms: SmallMap::One([(package.clone(), Term::Positive(set.clone()))]),
-            kind: Kind::UnusableDependencies(package, set, reason),
+            kind: Kind::Unavailable(package, set, reason),
         }
     }
 
@@ -259,11 +245,8 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
             Kind::NoVersions(package, set) => {
                 DerivationTree::External(External::NoVersions(package.clone(), set.clone()))
             }
-            Kind::UnavailableDependencies(package, set) => DerivationTree::External(
-                External::UnavailableDependencies(package.clone(), set.clone()),
-            ),
-            Kind::UnusableDependencies(package, set, reason) => DerivationTree::External(
-                External::UnusableDependencies(package.clone(), set.clone(), reason.clone()),
+            Kind::Unavailable(package, set, reason) => DerivationTree::External(
+                External::Unavailable(package.clone(), set.clone(), reason.clone()),
             ),
             Kind::FromDependencyOf(package, set, dep_package, dep_set) => {
                 DerivationTree::External(External::FromDependencyOf(
@@ -339,12 +322,12 @@ pub mod tests {
             let mut store = Arena::new();
             let i1 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([("p1", t1.clone()), ("p2", t2.negate())]),
-                kind: Kind::UnavailableDependencies("0", Range::full())
+                kind: Kind::Unavailable("0", Range::full(), "foo".to_string())
             });
 
             let i2 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([("p2", t2), ("p3", t3.clone())]),
-                kind: Kind::UnavailableDependencies("0", Range::full())
+                kind: Kind::Unavailable("0", Range::full(), "bar".to_string())
             });
 
             let mut i3 = Map::default();
