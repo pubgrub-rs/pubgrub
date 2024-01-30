@@ -296,12 +296,28 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                 if all_ids.contains(&i) {
                     shared_ids.insert(i);
                 } else {
-                    all_ids.insert(i);
                     stack.push(id1);
                     stack.push(id2);
                 }
             }
+            all_ids.insert(i);
         }
-        Incompatibility::build_derivation_tree(incompat, &shared_ids, &self.incompatibility_store)
+        // To avoid recursion we need to generate trees in topological order.
+        // That is to say we need to ensure that the causes are processed before the incompatibility they effect.
+        // It happens to be that sorting by their ID maintains this property.
+        let mut sorted_ids = all_ids.into_iter().collect::<Vec<_>>();
+        sorted_ids.sort_unstable_by_key(|id| id.into_raw());
+        let mut precomputed = Map::default();
+        for id in sorted_ids {
+            let tree = Incompatibility::build_derivation_tree(
+                id,
+                &shared_ids,
+                &self.incompatibility_store,
+                &precomputed,
+            );
+            precomputed.insert(id, Box::new(tree));
+        }
+        // Now the user can refer to the entire tree from its root.
+        *precomputed.remove(&incompat).unwrap()
     }
 }

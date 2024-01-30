@@ -12,7 +12,7 @@ use crate::report::{
     DefaultStringReportFormatter, DerivationTree, Derived, External, ReportFormatter,
 };
 use crate::term::{self, Term};
-use crate::type_aliases::Set;
+use crate::type_aliases::{Map, Set};
 use crate::version_set::VersionSet;
 
 /// An incompatibility is a set of terms for different packages
@@ -227,16 +227,21 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
         self_id: Id<Self>,
         shared_ids: &Set<Id<Self>>,
         store: &Arena<Self>,
+        precomputed: &Map<Id<Self>, Box<DerivationTree<P, VS>>>,
     ) -> DerivationTree<P, VS> {
         match store[self_id].kind.clone() {
             Kind::DerivedFrom(id1, id2) => {
-                let cause1 = Self::build_derivation_tree(id1, shared_ids, store);
-                let cause2 = Self::build_derivation_tree(id2, shared_ids, store);
                 let derived = Derived {
                     terms: store[self_id].package_terms.as_map(),
                     shared_id: shared_ids.get(&self_id).map(|id| id.into_raw()),
-                    cause1: Box::new(cause1),
-                    cause2: Box::new(cause2),
+                    cause1: precomputed
+                        .get(&id1)
+                        .expect("Non-topological calls building tree")
+                        .clone(),
+                    cause2: precomputed
+                        .get(&id2)
+                        .expect("Non-topological calls building tree")
+                        .clone(),
                 };
                 DerivationTree::Derived(derived)
             }
