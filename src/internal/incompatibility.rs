@@ -4,6 +4,7 @@
 //! that should never be satisfied all together.
 
 use std::fmt;
+use std::rc::Rc;
 
 use crate::internal::arena::{Arena, Id};
 use crate::internal::small_map::SmallMap;
@@ -227,7 +228,7 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
         self_id: Id<Self>,
         shared_ids: &Set<Id<Self>>,
         store: &Arena<Self>,
-        precomputed: &Map<Id<Self>, Box<DerivationTree<P, VS>>>,
+        precomputed: &Map<Id<Self>, Rc<DerivationTree<P, VS>>>,
     ) -> DerivationTree<P, VS> {
         match store[self_id].kind.clone() {
             Kind::DerivedFrom(id1, id2) => {
