@@ -288,11 +288,6 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     // Error reporting #########################################################
 
     fn build_derivation_tree(&self, incompat: IncompId<P, VS>) -> DerivationTree<P, VS> {
-        let shared_ids = self.find_shared_ids(incompat);
-        Incompatibility::build_derivation_tree(incompat, &shared_ids, &self.incompatibility_store)
-    }
-
-    fn find_shared_ids(&self, incompat: IncompId<P, VS>) -> Set<IncompId<P, VS>> {
         let mut all_ids = Set::default();
         let mut shared_ids = Set::default();
         let mut stack = vec![incompat];
@@ -307,6 +302,6 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                 }
             }
         }
-        shared_ids
+        Incompatibility::build_derivation_tree(incompat, &shared_ids, &self.incompatibility_store)
     }
 }
