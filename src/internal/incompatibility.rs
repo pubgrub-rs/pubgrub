@@ -228,10 +228,10 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
         shared_ids: &Set<Id<Self>>,
         store: &Arena<Self>,
     ) -> DerivationTree<P, VS> {
-        match &store[self_id].kind {
+        match store[self_id].kind.clone() {
             Kind::DerivedFrom(id1, id2) => {
-                let cause1 = Self::build_derivation_tree(*id1, shared_ids, store);
-                let cause2 = Self::build_derivation_tree(*id2, shared_ids, store);
+                let cause1 = Self::build_derivation_tree(id1, shared_ids, store);
+                let cause2 = Self::build_derivation_tree(id2, shared_ids, store);
                 let derived = Derived {
                     terms: store[self_id].package_terms.as_map(),
                     shared_id: shared_ids.get(&self_id).map(|id| id.into_raw()),
@@ -241,22 +241,17 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
                 DerivationTree::Derived(derived)
             }
             Kind::NotRoot(package, version) => {
-                DerivationTree::External(External::NotRoot(package.clone(), version.clone()))
+                DerivationTree::External(External::NotRoot(package, version))
             }
             Kind::NoVersions(package, set) => {
-                DerivationTree::External(External::NoVersions(package.clone(), set.clone()))
+                DerivationTree::External(External::NoVersions(package, set))
             }
-            Kind::UnavailableDependencies(package, set) => DerivationTree::External(
-                External::UnavailableDependencies(package.clone(), set.clone()),
+            Kind::UnavailableDependencies(package, set) => {
+                DerivationTree::External(External::UnavailableDependencies(package, set))
+            }
+            Kind::FromDependencyOf(package, set, dep_package, dep_set) => DerivationTree::External(
+                External::FromDependencyOf(package, set, dep_package, dep_set),
             ),
-            Kind::FromDependencyOf(package, set, dep_package, dep_set) => {
-                DerivationTree::External(External::FromDependencyOf(
-                    package.clone(),
-                    set.clone(),
-                    dep_package.clone(),
-                    dep_set.clone(),
-                ))
-            }
         }
     }
 }
