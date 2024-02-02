@@ -51,6 +51,7 @@
 //! If we do not see practical bugs, or we get a formal proof that the code cannot lead to error states, then we may remove this warning.
 
 use crate::{internal::small_vec::SmallVec, version_set::VersionSet};
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::ops::RangeBounds;
 use std::{
@@ -217,28 +218,33 @@ impl<V: Ord> Range<V> {
     /// The `versions` iterator must be sorted.
     /// Functionally equivalent to `versions.map(|v| self.contains(v))`.
     /// Except it runs in `O(size_of_range + len_of_versions)` not `O(size_of_range * len_of_versions)`
-    pub fn contains_many<'s, I>(&'s self, versions: I) -> impl Iterator<Item = bool> + 's
+    pub fn contains_many<'s, I, BV>(&'s self, versions: I) -> impl Iterator<Item = bool> + 's
     where
-        I: Iterator<Item = &'s V> + 's,
-        V: 's,
+        I: Iterator<Item = BV> + 's,
+        BV: Borrow<V> + 's,
     {
         #[cfg(debug_assertions)]
-        let mut last: Option<&V> = None;
+        let mut last: Option<BV> = None;
         versions.scan(0, move |i, v| {
             #[cfg(debug_assertions)]
             {
-                assert!(
-                    last <= Some(v),
-                    "`contains_many` `versions` argument incorrectly sorted"
-                );
-                last = Some(v);
+                if let Some(l) = last.as_ref() {
+                    assert!(
+                        l.borrow() <= v.borrow(),
+                        "`contains_many` `versions` argument incorrectly sorted"
+                    );
+                }
             }
             while let Some(segment) = self.segments.get(*i) {
-                match within_bounds(v, segment) {
+                match within_bounds(v.borrow(), segment) {
                     Ordering::Less => return Some(false),
                     Ordering::Equal => return Some(true),
                     Ordering::Greater => *i += 1,
                 }
+            }
+            #[cfg(debug_assertions)]
+            {
+                last = Some(v);
             }
             Some(false)
         })
@@ -435,29 +441,34 @@ impl<V: Ord + Clone> Range<V> {
     ///  - If none of the versions are contained in the original than the range will be simplified to `empty`.
     ///
     /// If versions are not sorted the correctness of this function is not guaranteed.
-    pub fn simplify<'v, I>(&self, versions: I) -> Self
+    pub fn simplify<'s, I, BV>(&self, versions: I) -> Self
     where
-        I: Iterator<Item = &'v V> + 'v,
-        V: 'v,
+        I: Iterator<Item = BV> + 's,
+        BV: Borrow<V> + 's,
     {
         #[cfg(debug_assertions)]
-        let mut last: Option<&V> = None;
+        let mut last: Option<BV> = None;
         // Return the segment index in the range for each version in the range, None otherwise
         let version_locations = versions.scan(0, move |i, v| {
             #[cfg(debug_assertions)]
             {
-                assert!(
-                    last <= Some(v),
-                    "`simplify` `versions` argument incorrectly sorted"
-                );
-                last = Some(v);
+                if let Some(l) = last.as_ref() {
+                    assert!(
+                        l.borrow() <= v.borrow(),
+                        "`simplify` `versions` argument incorrectly sorted"
+                    );
+                }
             }
             while let Some(segment) = self.segments.get(*i) {
-                match within_bounds(v, segment) {
+                match within_bounds(v.borrow(), segment) {
                     Ordering::Less => return Some(None),
                     Ordering::Equal => return Some(Some(*i)),
                     Ordering::Greater => *i += 1,
                 }
+            }
+            #[cfg(debug_assertions)]
+            {
+                last = Some(v);
             }
             Some(None)
         });
@@ -788,5 +799,39 @@ pub mod tests {
             }
             assert!(simp.segments.len() <= range.segments.len())
         }
+    }
+
+    #[test]
+    fn contains_many_can_take_owned() {
+        let range: Range<u8> = Range::singleton(1);
+        let versions = vec![1, 2, 3];
+        // Check that iter can be a Cow
+        assert_eq!(
+            range.contains_many(versions.iter()).count(),
+            range
+                .contains_many(versions.iter().map(std::borrow::Cow::Borrowed))
+                .count()
+        );
+        // Check that iter can be a V
+        assert_eq!(
+            range.contains_many(versions.iter()).count(),
+            range.contains_many(versions.into_iter()).count()
+        );
+    }
+
+    #[test]
+    fn simplify_can_take_owned() {
+        let range: Range<u8> = Range::singleton(1);
+        let versions = vec![1, 2, 3];
+        // Check that iter can be a Cow
+        assert_eq!(
+            range.simplify(versions.iter()),
+            range.simplify(versions.iter().map(std::borrow::Cow::Borrowed))
+        );
+        // Check that iter can be a V
+        assert_eq!(
+            range.simplify(versions.iter()),
+            range.simplify(versions.into_iter())
+        );
     }
 }
