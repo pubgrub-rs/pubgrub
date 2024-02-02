@@ -222,7 +222,17 @@ impl<V: Ord> Range<V> {
         I: Iterator<Item = &'s V> + 's,
         V: 's,
     {
+        #[cfg(debug_assertions)]
+        let mut last: Option<&V> = None;
         versions.scan(0, move |i, v| {
+            #[cfg(debug_assertions)]
+            {
+                assert!(
+                    last <= Some(v),
+                    "`contains_many` `versions` argument incorrectly sorted"
+                );
+                last = Some(v);
+            }
             while let Some(segment) = self.segments.get(*i) {
                 match within_bounds(v, segment) {
                     Ordering::Less => return Some(false),
@@ -430,8 +440,18 @@ impl<V: Ord + Clone> Range<V> {
         I: Iterator<Item = &'v V> + 'v,
         V: 'v,
     {
+        #[cfg(debug_assertions)]
+        let mut last: Option<&V> = None;
         // Return the segment index in the range for each version in the range, None otherwise
         let version_locations = versions.scan(0, move |i, v| {
+            #[cfg(debug_assertions)]
+            {
+                assert!(
+                    last <= Some(v),
+                    "`simplify` `versions` argument incorrectly sorted"
+                );
+                last = Some(v);
+            }
             while let Some(segment) = self.segments.get(*i) {
                 match within_bounds(v, segment) {
                     Ordering::Less => return Some(None),
