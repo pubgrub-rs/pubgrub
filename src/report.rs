@@ -5,7 +5,7 @@
 
 use std::fmt;
 use std::ops::Deref;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::package::Package;
 use crate::term::Term;
@@ -65,9 +65,9 @@ pub struct Derived<P: Package, VS: VersionSet> {
     /// and refer to the explanation for the other times.
     pub shared_id: Option<usize>,
     /// First cause.
-    pub cause1: Rc<DerivationTree<P, VS>>,
+    pub cause1: Arc<DerivationTree<P, VS>>,
     /// Second cause.
-    pub cause2: Rc<DerivationTree<P, VS>>,
+    pub cause2: Arc<DerivationTree<P, VS>>,
 }
 
 impl<P: Package, VS: VersionSet> DerivationTree<P, VS> {
@@ -84,8 +84,8 @@ impl<P: Package, VS: VersionSet> DerivationTree<P, VS> {
             DerivationTree::External(_) => {}
             DerivationTree::Derived(derived) => {
                 match (
-                    Rc::make_mut(&mut derived.cause1),
-                    Rc::make_mut(&mut derived.cause2),
+                    Arc::make_mut(&mut derived.cause1),
+                    Arc::make_mut(&mut derived.cause2),
                 ) {
                     (DerivationTree::External(External::NoVersions(p, r)), ref mut cause2) => {
                         cause2.collapse_no_versions();
@@ -102,8 +102,8 @@ impl<P: Package, VS: VersionSet> DerivationTree<P, VS> {
                             .unwrap_or_else(|| self.to_owned());
                     }
                     _ => {
-                        Rc::make_mut(&mut derived.cause1).collapse_no_versions();
-                        Rc::make_mut(&mut derived.cause2).collapse_no_versions();
+                        Arc::make_mut(&mut derived.cause1).collapse_no_versions();
+                        Arc::make_mut(&mut derived.cause2).collapse_no_versions();
                     }
                 }
             }

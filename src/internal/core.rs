@@ -4,7 +4,7 @@
 //! to write a functional PubGrub algorithm.
 
 use std::error::Error;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::error::PubGrubError;
 use crate::internal::arena::Arena;
@@ -316,9 +316,9 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                 &self.incompatibility_store,
                 &precomputed,
             );
-            precomputed.insert(id, Rc::new(tree));
+            precomputed.insert(id, Arc::new(tree));
         }
         // Now the user can refer to the entire tree from its root.
-        Rc::into_inner(precomputed.remove(&incompat).unwrap()).unwrap()
+        Arc::into_inner(precomputed.remove(&incompat).unwrap()).unwrap()
     }
 }
