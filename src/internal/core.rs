@@ -4,6 +4,7 @@
 //! to write a functional PubGrub algorithm.
 
 use std::error::Error;
+use std::sync::Arc;
 
 use crate::error::PubGrubError;
 use crate::internal::arena::Arena;
@@ -288,11 +289,6 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     // Error reporting #########################################################
 
     fn build_derivation_tree(&self, incompat: IncompId<P, VS>) -> DerivationTree<P, VS> {
-        let shared_ids = self.find_shared_ids(incompat);
-        Incompatibility::build_derivation_tree(incompat, &shared_ids, &self.incompatibility_store)
-    }
-
-    fn find_shared_ids(&self, incompat: IncompId<P, VS>) -> Set<IncompId<P, VS>> {
         let mut all_ids = Set::default();
         let mut shared_ids = Set::default();
         let mut stack = vec![incompat];
@@ -301,12 +297,28 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                 if all_ids.contains(&i) {
                     shared_ids.insert(i);
                 } else {
-                    all_ids.insert(i);
                     stack.push(id1);
                     stack.push(id2);
                 }
             }
+            all_ids.insert(i);
         }
-        shared_ids
+        // To avoid recursion we need to generate trees in topological order.
+        // That is to say we need to ensure that the causes are processed before the incompatibility they effect.
+        // It happens to be that sorting by their ID maintains this property.
+        let mut sorted_ids = all_ids.into_iter().collect::<Vec<_>>();
+        sorted_ids.sort_unstable_by_key(|id| id.into_raw());
+        let mut precomputed = Map::default();
+        for id in sorted_ids {
+            let tree = Incompatibility::build_derivation_tree(
+                id,
+                &shared_ids,
+                &self.incompatibility_store,
+                &precomputed,
+            );
+            precomputed.insert(id, Arc::new(tree));
+        }
+        // Now the user can refer to the entire tree from its root.
+        Arc::into_inner(precomputed.remove(&incompat).unwrap()).unwrap()
     }
 }
