@@ -128,7 +128,11 @@ pub fn resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
         // Pick the next compatible version.
         let v = match decision {
             None => {
-                let inc = Incompatibility::no_versions(next.clone(), term_intersection.clone());
+                let inc = Incompatibility::no_versions(
+                    next.clone(),
+                    term_intersection.clone(),
+                    "no compatible versions".to_string(),
+                );
                 state.add_incompatibility(inc);
                 continue;
             }

@@ -43,8 +43,8 @@ pub type IncompId<P, VS> = Id<Incompatibility<P, VS>>;
 pub enum Kind<P: Package, VS: VersionSet> {
     /// Initial incompatibility aiming at picking the root package for the first decision.
     NotRoot(P, VS::V),
-    /// There are no versions in the given range for this package.
-    NoVersions(P, VS),
+    /// There are no versions in the given range for this package. A string reason is included.
+    NoVersions(P, VS, String),
     /// The package is unavailable for versions in the range. A string reason is included.
     Unavailable(P, VS, String),
     /// Incompatibility coming from the dependencies of a given package.
@@ -84,14 +84,14 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
 
     /// Create an incompatibility to remember
     /// that a given set does not contain any version.
-    pub fn no_versions(package: P, term: Term<VS>) -> Self {
+    pub fn no_versions(package: P, term: Term<VS>, reason: String) -> Self {
         let set = match &term {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
         };
         Self {
             package_terms: SmallMap::One([(package.clone(), term)]),
-            kind: Kind::NoVersions(package, set),
+            kind: Kind::NoVersions(package, set, reason),
         }
     }
 
@@ -242,9 +242,9 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
             Kind::NotRoot(package, version) => {
                 DerivationTree::External(External::NotRoot(package.clone(), version.clone()))
             }
-            Kind::NoVersions(package, set) => {
-                DerivationTree::External(External::NoVersions(package.clone(), set.clone()))
-            }
+            Kind::NoVersions(package, set, reason) => DerivationTree::External(
+                External::NoVersions(package.clone(), set.clone(), reason.clone()),
+            ),
             Kind::Unavailable(package, set, reason) => DerivationTree::External(
                 External::Unavailable(package.clone(), set.clone(), reason.clone()),
             ),
