@@ -221,19 +221,32 @@ impl<V: Ord> Range<V> {
         })
     }
 
-    /// Returns true if the this Range contains the specified value.
+    /// Returns true if this Range contains the specified value.
     pub fn contains(&self, v: &V) -> bool {
-        for segment in self.segments.iter() {
-            match within_bounds(v, segment) {
-                Ordering::Less => return false,
-                Ordering::Equal => return true,
-                Ordering::Greater => (),
-            }
-        }
-        false
+        self.segments
+            .binary_search_by(|segment| {
+                let lower_bound_greater = match segment {
+                    (Excluded(start), _) => v <= start,
+                    (Included(start), _) => v < start,
+                    (Unbounded, _) => false,
+                };
+                if lower_bound_greater {
+                    return Ordering::Greater;
+                }
+                let upper_bound_greater = match segment {
+                    (_, Unbounded) => true,
+                    (_, Included(end)) => v <= end,
+                    (_, Excluded(end)) => v < end,
+                };
+                if upper_bound_greater {
+                    return Ordering::Equal;
+                }
+                Ordering::Less
+            })
+            .is_ok()
     }
 
-    /// Returns true if the this Range contains the specified values.
+    /// Returns true if this Range contains the specified values.
     ///
     /// The `versions` iterator must be sorted.
     /// Functionally equivalent to `versions.map(|v| self.contains(v))`.
