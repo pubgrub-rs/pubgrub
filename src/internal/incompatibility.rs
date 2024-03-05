@@ -173,8 +173,11 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
         incompatibility_store: &Arena<Self>,
     ) -> Self {
         let kind = Kind::DerivedFrom(incompat, satisfier_cause);
-        let mut package_terms = incompatibility_store[incompat].package_terms.clone();
-        let t1 = package_terms.remove(package).unwrap();
+        // Optimization to avoid cloning and dropping t1
+        let (t1, mut package_terms) = incompatibility_store[incompat]
+            .package_terms
+            .split_one(package)
+            .unwrap();
         let satisfier_cause_terms = &incompatibility_store[satisfier_cause].package_terms;
         package_terms.merge(
             satisfier_cause_terms.iter().filter(|(p, _)| p != &package),

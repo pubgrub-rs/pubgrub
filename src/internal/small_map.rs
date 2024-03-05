@@ -99,6 +99,49 @@ impl<K: PartialEq + Eq + Hash, V> SmallMap<K, V> {
             }
         };
     }
+
+    /// Returns a reference to the value for one key and a copy of the map without the key.
+    ///
+    /// This is an optimization over the following, where we only need a reference to `t1`. It
+    /// avoids cloning and then drop the ranges in each `prior_cause` call.
+    /// ```ignore
+    /// let mut package_terms = package_terms.clone();
+    //  let t1 = package_terms.remove(package).unwrap();
+    /// ```
+    pub fn split_one(&self, key: &K) -> Option<(&V, Self)>
+    where
+        K: Clone,
+        V: Clone,
+    {
+        match self {
+            Self::Empty => None,
+            Self::One([(k, v)]) => {
+                if k == key {
+                    Some((v, Self::Empty))
+                } else {
+                    None
+                }
+            }
+            Self::Two([(k1, v1), (k2, v2)]) => {
+                if k1 == key {
+                    Some((v1, Self::One([(k2.clone(), v2.clone())])))
+                } else if k2 == key {
+                    Some((v2, Self::One([(k1.clone(), v1.clone())])))
+                } else {
+                    None
+                }
+            }
+            Self::Flexible(map) => {
+                if let Some(value) = map.get(key) {
+                    let mut map = map.clone();
+                    map.remove(key).unwrap();
+                    Some((value, Self::Flexible(map)))
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
 impl<K: Clone + PartialEq + Eq + Hash, V: Clone> SmallMap<K, V> {
