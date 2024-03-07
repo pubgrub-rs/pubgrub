@@ -222,27 +222,14 @@ impl<V: Ord> Range<V> {
     }
 
     /// Returns true if this Range contains the specified value.
-    pub fn contains(&self, v: &V) -> bool {
+    pub fn contains(&self, version: &V) -> bool {
         self.segments
             .binary_search_by(|segment| {
-                let lower_bound_greater = match segment {
-                    (Excluded(start), _) => v <= start,
-                    (Included(start), _) => v < start,
-                    (Unbounded, _) => false,
-                };
-                if lower_bound_greater {
-                    return Ordering::Greater;
-                }
-                let upper_bound_greater = match segment {
-                    (_, Unbounded) => true,
-                    (_, Included(end)) => v <= end,
-                    (_, Excluded(end)) => v < end,
-                };
-                if upper_bound_greater {
-                    return Ordering::Equal;
-                }
-                Ordering::Less
+                // We have to reverse because we need the segment wrt to the version, while
+                // within bounds tells us the version wrt to the segment.
+                within_bounds(version, segment).reverse()
             })
+            // An equal interval is one that contains the version
             .is_ok()
     }
 
@@ -328,10 +315,16 @@ impl<V: Ord> Range<V> {
     }
 }
 
-fn within_bounds<V: PartialOrd>(v: &V, segment: &Interval<V>) -> Ordering {
+/// The ordering of the version wrt to the interval.
+/// ```text
+///      |-------|
+///   ^      ^      ^
+///   less   equal  greater
+/// ```
+fn within_bounds<V: PartialOrd>(version: &V, segment: &Interval<V>) -> Ordering {
     let below_lower_bound = match segment {
-        (Excluded(start), _) => v <= start,
-        (Included(start), _) => v < start,
+        (Excluded(start), _) => version <= start,
+        (Included(start), _) => version < start,
         (Unbounded, _) => false,
     };
     if below_lower_bound {
@@ -339,8 +332,8 @@ fn within_bounds<V: PartialOrd>(v: &V, segment: &Interval<V>) -> Ordering {
     }
     let below_upper_bound = match segment {
         (_, Unbounded) => true,
-        (_, Included(end)) => v <= end,
-        (_, Excluded(end)) => v < end,
+        (_, Included(end)) => version <= end,
+        (_, Excluded(end)) => version < end,
     };
     if below_upper_bound {
         return Ordering::Equal;
