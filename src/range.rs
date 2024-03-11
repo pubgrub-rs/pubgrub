@@ -186,6 +186,21 @@ impl<V: Clone> Range<V> {
 }
 
 impl<V: Ord> Range<V> {
+    /// If the range includes a single version, return it.
+    /// Otherwise, returns [None].
+    pub fn as_singleton(&self) -> Option<&V> {
+        match self.segments.as_slice() {
+            [(Included(v1), Included(v2))] => {
+                if v1 == v2 {
+                    Some(v1)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     /// Convert to something that can be used with
     /// [BTreeMap::range](std::collections::BTreeMap::range).
     /// All versions contained in self, will be in the output,
