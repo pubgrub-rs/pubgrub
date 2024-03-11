@@ -131,7 +131,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                         break;
                     }
                     Relation::AlmostSatisfied(package_almost) => {
-                        if !self.unit_propagation_buffer.contains(&package_almost) {
+                        if self.unit_propagation_buffer.last() != Some(&package_almost) {
                             self.unit_propagation_buffer.push(package_almost.clone());
                         }
                         // Add (not term) to the partial solution with incompat as cause.
