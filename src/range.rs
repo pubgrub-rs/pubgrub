@@ -119,6 +119,11 @@ impl<V> Range<V> {
             segments: SmallVec::one((Included(v1.into()), Excluded(v2.into()))),
         }
     }
+
+    /// Whether the set is empty, i.e. it has not ranges
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
 }
 
 impl<V: Clone> Range<V> {
