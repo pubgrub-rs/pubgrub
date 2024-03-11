@@ -374,16 +374,25 @@ fn end_before_start_with_gap<V: PartialOrd>(end: &Bound<V>, start: &Bound<V>) ->
     }
 }
 
-/// The end of one interval is before the start of the next one, meaning they don't share any
-/// version.
-fn end_before_start<V: PartialOrd>(end: Bound<&V>, start: Bound<&V>) -> bool {
-    match (end, start) {
+fn left_start_is_smaller<V: PartialOrd>(left: Bound<V>, right: Bound<V>) -> bool {
+    match (left, right) {
+        (Unbounded, _) => true,
         (_, Unbounded) => false,
+        (Included(l), Included(r)) => l <= r,
+        (Excluded(l), Excluded(r)) => l <= r,
+        (Included(l), Excluded(r)) => l <= r,
+        (Excluded(l), Included(r)) => l < r,
+    }
+}
+
+fn left_end_is_smaller<V: PartialOrd>(left: Bound<V>, right: Bound<V>) -> bool {
+    match (left, right) {
+        (_, Unbounded) => true,
         (Unbounded, _) => false,
-        (Included(left), Included(right)) => left < right,
-        (Included(left), Excluded(right)) => left <= right,
-        (Excluded(left), Included(right)) => left <= right,
-        (Excluded(left), Excluded(right)) => left <= right,
+        (Included(l), Included(r)) => l <= r,
+        (Excluded(l), Excluded(r)) => l <= r,
+        (Excluded(l), Included(r)) => l <= r,
+        (Included(l), Excluded(r)) => l < r,
     }
 }
 
@@ -427,16 +436,7 @@ impl<V: Ord + Clone> Range<V> {
         loop {
             let smaller_interval = match (left_iter.peek(), right_iter.peek()) {
                 (Some((left_start, left_end)), Some((right_start, right_end))) => {
-                    let left_start_is_smaller = match (left_start, right_start) {
-                        (Unbounded, _) => true,
-                        (_, Unbounded) => false,
-                        (Included(l), Included(r)) => l <= r,
-                        (Excluded(l), Excluded(r)) => l <= r,
-                        (Included(l), Excluded(r)) => l <= r,
-                        (Excluded(l), Included(r)) => l < r,
-                    };
-
-                    if left_start_is_smaller {
+                    if left_start_is_smaller(left_start.as_ref(), right_start.as_ref()) {
                         left_iter.next();
                         (left_start, left_end)
                     } else {
@@ -500,15 +500,7 @@ impl<V: Ord + Clone> Range<V> {
             left_iter.peek().zip(right_iter.peek())
         {
             // The next smallest `end` value is going to come from one of the inputs.
-            let left_end_is_smaller = match (left_end, right_end) {
-                (Included(l), Included(r))
-                | (Excluded(l), Excluded(r))
-                | (Excluded(l), Included(r)) => l <= r,
-
-                (Included(l), Excluded(r)) => l < r,
-                (_, Unbounded) => true,
-                (Unbounded, _) => false,
-            };
+            let left_end_is_smaller = left_end_is_smaller(left_end.as_ref(), right_end.as_ref());
             // Now that we are processing `end` we will never have to process any segment smaller than that.
             // We can ensure that the input that `end` came from is larger than `end` by advancing it one step.
             // `end` is the smaller available input, so we know the other input is already larger than `end`.
@@ -579,7 +571,7 @@ impl<V: Ord + Clone> Range<V> {
     ///
     /// Note that we don't know that set of all existing `V`s here, so we only check if all
     /// segments `self` are contained in a segment of `other`.
-    fn subset_of(&self, other: &Self) -> bool {
+    pub fn subset_of(&self, other: &Self) -> bool {
         let mut containing_iter = other.segments.iter();
         let mut subset_iter = self.segments.iter();
         let Some(mut containing_elem) = containing_iter.next() else {
@@ -590,7 +582,7 @@ impl<V: Ord + Clone> Range<V> {
         for subset_elem in subset_iter {
             // Check if the current containing element ends before the subset element.
             // There needs to be another containing element for our subset element in this case.
-            while end_before_start(containing_elem.end_bound(), subset_elem.start_bound()) {
+            while !valid_segment(&subset_elem.start_bound(), &containing_elem.end_bound()) {
                 if let Some(containing_elem_) = containing_iter.next() {
                     containing_elem = containing_elem_;
                 } else {
@@ -598,30 +590,19 @@ impl<V: Ord + Clone> Range<V> {
                 };
             }
 
-            let start_contained = match (containing_elem.start_bound(), subset_elem.start_bound()) {
-                (Unbounded, _) => true,
-                (Included(_) | Excluded(_), Unbounded) => false,
-                // This is the only case where the subset is bound is "wider" than containing bound ...
-                (Excluded(left), Included(right)) => left < right,
-                // ... while in the other cases they can share the point
-                (Included(left), Included(right)) => left <= right,
-                (Included(left), Excluded(right)) => left <= right,
-                (Excluded(left), Excluded(right)) => left <= right,
-            };
+            let start_contained =
+                left_start_is_smaller(containing_elem.start_bound(), subset_elem.start_bound());
 
-            let end_contained = match (subset_elem.end_bound(), containing_elem.end_bound()) {
-                (_, Unbounded) => true,
-                (Unbounded, Included(_) | Excluded(_)) => false,
-                // This is the only case where the subset is bound is "wider" than containing bound ...
-                (Included(left), Excluded(right)) => left < right,
-                // ... while in the other cases they can share the point
-                (Included(left), Included(right)) => left <= right,
-                (Excluded(left), Included(right)) => left <= right,
-                (Excluded(left), Excluded(right)) => left <= right,
-            };
+            if !start_contained {
+                // The start element is not contained
+                return false;
+            }
 
-            if !(start_contained && end_contained) {
-                // This subset element is not contained
+            let end_contained =
+                left_end_is_smaller(subset_elem.end_bound(), containing_elem.end_bound());
+
+            if !end_contained {
+                // The end element is not contained
                 return false;
             }
         }
@@ -943,6 +924,12 @@ pub mod tests {
         fn is_disjoint_through_intersection(r1 in strategy(), r2 in strategy()) {
             let disjoint_def = r1.intersection(&r2) == Range::empty();
             assert_eq!(r1.is_disjoint(&r2), disjoint_def);
+        }
+
+        #[test]
+        fn subset_of_through_intersection(r1 in strategy(), r2 in strategy()) {
+            let disjoint_def = r1.intersection(&r2) == r1;
+            assert_eq!(r1.subset_of(&r2), disjoint_def);
         }
 
         #[test]
