@@ -54,3 +54,64 @@ fn cannot_depend_on_self() {
         Err(PubGrubError::SelfDependency { .. })
     ));
 }
+
+#[test]
+fn redundant_scanning() {
+    let mut dependency_provider = OfflineDependencyProvider::<u32, NumVS>::new();
+    dependency_provider.add_dependencies(
+        0,
+        0,
+        [
+            (247, Range::higher_than(1)),
+            (71, Range::strictly_lower_than(7)),
+            (69, Range::higher_than(4)),
+            (1, Range::full()),
+        ],
+    );
+
+    dependency_provider.add_dependencies(1, 0, [(646, Range::singleton(0))]);
+    dependency_provider.add_dependencies(1, 1, [(247, Range::strictly_lower_than(3))]);
+    dependency_provider.add_dependencies(1, 2, [(71, Range::higher_than(7))]);
+    dependency_provider.add_dependencies(1, 3, [(66, Range::full())]);
+    dependency_provider.add_dependencies(1, 4, [(2, Range::empty())]);
+    dependency_provider.add_dependencies(1, 5, [(3, Range::empty())]);
+    dependency_provider.add_dependencies(1, 6, [(248, Range::from_range_bounds(1..3))]);
+    dependency_provider.add_dependencies(1, 7, [(247, Range::singleton(0))]);
+    dependency_provider.add_dependencies(1, 8, [(247, Range::singleton(1))]);
+    dependency_provider.add_dependencies(1, 9, [(248, Range::singleton(1))]);
+    dependency_provider.add_dependencies(1, 10, [(71, Range::singleton(7))]);
+    dependency_provider.add_dependencies(1, 11, [(99, Range::full())]);
+    dependency_provider.add_dependencies(1, 12, [(69, Range::strictly_lower_than(6))]);
+
+    dependency_provider.add_dependencies(66, 0, [(69, Range::strictly_lower_than(5))]);
+
+    dependency_provider.add_dependencies(
+        69,
+        7,
+        [(176, Range::singleton(3)), (248, Range::singleton(0))],
+    );
+    dependency_provider.add_dependencies(
+        69,
+        10,
+        [(248, Range::singleton(0)), (646, Range::singleton(3))],
+    );
+
+    dependency_provider.add_dependencies(99, 0, [(248, Range::singleton(1))]);
+
+    dependency_provider.add_dependencies(71, 0, []);
+    dependency_provider.add_dependencies(71, 2, []);
+    dependency_provider.add_dependencies(71, 3, []);
+    dependency_provider.add_dependencies(71, 4, []);
+    dependency_provider.add_dependencies(71, 5, []);
+
+    dependency_provider.add_dependencies(247, 3, []);
+    dependency_provider.add_dependencies(247, 6, [(249, Range::empty())]);
+
+    dependency_provider.add_dependencies(248, 0, []);
+    dependency_provider.add_dependencies(248, 1, []);
+
+    dependency_provider.add_dependencies(646, 0, []);
+    dependency_provider.add_dependencies(646, 3, []);
+
+    _ = resolve(&dependency_provider, 0, 0);
+}
