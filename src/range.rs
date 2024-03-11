@@ -374,6 +374,19 @@ fn end_before_start_with_gap<V: PartialOrd>(end: &Bound<V>, start: &Bound<V>) ->
     }
 }
 
+/// The end of one interval is before the start of the next one, meaning they don't share any
+/// version.
+fn end_before_start<V: PartialOrd>(end: Bound<&V>, start: Bound<&V>) -> bool {
+    match (end, start) {
+        (_, Unbounded) => false,
+        (Unbounded, _) => false,
+        (Included(left), Included(right)) => left < right,
+        (Included(left), Excluded(right)) => left <= right,
+        (Excluded(left), Included(right)) => left <= right,
+        (Excluded(left), Excluded(right)) => left <= right,
+    }
+}
+
 /// Group adjacent versions locations.
 ///
 /// ```text
@@ -559,6 +572,60 @@ impl<V: Ord + Clone> Range<V> {
         }
 
         // The remaining element(s) can't intersect anymore
+        true
+    }
+
+    /// Return true if any `V` that is contained in `self` is also contained in `other`.
+    ///
+    /// Note that we don't know that set of all existing `V`s here, so we only check if all
+    /// segments `self` are contained in a segment of `other`.
+    fn subset_of(&self, other: &Self) -> bool {
+        let mut containing_iter = other.segments.iter();
+        let mut subset_iter = self.segments.iter();
+        let Some(mut containing_elem) = containing_iter.next() else {
+            // As long as we have subset elements, we need containing elements
+            return subset_iter.next().is_none();
+        };
+
+        for subset_elem in subset_iter {
+            // Check if the current containing element ends before the subset element.
+            // There needs to be another containing element for our subset element in this case.
+            while end_before_start(containing_elem.end_bound(), subset_elem.start_bound()) {
+                if let Some(containing_elem_) = containing_iter.next() {
+                    containing_elem = containing_elem_;
+                } else {
+                    return false;
+                };
+            }
+
+            let start_contained = match (containing_elem.start_bound(), subset_elem.start_bound()) {
+                (Unbounded, _) => true,
+                (Included(_) | Excluded(_), Unbounded) => false,
+                // This is the only case where the subset is bound is "wider" than containing bound ...
+                (Excluded(left), Included(right)) => left < right,
+                // ... while in the other cases they can share the point
+                (Included(left), Included(right)) => left <= right,
+                (Included(left), Excluded(right)) => left <= right,
+                (Excluded(left), Excluded(right)) => left <= right,
+            };
+
+            let end_contained = match (subset_elem.end_bound(), containing_elem.end_bound()) {
+                (_, Unbounded) => true,
+                (Unbounded, Included(_) | Excluded(_)) => false,
+                // This is the only case where the subset is bound is "wider" than containing bound ...
+                (Included(left), Excluded(right)) => left < right,
+                // ... while in the other cases they can share the point
+                (Included(left), Included(right)) => left <= right,
+                (Excluded(left), Included(right)) => left <= right,
+                (Excluded(left), Excluded(right)) => left <= right,
+            };
+
+            if !(start_contained && end_contained) {
+                // This subset element is not contained
+                return false;
+            }
+        }
+
         true
     }
 
