@@ -539,6 +539,38 @@ impl<V: Ord + Clone> Range<V> {
         Self { segments: output }.check_invariants()
     }
 
+    /// Return true is there can be no `V` so that `V` is contained in both `self` and `other`.
+    ///
+    /// Note that we don't know that set of all existing `V`s here, so we only check if the segments
+    /// are disjoint, not if no version is contained in both.
+    pub fn is_disjoint(&self, other: &Self) -> bool {
+        let end_before_start = |end, start| match (end, start) {
+            (_, Unbounded) => false,
+            (Unbounded, _) => false,
+            (Included(left), Included(right)) => left < right,
+            (Included(left), Excluded(right)) => left <= right,
+            (Excluded(left), Included(right)) => left <= right,
+            (Excluded(left), Excluded(right)) => left <= right,
+        };
+
+        // The operation is symmetric
+        let mut left_iter = self.segments.iter().peekable();
+        let mut right_iter = other.segments.iter().peekable();
+
+        while let (Some(left), Some(right)) = (left_iter.peek(), right_iter.peek()) {
+            if end_before_start(left.end_bound(), right.start_bound()) {
+                left_iter.next();
+            } else if end_before_start(right.end_bound(), left.start_bound()) {
+                right_iter.next();
+            } else {
+                return false;
+            }
+        }
+
+        // The remaining element(s) can't intersect anymore
+        true
+    }
+
     /// Returns a simpler Range that contains the same versions
     ///
     /// For every one of the Versions provided in versions the existing range and
