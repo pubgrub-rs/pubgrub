@@ -341,13 +341,43 @@ fn within_bounds<V: PartialOrd>(version: &V, segment: &Interval<V>) -> Ordering 
     Ordering::Greater
 }
 
+/// A valid segment is one where at least one version fits between start and end
 fn valid_segment<T: PartialOrd>(start: &Bound<T>, end: &Bound<T>) -> bool {
     match (start, end) {
+        // Singleton interval are allowed
         (Included(s), Included(e)) => s <= e,
         (Included(s), Excluded(e)) => s < e,
         (Excluded(s), Included(e)) => s < e,
         (Excluded(s), Excluded(e)) => s < e,
         (Unbounded, _) | (_, Unbounded) => true,
+    }
+}
+
+/// The end of one interval is before the start of the next one, so they can't be concatenated
+/// into a single interval. The `union` method calling with both intervals and then the intervals
+/// switched. If either is true, the intervals are separate in the union and if both are false, they
+/// are merged.
+/// ```text
+/// True for these two:
+///  |----|
+///                |-----|
+///       ^ end    ^ start
+/// False for these two:
+///  |----|
+///     |-----|
+/// Here it depends: If they both exclude the position they share, there is a version in between
+/// them that blocks concatenation
+///  |----|
+///       |-----|
+/// ```
+fn end_before_start_with_gap<V: PartialOrd>(end: &Bound<V>, start: &Bound<V>) -> bool {
+    match (end, start) {
+        (_, Unbounded) => false,
+        (Unbounded, _) => false,
+        (Included(left), Included(right)) => left < right,
+        (Included(left), Excluded(right)) => left < right,
+        (Excluded(left), Included(right)) => left < right,
+        (Excluded(left), Excluded(right)) => left <= right,
     }
 }
 
@@ -384,10 +414,70 @@ fn group_adjacent_locations(
 impl<V: Ord + Clone> Range<V> {
     /// Computes the union of this `Range` and another.
     pub fn union(&self, other: &Self) -> Self {
-        self.complement()
-            .intersection(&other.complement())
-            .complement()
-            .check_invariants()
+        let mut output: SmallVec<Interval<V>> = SmallVec::empty();
+        let mut accumulator: Option<(&Bound<_>, &Bound<_>)> = None;
+        let mut left_iter = self.segments.iter().peekable();
+        let mut right_iter = other.segments.iter().peekable();
+        loop {
+            let smaller_interval = match (left_iter.peek(), right_iter.peek()) {
+                (Some((left_start, left_end)), Some((right_start, right_end))) => {
+                    let left_start_is_smaller = match (left_start, right_start) {
+                        (Unbounded, _) => true,
+                        (_, Unbounded) => false,
+                        (Included(l), Included(r)) => l <= r,
+                        (Excluded(l), Excluded(r)) => l <= r,
+                        (Included(l), Excluded(r)) => l <= r,
+                        (Excluded(l), Included(r)) => l < r,
+                    };
+
+                    if left_start_is_smaller {
+                        left_iter.next();
+                        (left_start, left_end)
+                    } else {
+                        right_iter.next();
+                        (right_start, right_end)
+                    }
+                }
+                (Some((left_start, left_end)), None) => {
+                    left_iter.next();
+                    (left_start, left_end)
+                }
+                (None, Some((right_start, right_end))) => {
+                    right_iter.next();
+                    (right_start, right_end)
+                }
+                (None, None) => break,
+            };
+
+            if let Some(accumulator_) = accumulator {
+                if end_before_start_with_gap(accumulator_.1, smaller_interval.0) {
+                    output.push((accumulator_.0.clone(), accumulator_.1.clone()));
+                    accumulator = Some(smaller_interval);
+                } else {
+                    let accumulator_end = match (accumulator_.1, smaller_interval.1) {
+                        (_, Unbounded) | (Unbounded, _) => &Unbounded,
+                        (Included(l), Excluded(r) | Included(r)) if l == r => accumulator_.1,
+                        (Excluded(l) | Included(l), Included(r)) if l == r => smaller_interval.1,
+                        (Included(l) | Excluded(l), Included(r) | Excluded(r)) => {
+                            if l > r {
+                                accumulator_.1
+                            } else {
+                                smaller_interval.1
+                            }
+                        }
+                    };
+                    accumulator = Some((accumulator_.0, accumulator_end));
+                }
+            } else {
+                accumulator = Some(smaller_interval)
+            }
+        }
+
+        if let Some(accumulator) = accumulator {
+            output.push((accumulator.0.clone(), accumulator.1.clone()));
+        }
+
+        Self { segments: output }.check_invariants()
     }
 
     /// Computes the intersection of two sets of versions.
@@ -765,6 +855,16 @@ pub mod tests {
         #[test]
         fn union_contains_either(r1 in strategy(), r2 in strategy(), version in version_strat()) {
             assert_eq!(r1.union(&r2).contains(&version), r1.contains(&version) || r2.contains(&version));
+        }
+
+        #[test]
+        fn union_through_intersection(r1 in strategy(), r2 in strategy()) {
+            let union_def = r1
+                .complement()
+                .intersection(&r2.complement())
+                .complement()
+                .check_invariants();
+            assert_eq!(r1.union(&r2), union_def);
         }
 
         // Testing contains --------------------------------
