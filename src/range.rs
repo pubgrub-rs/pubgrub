@@ -301,7 +301,7 @@ impl<V: Ord> Range<V> {
                 assert!(end_before_start_with_gap(&p[0].1, &p[1].0));
             }
             for (s, e) in self.segments.iter() {
-                assert!(valid_segment(s, e));
+                assert!(valid_segment(&s, &e));
             }
         }
         self
@@ -513,7 +513,7 @@ impl<V: Ord + Clone> Range<V> {
             // But, we already know that the segments in our input are valid.
             // So we do not need to check if the `start`  from the input `end` came from is smaller then `end`.
             // If the `other_start` is larger than end, then the intersection will be invalid.
-            if !valid_segment(other_start, end) {
+            if !valid_segment(&other_start, &end) {
                 // Note: We can call `this_iter.next_if(!valid_segment(other_start, this_end))` in a loop.
                 // But the checks make it slower for the benchmarked inputs.
                 continue;
@@ -539,28 +539,19 @@ impl<V: Ord + Clone> Range<V> {
         Self { segments: output }.check_invariants()
     }
 
-    /// Return true is there can be no `V` so that `V` is contained in both `self` and `other`.
+    /// Return true if there can be no `V` so that `V` is contained in both `self` and `other`.
     ///
     /// Note that we don't know that set of all existing `V`s here, so we only check if the segments
     /// are disjoint, not if no version is contained in both.
     pub fn is_disjoint(&self, other: &Self) -> bool {
-        let end_before_start = |end, start| match (end, start) {
-            (_, Unbounded) => false,
-            (Unbounded, _) => false,
-            (Included(left), Included(right)) => left < right,
-            (Included(left), Excluded(right)) => left <= right,
-            (Excluded(left), Included(right)) => left <= right,
-            (Excluded(left), Excluded(right)) => left <= right,
-        };
-
         // The operation is symmetric
         let mut left_iter = self.segments.iter().peekable();
         let mut right_iter = other.segments.iter().peekable();
 
-        while let (Some(left), Some(right)) = (left_iter.peek(), right_iter.peek()) {
-            if end_before_start(left.end_bound(), right.start_bound()) {
+        while let Some((left, right)) = left_iter.peek().zip(right_iter.peek()) {
+            if !valid_segment(&right.start_bound(), &left.end_bound()) {
                 left_iter.next();
-            } else if end_before_start(right.end_bound(), left.start_bound()) {
+            } else if !valid_segment(&left.start_bound(), &right.end_bound()) {
                 right_iter.next();
             } else {
                 return false;
@@ -879,6 +870,12 @@ pub mod tests {
         #[test]
         fn union_contains_either(r1 in strategy(), r2 in strategy(), version in version_strat()) {
             assert_eq!(r1.union(&r2).contains(&version), r1.contains(&version) || r2.contains(&version));
+        }
+
+        #[test]
+        fn is_disjoint_through_intersection(r1 in strategy(), r2 in strategy()) {
+            let disjoint_def = r1.intersection(&r2) == Range::empty();
+            assert_eq!(r1.is_disjoint(&r2), disjoint_def);
         }
 
         #[test]
