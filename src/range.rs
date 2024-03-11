@@ -298,14 +298,7 @@ impl<V: Ord> Range<V> {
     fn check_invariants(self) -> Self {
         if cfg!(debug_assertions) {
             for p in self.segments.as_slice().windows(2) {
-                match (&p[0].1, &p[1].0) {
-                    (Included(l_end), Included(r_start)) => assert!(l_end < r_start),
-                    (Included(l_end), Excluded(r_start)) => assert!(l_end < r_start),
-                    (Excluded(l_end), Included(r_start)) => assert!(l_end < r_start),
-                    (Excluded(l_end), Excluded(r_start)) => assert!(l_end <= r_start),
-                    (_, Unbounded) => panic!(),
-                    (Unbounded, _) => panic!(),
-                }
+                assert!(end_before_start_with_gap(&p[0].1, &p[1].0));
             }
             for (s, e) in self.segments.iter() {
                 assert!(valid_segment(s, e));
@@ -457,7 +450,6 @@ impl<V: Ord + Clone> Range<V> {
                     let accumulator_end = match (accumulator_.1, smaller_interval.1) {
                         (_, Unbounded) | (Unbounded, _) => &Unbounded,
                         (Included(l), Excluded(r) | Included(r)) if l == r => accumulator_.1,
-                        (Excluded(l) | Included(l), Included(r)) if l == r => smaller_interval.1,
                         (Included(l) | Excluded(l), Included(r) | Excluded(r)) => {
                             if l > r {
                                 accumulator_.1
