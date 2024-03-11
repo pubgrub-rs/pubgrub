@@ -92,7 +92,7 @@ impl<VS: VersionSet> Term<VS> {
 impl<VS: VersionSet> Term<VS> {
     /// Compute the intersection of two terms.
     ///
-    /// The intersection is positive is at least one of the two terms is positive.
+    /// The intersection is positive if at least one of the two terms is positive.
     pub(crate) fn intersection(&self, other: &Self) -> Self {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => Self::Positive(r1.intersection(r2)),
@@ -139,9 +139,13 @@ impl<VS: VersionSet> Term<VS> {
     /// Indicate if this term is a subset of another term.
     /// Just like for sets, we say that t1 is a subset of t2
     /// if and only if t1 ∩ t2 = t1.
-    #[cfg(test)]
     pub(crate) fn subset_of(&self, other: &Self) -> bool {
-        self == &self.intersection(other)
+        match (self, other) {
+            (Self::Positive(r1), Self::Positive(r2)) => r1.subset_of(r2),
+            (Self::Positive(r1), Self::Negative(r2)) => r1.subset_of(&r2.complement()),
+            (Self::Negative(_), Self::Positive(_)) => false,
+            (Self::Negative(r1), Self::Negative(r2)) => r2.subset_of(&r1),
+        }
     }
 }
 
@@ -190,10 +194,9 @@ impl<VS: VersionSet> Term<VS> {
     /// Check if a set of terms satisfies or contradicts a given term.
     /// Otherwise the relation is inconclusive.
     pub(crate) fn relation_with(&self, other_terms_intersection: &Self) -> Relation {
-        let full_intersection = self.intersection(other_terms_intersection);
-        if &full_intersection == other_terms_intersection {
+        if other_terms_intersection.subset_of(self) {
             Relation::Satisfied
-        } else if full_intersection == Self::empty() {
+        } else if self.is_disjoint(other_terms_intersection) {
             Relation::Contradicted
         } else {
             Relation::Inconclusive
@@ -255,6 +258,27 @@ pub mod tests {
             let union_positive = term1.is_positive() && term2.is_positive();
             assert_eq!(term1.intersection(&term2).is_positive(), intersection_positive);
             assert_eq!(term1.union(&term2).is_positive(), union_positive);
+        }
+
+        #[test]
+        fn is_disjoint_through_intersection(r1 in strategy(), r2 in strategy()) {
+            let disjoint_def = r1.intersection(&r2) == Term::empty();
+            assert_eq!(r1.is_disjoint(&r2), disjoint_def);
+        }
+
+        #[test]
+        fn subset_of_through_intersection(r1 in strategy(), r2 in strategy()) {
+            let disjoint_def = r1.intersection(&r2) == r1;
+            assert_eq!(r1.subset_of(&r2), disjoint_def);
+        }
+
+        #[test]
+        fn union_through_intersection(r1 in strategy(), r2 in strategy()) {
+            let union_def = r1
+                .negate()
+                .intersection(&r2.negate())
+                .negate();
+            assert_eq!(r1.union(&r2), union_def);
         }
     }
 }
