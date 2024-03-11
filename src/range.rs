@@ -709,6 +709,14 @@ impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
     fn union(&self, other: &Self) -> Self {
         Range::union(self, other)
     }
+
+    fn is_disjoint(&self, other: &Self) -> bool {
+        Range::is_disjoint(self, other)
+    }
+
+    fn subset_of(&self, other: &Self) -> bool {
+        Range::subset_of(self, other)
+    }
 }
 
 // REPORT ######################################################################

@@ -501,7 +501,7 @@ impl<P: Package, VS: VersionSet> PackageAssignments<P, VS> {
         let idx = self
             .dated_derivations
             .as_slice()
-            .partition_point(|dd| dd.accumulated_intersection.intersection(start_term) != empty);
+            .partition_point(|dd| !dd.accumulated_intersection.is_disjoint(start_term));
         if let Some(dd) = self.dated_derivations.get(idx) {
             debug_assert_eq!(dd.accumulated_intersection.intersection(start_term), empty);
             return (Some(dd.cause), dd.global_index, dd.decision_level);

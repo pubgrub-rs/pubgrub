@@ -6,7 +6,14 @@
 use crate::version_set::VersionSet;
 use std::fmt::{self, Display};
 
-///  A positive or negative expression regarding a set of versions.
+/// A positive or negative expression regarding a set of versions.
+///
+/// If a version is selected then `Positive(r)` and `Negative(r.complement())` are equivalent, but
+/// they have different semantics when no version is selected. A `Positive` term in the partial
+/// solution requires a version to be selected. But a `Negative` term allows for a solution that
+/// does not have that package selected. Specifically, `Positive(VS::empty())` means that there was
+/// a conflict, we need to select a version for the package but can't pick any, while
+/// `Negative(VS::full())` would mean it is fine as long as we don't select the package.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Term<VS: VersionSet> {
     /// For example, "1.0.0 <= v < 2.0.0" is a positive expression
@@ -84,7 +91,8 @@ impl<VS: VersionSet> Term<VS> {
 /// Set operations with terms.
 impl<VS: VersionSet> Term<VS> {
     /// Compute the intersection of two terms.
-    /// If at least one term is positive, the intersection is also positive.
+    ///
+    /// The intersection is positive is at least one of the two terms is positive.
     pub(crate) fn intersection(&self, other: &Self) -> Self {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => Self::Positive(r1.intersection(r2)),
@@ -98,10 +106,34 @@ impl<VS: VersionSet> Term<VS> {
         }
     }
 
+    /// Check whether two terms are mutually exclusive.
+    ///
+    /// An optimization for the native implementation of checking whether the intersection of two sets is empty.
+    pub(crate) fn is_disjoint(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Positive(r1), Self::Positive(r2)) => r1.is_disjoint(r2),
+            (Self::Negative(r1), Self::Negative(r2)) => r1 == &VS::empty() && r2 == &VS::empty(),
+            // If the positive term is a subset of the negative term, it lies fully in the region that the negative
+            // term excludes.
+            (Self::Positive(r1), Self::Negative(r2)) => r1.subset_of(r2),
+            // Inversely, if there is a region outside the negative, they overlap in this region.
+            (Self::Negative(r1), Self::Positive(r2)) => r2.subset_of(r1),
+        }
+    }
+
     /// Compute the union of two terms.
     /// If at least one term is negative, the union is also negative.
     pub(crate) fn union(&self, other: &Self) -> Self {
-        (self.negate().intersection(&other.negate())).negate()
+        match (self, other) {
+            (Self::Positive(r1), Self::Positive(r2)) => Self::Positive(r1.union(r2)),
+            (Self::Positive(r1), Self::Negative(r2)) => {
+                Self::Negative(r1.union(&r2.complement()).complement())
+            }
+            (Self::Negative(r1), Self::Positive(r2)) => {
+                Self::Negative(r1.complement().union(r2).complement())
+            }
+            (Self::Negative(r1), Self::Negative(r2)) => Self::Negative(r1.intersection(r2)),
+        }
     }
 
     /// Indicate if this term is a subset of another term.
@@ -200,7 +232,6 @@ pub mod tests {
             crate::range::tests::strategy().prop_map(Term::Negative),
         ]
     }
-
     proptest! {
 
         // Testing relation --------------------------------
@@ -217,5 +248,13 @@ pub mod tests {
             }
         }
 
+        /// Ensure that we don't wrongly convert between positive and negative ranges
+        #[test]
+        fn positive_negative(term1 in strategy(), term2 in strategy()) {
+            let intersection_positive = term1.is_positive() || term2.is_positive();
+            let union_positive = term1.is_positive() && term2.is_positive();
+            assert_eq!(term1.intersection(&term2).is_positive(), intersection_positive);
+            assert_eq!(term1.union(&term2).is_positive(), union_positive);
+        }
     }
 }
