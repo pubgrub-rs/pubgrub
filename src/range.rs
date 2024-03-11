@@ -301,7 +301,7 @@ impl<V: Ord> Range<V> {
                 assert!(end_before_start_with_gap(&p[0].1, &p[1].0));
             }
             for (s, e) in self.segments.iter() {
-                assert!(valid_segment(&s, &e));
+                assert!(valid_segment(s, e));
             }
         }
         self
@@ -518,7 +518,7 @@ impl<V: Ord + Clone> Range<V> {
             // But, we already know that the segments in our input are valid.
             // So we do not need to check if the `start`  from the input `end` came from is smaller then `end`.
             // If the `other_start` is larger than end, then the intersection will be invalid.
-            if !valid_segment(&other_start, &end) {
+            if !valid_segment(other_start, end) {
                 // Note: We can call `this_iter.next_if(!valid_segment(other_start, this_end))` in a loop.
                 // But the checks make it slower for the benchmarked inputs.
                 continue;

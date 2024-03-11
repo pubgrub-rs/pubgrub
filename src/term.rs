@@ -144,7 +144,7 @@ impl<VS: VersionSet> Term<VS> {
             (Self::Positive(r1), Self::Positive(r2)) => r1.subset_of(r2),
             (Self::Positive(r1), Self::Negative(r2)) => r1.subset_of(&r2.complement()),
             (Self::Negative(_), Self::Positive(_)) => false,
-            (Self::Negative(r1), Self::Negative(r2)) => r2.subset_of(&r1),
+            (Self::Negative(r1), Self::Negative(r2)) => r2.subset_of(r1),
         }
     }
 }
