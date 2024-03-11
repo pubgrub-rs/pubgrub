@@ -131,6 +131,11 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
                         break;
                     }
                     Relation::AlmostSatisfied(package_almost) => {
+                        // Add `package_almost` to the `unit_propagation_buffer` set.
+                        // Putting items in `unit_propagation_buffer` more than once waste cycles,
+                        // but so does checking for duplicates.
+                        // In practice the most common pathology is adding the same package repeatedly.
+                        // So we only check if it is duplicated with the last item.
                         if self.unit_propagation_buffer.last() != Some(&package_almost) {
                             self.unit_propagation_buffer.push(package_almost.clone());
                         }
