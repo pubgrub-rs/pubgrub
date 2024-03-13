@@ -142,7 +142,7 @@ impl<VS: VersionSet> Term<VS> {
     pub(crate) fn subset_of(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => r1.subset_of(r2),
-            (Self::Positive(r1), Self::Negative(r2)) => r1.subset_of(&r2.complement()),
+            (Self::Positive(r1), Self::Negative(r2)) => r1.is_disjoint(r2),
             (Self::Negative(_), Self::Positive(_)) => false,
             (Self::Negative(r1), Self::Negative(r2)) => r2.subset_of(r1),
         }
