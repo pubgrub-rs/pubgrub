@@ -96,11 +96,8 @@ impl<VS: VersionSet> Term<VS> {
     pub(crate) fn intersection(&self, other: &Self) -> Self {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => Self::Positive(r1.intersection(r2)),
-            (Self::Positive(r1), Self::Negative(r2)) => {
-                Self::Positive(r1.intersection(&r2.complement()))
-            }
-            (Self::Negative(r1), Self::Positive(r2)) => {
-                Self::Positive(r1.complement().intersection(r2))
+            (Self::Positive(p), Self::Negative(n)) | (Self::Negative(n), Self::Positive(p)) => {
+                Self::Positive(n.complement().intersection(p))
             }
             (Self::Negative(r1), Self::Negative(r2)) => Self::Negative(r1.union(r2)),
         }
@@ -115,9 +112,9 @@ impl<VS: VersionSet> Term<VS> {
             (Self::Negative(r1), Self::Negative(r2)) => r1 == &VS::empty() && r2 == &VS::empty(),
             // If the positive term is a subset of the negative term, it lies fully in the region that the negative
             // term excludes.
-            (Self::Positive(r1), Self::Negative(r2)) => r1.subset_of(r2),
-            // Inversely, if there is a region outside the negative, they overlap in this region.
-            (Self::Negative(r1), Self::Positive(r2)) => r2.subset_of(r1),
+            (Self::Positive(p), Self::Negative(n)) | (Self::Negative(n), Self::Positive(p)) => {
+                p.subset_of(n)
+            }
         }
     }
 
@@ -126,11 +123,8 @@ impl<VS: VersionSet> Term<VS> {
     pub(crate) fn union(&self, other: &Self) -> Self {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => Self::Positive(r1.union(r2)),
-            (Self::Positive(r1), Self::Negative(r2)) => {
-                Self::Negative(r1.complement().intersection(r2))
-            }
-            (Self::Negative(r1), Self::Positive(r2)) => {
-                Self::Negative(r1.intersection(&r2.complement()))
+            (Self::Positive(p), Self::Negative(n)) | (Self::Negative(n), Self::Positive(p)) => {
+                Self::Negative(p.complement().intersection(n))
             }
             (Self::Negative(r1), Self::Negative(r2)) => Self::Negative(r1.intersection(r2)),
         }
