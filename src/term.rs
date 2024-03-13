@@ -127,10 +127,10 @@ impl<VS: VersionSet> Term<VS> {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => Self::Positive(r1.union(r2)),
             (Self::Positive(r1), Self::Negative(r2)) => {
-                Self::Negative(r1.union(&r2.complement()).complement())
+                Self::Negative(r1.complement().intersection(r2))
             }
             (Self::Negative(r1), Self::Positive(r2)) => {
-                Self::Negative(r1.complement().union(r2).complement())
+                Self::Negative(r1.intersection(&r2.complement()))
             }
             (Self::Negative(r1), Self::Negative(r2)) => Self::Negative(r1.intersection(r2)),
         }
