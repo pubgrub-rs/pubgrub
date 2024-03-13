@@ -57,4 +57,14 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
             .intersection(&other.complement())
             .complement()
     }
+
+    /// Whether the range have no overlapping segmets
+    fn is_disjoint(&self, other: &Self) -> bool {
+        self.intersection(other) == Self::empty()
+    }
+
+    /// Whether all range of `self` are contained in `other`
+    fn subset_of(&self, other: &Self) -> bool {
+        self == &self.intersection(other)
+    }
 }

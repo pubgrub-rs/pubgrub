@@ -221,19 +221,19 @@ impl<V: Ord> Range<V> {
         })
     }
 
-    /// Returns true if the this Range contains the specified value.
-    pub fn contains(&self, v: &V) -> bool {
-        for segment in self.segments.iter() {
-            match within_bounds(v, segment) {
-                Ordering::Less => return false,
-                Ordering::Equal => return true,
-                Ordering::Greater => (),
-            }
-        }
-        false
+    /// Returns true if this Range contains the specified value.
+    pub fn contains(&self, version: &V) -> bool {
+        self.segments
+            .binary_search_by(|segment| {
+                // We have to reverse because we need the segment wrt to the version, while
+                // within bounds tells us the version wrt to the segment.
+                within_bounds(version, segment).reverse()
+            })
+            // An equal interval is one that contains the version
+            .is_ok()
     }
 
-    /// Returns true if the this Range contains the specified values.
+    /// Returns true if this Range contains the specified values.
     ///
     /// The `versions` iterator must be sorted.
     /// Functionally equivalent to `versions.map(|v| self.contains(v))`.
@@ -298,14 +298,7 @@ impl<V: Ord> Range<V> {
     fn check_invariants(self) -> Self {
         if cfg!(debug_assertions) {
             for p in self.segments.as_slice().windows(2) {
-                match (&p[0].1, &p[1].0) {
-                    (Included(l_end), Included(r_start)) => assert!(l_end < r_start),
-                    (Included(l_end), Excluded(r_start)) => assert!(l_end < r_start),
-                    (Excluded(l_end), Included(r_start)) => assert!(l_end < r_start),
-                    (Excluded(l_end), Excluded(r_start)) => assert!(l_end <= r_start),
-                    (_, Unbounded) => panic!(),
-                    (Unbounded, _) => panic!(),
-                }
+                assert!(end_before_start_with_gap(&p[0].1, &p[1].0));
             }
             for (s, e) in self.segments.iter() {
                 assert!(valid_segment(s, e));
@@ -315,10 +308,16 @@ impl<V: Ord> Range<V> {
     }
 }
 
-fn within_bounds<V: PartialOrd>(v: &V, segment: &Interval<V>) -> Ordering {
+/// The ordering of the version wrt to the interval.
+/// ```text
+///      |-------|
+///   ^      ^      ^
+///   less   equal  greater
+/// ```
+fn within_bounds<V: PartialOrd>(version: &V, segment: &Interval<V>) -> Ordering {
     let below_lower_bound = match segment {
-        (Excluded(start), _) => v <= start,
-        (Included(start), _) => v < start,
+        (Excluded(start), _) => version <= start,
+        (Included(start), _) => version < start,
         (Unbounded, _) => false,
     };
     if below_lower_bound {
@@ -326,8 +325,8 @@ fn within_bounds<V: PartialOrd>(v: &V, segment: &Interval<V>) -> Ordering {
     }
     let below_upper_bound = match segment {
         (_, Unbounded) => true,
-        (_, Included(end)) => v <= end,
-        (_, Excluded(end)) => v < end,
+        (_, Included(end)) => version <= end,
+        (_, Excluded(end)) => version < end,
     };
     if below_upper_bound {
         return Ordering::Equal;
@@ -335,13 +334,65 @@ fn within_bounds<V: PartialOrd>(v: &V, segment: &Interval<V>) -> Ordering {
     Ordering::Greater
 }
 
+/// A valid segment is one where at least one version fits between start and end
 fn valid_segment<T: PartialOrd>(start: &Bound<T>, end: &Bound<T>) -> bool {
     match (start, end) {
+        // Singleton interval are allowed
         (Included(s), Included(e)) => s <= e,
         (Included(s), Excluded(e)) => s < e,
         (Excluded(s), Included(e)) => s < e,
         (Excluded(s), Excluded(e)) => s < e,
         (Unbounded, _) | (_, Unbounded) => true,
+    }
+}
+
+/// The end of one interval is before the start of the next one, so they can't be concatenated
+/// into a single interval. The `union` method calling with both intervals and then the intervals
+/// switched. If either is true, the intervals are separate in the union and if both are false, they
+/// are merged.
+/// ```text
+/// True for these two:
+///  |----|
+///                |-----|
+///       ^ end    ^ start
+/// False for these two:
+///  |----|
+///     |-----|
+/// Here it depends: If they both exclude the position they share, there is a version in between
+/// them that blocks concatenation
+///  |----|
+///       |-----|
+/// ```
+fn end_before_start_with_gap<V: PartialOrd>(end: &Bound<V>, start: &Bound<V>) -> bool {
+    match (end, start) {
+        (_, Unbounded) => false,
+        (Unbounded, _) => false,
+        (Included(left), Included(right)) => left < right,
+        (Included(left), Excluded(right)) => left < right,
+        (Excluded(left), Included(right)) => left < right,
+        (Excluded(left), Excluded(right)) => left <= right,
+    }
+}
+
+fn left_start_is_smaller<V: PartialOrd>(left: Bound<V>, right: Bound<V>) -> bool {
+    match (left, right) {
+        (Unbounded, _) => true,
+        (_, Unbounded) => false,
+        (Included(l), Included(r)) => l <= r,
+        (Excluded(l), Excluded(r)) => l <= r,
+        (Included(l), Excluded(r)) => l <= r,
+        (Excluded(l), Included(r)) => l < r,
+    }
+}
+
+fn left_end_is_smaller<V: PartialOrd>(left: Bound<V>, right: Bound<V>) -> bool {
+    match (left, right) {
+        (_, Unbounded) => true,
+        (Unbounded, _) => false,
+        (Included(l), Included(r)) => l <= r,
+        (Excluded(l), Excluded(r)) => l <= r,
+        (Excluded(l), Included(r)) => l <= r,
+        (Included(l), Excluded(r)) => l < r,
     }
 }
 
@@ -378,10 +429,60 @@ fn group_adjacent_locations(
 impl<V: Ord + Clone> Range<V> {
     /// Computes the union of this `Range` and another.
     pub fn union(&self, other: &Self) -> Self {
-        self.complement()
-            .intersection(&other.complement())
-            .complement()
-            .check_invariants()
+        let mut output: SmallVec<Interval<V>> = SmallVec::empty();
+        let mut accumulator: Option<(&Bound<_>, &Bound<_>)> = None;
+        let mut left_iter = self.segments.iter().peekable();
+        let mut right_iter = other.segments.iter().peekable();
+        loop {
+            let smaller_interval = match (left_iter.peek(), right_iter.peek()) {
+                (Some((left_start, left_end)), Some((right_start, right_end))) => {
+                    if left_start_is_smaller(left_start.as_ref(), right_start.as_ref()) {
+                        left_iter.next();
+                        (left_start, left_end)
+                    } else {
+                        right_iter.next();
+                        (right_start, right_end)
+                    }
+                }
+                (Some((left_start, left_end)), None) => {
+                    left_iter.next();
+                    (left_start, left_end)
+                }
+                (None, Some((right_start, right_end))) => {
+                    right_iter.next();
+                    (right_start, right_end)
+                }
+                (None, None) => break,
+            };
+
+            if let Some(accumulator_) = accumulator {
+                if end_before_start_with_gap(accumulator_.1, smaller_interval.0) {
+                    output.push((accumulator_.0.clone(), accumulator_.1.clone()));
+                    accumulator = Some(smaller_interval);
+                } else {
+                    let accumulator_end = match (accumulator_.1, smaller_interval.1) {
+                        (_, Unbounded) | (Unbounded, _) => &Unbounded,
+                        (Included(l), Excluded(r) | Included(r)) if l == r => accumulator_.1,
+                        (Included(l) | Excluded(l), Included(r) | Excluded(r)) => {
+                            if l > r {
+                                accumulator_.1
+                            } else {
+                                smaller_interval.1
+                            }
+                        }
+                    };
+                    accumulator = Some((accumulator_.0, accumulator_end));
+                }
+            } else {
+                accumulator = Some(smaller_interval)
+            }
+        }
+
+        if let Some(accumulator) = accumulator {
+            output.push((accumulator.0.clone(), accumulator.1.clone()));
+        }
+
+        Self { segments: output }.check_invariants()
     }
 
     /// Computes the intersection of two sets of versions.
@@ -399,15 +500,7 @@ impl<V: Ord + Clone> Range<V> {
             left_iter.peek().zip(right_iter.peek())
         {
             // The next smallest `end` value is going to come from one of the inputs.
-            let left_end_is_smaller = match (left_end, right_end) {
-                (Included(l), Included(r))
-                | (Excluded(l), Excluded(r))
-                | (Excluded(l), Included(r)) => l <= r,
-
-                (Included(l), Excluded(r)) => l < r,
-                (_, Unbounded) => true,
-                (Unbounded, _) => false,
-            };
+            let left_end_is_smaller = left_end_is_smaller(left_end.as_ref(), right_end.as_ref());
             // Now that we are processing `end` we will never have to process any segment smaller than that.
             // We can ensure that the input that `end` came from is larger than `end` by advancing it one step.
             // `end` is the smaller available input, so we know the other input is already larger than `end`.
@@ -449,6 +542,72 @@ impl<V: Ord + Clone> Range<V> {
         }
 
         Self { segments: output }.check_invariants()
+    }
+
+    /// Return true if there can be no `V` so that `V` is contained in both `self` and `other`.
+    ///
+    /// Note that we don't know that set of all existing `V`s here, so we only check if the segments
+    /// are disjoint, not if no version is contained in both.
+    pub fn is_disjoint(&self, other: &Self) -> bool {
+        // The operation is symmetric
+        let mut left_iter = self.segments.iter().peekable();
+        let mut right_iter = other.segments.iter().peekable();
+
+        while let Some((left, right)) = left_iter.peek().zip(right_iter.peek()) {
+            if !valid_segment(&right.start_bound(), &left.end_bound()) {
+                left_iter.next();
+            } else if !valid_segment(&left.start_bound(), &right.end_bound()) {
+                right_iter.next();
+            } else {
+                return false;
+            }
+        }
+
+        // The remaining element(s) can't intersect anymore
+        true
+    }
+
+    /// Return true if any `V` that is contained in `self` is also contained in `other`.
+    ///
+    /// Note that we don't know that set of all existing `V`s here, so we only check if all
+    /// segments `self` are contained in a segment of `other`.
+    pub fn subset_of(&self, other: &Self) -> bool {
+        let mut containing_iter = other.segments.iter();
+        let mut subset_iter = self.segments.iter();
+        let Some(mut containing_elem) = containing_iter.next() else {
+            // As long as we have subset elements, we need containing elements
+            return subset_iter.next().is_none();
+        };
+
+        for subset_elem in subset_iter {
+            // Check if the current containing element ends before the subset element.
+            // There needs to be another containing element for our subset element in this case.
+            while !valid_segment(&subset_elem.start_bound(), &containing_elem.end_bound()) {
+                if let Some(containing_elem_) = containing_iter.next() {
+                    containing_elem = containing_elem_;
+                } else {
+                    return false;
+                };
+            }
+
+            let start_contained =
+                left_start_is_smaller(containing_elem.start_bound(), subset_elem.start_bound());
+
+            if !start_contained {
+                // The start element is not contained
+                return false;
+            }
+
+            let end_contained =
+                left_end_is_smaller(subset_elem.end_bound(), containing_elem.end_bound());
+
+            if !end_contained {
+                // The end element is not contained
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Returns a simpler Range that contains the same versions
@@ -549,6 +708,14 @@ impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
 
     fn union(&self, other: &Self) -> Self {
         Range::union(self, other)
+    }
+
+    fn is_disjoint(&self, other: &Self) -> bool {
+        Range::is_disjoint(self, other)
+    }
+
+    fn subset_of(&self, other: &Self) -> bool {
+        Range::subset_of(self, other)
     }
 }
 
@@ -759,6 +926,28 @@ pub mod tests {
         #[test]
         fn union_contains_either(r1 in strategy(), r2 in strategy(), version in version_strat()) {
             assert_eq!(r1.union(&r2).contains(&version), r1.contains(&version) || r2.contains(&version));
+        }
+
+        #[test]
+        fn is_disjoint_through_intersection(r1 in strategy(), r2 in strategy()) {
+            let disjoint_def = r1.intersection(&r2) == Range::empty();
+            assert_eq!(r1.is_disjoint(&r2), disjoint_def);
+        }
+
+        #[test]
+        fn subset_of_through_intersection(r1 in strategy(), r2 in strategy()) {
+            let disjoint_def = r1.intersection(&r2) == r1;
+            assert_eq!(r1.subset_of(&r2), disjoint_def);
+        }
+
+        #[test]
+        fn union_through_intersection(r1 in strategy(), r2 in strategy()) {
+            let union_def = r1
+                .complement()
+                .intersection(&r2.complement())
+                .complement()
+                .check_invariants();
+            assert_eq!(r1.union(&r2), union_def);
         }
 
         // Testing contains --------------------------------
