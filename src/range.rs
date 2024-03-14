@@ -717,6 +717,14 @@ impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
     fn subset_of(&self, other: &Self) -> bool {
         Range::subset_of(self, other)
     }
+
+    fn simplify<'s, I>(&'s self, versions: I) -> Self
+    where
+        I: Iterator<Item = &'s Self::V> + 's,
+        Self::V: 's,
+    {
+        self.simplify(versions)
+    }
 }
 
 // REPORT ######################################################################

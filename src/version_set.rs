@@ -67,4 +67,12 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
     fn subset_of(&self, other: &Self) -> bool {
         self == &self.intersection(other)
     }
+
+    fn simplify<'s, I>(&'s self, versions: I) -> Self
+    where
+        I: Iterator<Item = &'s Self::V> + 's,
+        Self::V: 's,
+    {
+        self.clone()
+    }
 }

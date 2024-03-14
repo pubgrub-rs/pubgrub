@@ -139,7 +139,7 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
     ///
     /// It is a special case of prior cause computation where the unified package
     /// is the common dependant in the two incompatibilities expressing dependencies.
-    pub fn merge_dependents(&self, other: &Self) -> Option<Self> {
+    pub fn merge_dependency(&self, other: &Self, simplify: impl Fn(&P, VS) -> VS) -> Option<Self> {
         // It is almost certainly a bug to call this method without checking that self is a dependency
         debug_assert!(self.as_dependency().is_some());
         // Check that both incompatibilities are of the shape p1 depends on p2,
@@ -155,12 +155,16 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
         if dep_term != other.get(p2) {
             return None;
         }
-        return Some(Self::from_dependency(
-            p1.clone(),
+        let union = simplify(
+            p1,
             self.get(p1)
                 .unwrap()
                 .unwrap_positive()
-                .union(other.get(p1).unwrap().unwrap_positive()), // It is safe to `simplify` here
+                .union(other.get(p1).unwrap().unwrap_positive()),
+        );
+        return Some(Self::from_dependency(
+            p1.clone(),
+            union,
             (&p2, dep_term.map_or(&VS::empty(), |v| v.unwrap_negative())),
         ));
     }

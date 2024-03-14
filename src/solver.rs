@@ -179,6 +179,7 @@ pub fn resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
                 p.clone(),
                 v.clone(),
                 &known_dependencies,
+                &|package, range| dependency_provider.simplify(package, range),
             );
 
             state.partial_solution.add_version(
@@ -260,6 +261,10 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
         package: &P,
         version: &VS::V,
     ) -> Result<Dependencies<P, VS>, Self::Err>;
+
+    fn simplify(&self, package: &P, range: VS) -> VS {
+        range
+    }
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
@@ -372,5 +377,14 @@ impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependency
             None => Dependencies::Unknown,
             Some(dependencies) => Dependencies::Known(dependencies),
         })
+    }
+
+    fn simplify(&self, package: &P, range: VS) -> VS {
+        range.simplify(
+            self.dependencies
+                .get(package)
+                .into_iter()
+                .flat_map(|x| x.keys()),
+        )
     }
 }
