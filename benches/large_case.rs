@@ -7,7 +7,7 @@ use self::criterion::*;
 use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
-use pubgrub::version::{NumberVersion, SemanticVersion};
+use pubgrub::version::SemanticVersion;
 use pubgrub::version_set::VersionSet;
 use serde::de::Deserialize;
 
@@ -36,9 +36,9 @@ fn bench_nested(c: &mut Criterion) {
         let case = case.unwrap().path();
         let name = case.file_name().unwrap().to_string_lossy();
         let data = std::fs::read_to_string(&case).unwrap();
-        if name.ends_with("u16_NumberVersion.ron") {
+        if name.ends_with("u16_NumberVersion.ron") || name.ends_with("u16_u32.ron") {
             group.bench_function(name, |b| {
-                bench::<u16, Range<NumberVersion>>(b, &data);
+                bench::<u16, Range<u32>>(b, &data);
             });
         } else if name.ends_with("str_SemanticVersion.ron") {
             group.bench_function(name, |b| {

@@ -5,10 +5,9 @@ use std::cell::RefCell;
 use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::version::NumberVersion;
 use pubgrub::version_set::VersionSet;
 
-type NumVS = Range<NumberVersion>;
+type NumVS = Range<u32>;
 
 // An example implementing caching dependency provider that will
 // store queried dependencies in memory and check them before querying more from remote.
@@ -77,11 +76,11 @@ fn main() {
     let mut remote_dependencies_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 
     // Add dependencies as needed. Here only root package is added.
-    remote_dependencies_provider.add_dependencies("root", 1, Vec::new());
+    remote_dependencies_provider.add_dependencies("root", 1u32, Vec::new());
 
     let caching_dependencies_provider =
         CachingDependencyProvider::new(remote_dependencies_provider);
 
-    let solution = resolve(&caching_dependencies_provider, "root", 1);
+    let solution = resolve(&caching_dependencies_provider, "root", 1u32);
     println!("Solution: {:?}", solution);
 }

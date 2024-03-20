@@ -11,24 +11,18 @@
 //! # Package and Version traits
 //!
 //! All the code in this crate is manipulating packages and versions, and for this to work
-//! we defined a [Package](package::Package) and [Version](version::Version) traits
-//! that are used as bounds on most of the exposed types and functions.
+//! we defined a [Package](package::Package) trait
+//! that is used as bounds on most of the exposed types and functions.
 //!
 //! Package identifiers needs to implement our [Package](package::Package) trait,
 //! which is automatic if the type already implements
 //! [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
 //! So things like [String] will work out of the box.
 //!
-//! Our [Version](version::Version) trait requires
-//! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display)
-//! and also the definition of two methods,
-//! [lowest() -> Self](version::Version::lowest) which returns the lowest version existing,
-//! and [bump(&self) -> Self](version::Version::bump) which returns the next smallest version
-//! strictly higher than the current one.
-//! For convenience, this library already provides
-//! two implementations of [Version](version::Version).
-//! The first one is [NumberVersion](version::NumberVersion), basically a newtype for [u32].
-//! The second one is [SemanticVersion](version::NumberVersion)
+//! TODO! This is all wrong. Need to talk about VS, not Version.
+//! Our Version trait requires
+//! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display).
+//! For convenience, this library provides [SemanticVersion](version::SemanticVersion)
 //! that implements semantic versioning rules.
 //!
 //! # Basic example
@@ -47,22 +41,21 @@
 //! We can model that scenario with this library as follows
 //! ```
 //! # use pubgrub::solver::{OfflineDependencyProvider, resolve};
-//! # use pubgrub::version::NumberVersion;
 //! # use pubgrub::range::Range;
 //!
-//! type NumVS = Range<NumberVersion>;
+//! type NumVS = Range<u32>;
 //!
 //! let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //!
 //! dependency_provider.add_dependencies(
-//!     "root", 1, [("menu", Range::full()), ("icons", Range::full())],
+//!     "root", 1u32, [("menu", Range::full()), ("icons", Range::full())],
 //! );
-//! dependency_provider.add_dependencies("menu", 1, [("dropdown", Range::full())]);
-//! dependency_provider.add_dependencies("dropdown", 1, [("icons", Range::full())]);
-//! dependency_provider.add_dependencies("icons", 1, []);
+//! dependency_provider.add_dependencies("menu", 1u32, [("dropdown", Range::full())]);
+//! dependency_provider.add_dependencies("dropdown", 1u32, [("icons", Range::full())]);
+//! dependency_provider.add_dependencies("icons", 1u32, []);
 //!
 //! // Run the algorithm.
-//! let solution = resolve(&dependency_provider, "root", 1).unwrap();
+//! let solution = resolve(&dependency_provider, "root", 1u32).unwrap();
 //! ```
 //!
 //! # DependencyProvider trait
@@ -183,14 +176,13 @@
 //! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
 //! # use pubgrub::report::{DefaultStringReporter, Reporter};
 //! # use pubgrub::error::PubGrubError;
-//! # use pubgrub::version::NumberVersion;
 //! # use pubgrub::range::Range;
 //! #
-//! # type NumVS = Range<NumberVersion>;
+//! # type NumVS = Range<u32>;
 //! #
 //! # let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! # let root_package = "root";
-//! # let root_version = 1;
+//! # let root_version = 1u32;
 //! #
 //! match resolve(&dependency_provider, root_package, root_version) {
 //!     Ok(solution) => println!("{:?}", solution),
