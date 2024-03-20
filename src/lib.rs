@@ -11,8 +11,8 @@
 //! # Package and Version traits
 //!
 //! All the code in this crate is manipulating packages and versions, and for this to work
-//! we defined a [Package](package::Package) and [Version](version::Version) traits
-//! that are used as bounds on most of the exposed types and functions.
+//! we defined a [Package](package::Package) trait
+//! that is used as bounds on most of the exposed types and functions.
 //!
 //! Package identifiers needs to implement our [Package](package::Package) trait,
 //! which is automatic if the type already implements
@@ -20,15 +20,9 @@
 //! So things like [String] will work out of the box.
 //!
 //! TODO! This is all wrong. Need to talk about VS, not Version.
-//! Our [Version](version::Version) trait requires
-//! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display)
-//! and also the definition of two methods,
-//! [lowest() -> Self](version::Version::lowest) which returns the lowest version existing,
-//! and [bump(&self) -> Self](version::Version::bump) which returns the next smallest version
-//! strictly higher than the current one.
-//! For convenience, this library already provides
-//! two implementations of [Version](version::Version).
-//! The second one is [SemanticVersion](version::SemanticVersion)
+//! Our Version trait requires
+//! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display).
+//! For convenience, this library provides [SemanticVersion](version::SemanticVersion)
 //! that implements semantic versioning rules.
 //!
 //! # Basic example
