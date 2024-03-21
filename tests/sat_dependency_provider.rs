@@ -116,9 +116,9 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
         }
     }
 
-    pub fn is_valid_solution(
+    pub fn is_valid_solution<DP: DependencyProvider<P = P, VS = VS, V = VS::V>>(
         &mut self,
-        pids: &SelectedDependencies<OfflineDependencyProvider<P, VS>>,
+        pids: &SelectedDependencies<DP>,
     ) -> bool {
         let mut assumption = vec![];
 
@@ -136,7 +136,7 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
             .expect("docs say it can't error in default config")
     }
 
-    pub fn check_resolve<DP: DependencyProvider<P = P, VS = VS>>(
+    pub fn check_resolve<DP: DependencyProvider<P = P, VS = VS, V = VS::V>>(
         &mut self,
         res: &Result<SelectedDependencies<DP>, PubGrubError<DP>>,
         p: &P,
@@ -144,7 +144,7 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
     ) {
         match res {
             Ok(s) => {
-                assert!(self.is_valid_solution(s));
+                assert!(self.is_valid_solution::<DP>(s));
             }
             Err(_) => {
                 assert!(!self.resolve(p, v));

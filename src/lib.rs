@@ -102,6 +102,7 @@
 //!
 //!     type Err = Infallible;
 //!     type P = String;
+//!     type V = SemanticVersion;
 //!     type VS = SemVS;
 //! }
 //! ```

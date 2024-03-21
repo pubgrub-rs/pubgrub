@@ -29,7 +29,7 @@
 //! as long as packages (P) and versions (V) implement
 //! the [Package] and [Version](crate::version::Version) traits.
 //! [Package] is strictly equivalent and automatically generated
-//! for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
+//! for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display].
 //! [Version](crate::version::Version) simply states that versions are ordered,
 //! that there should be
 //! a minimal [lowest](crate::version::Version::lowest) version (like 0.0.0 in semantic versions),
@@ -72,12 +72,13 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet as Set};
 use std::convert::Infallible;
 use std::error::Error;
+use std::fmt::{Debug, Display};
 
 use crate::error::PubGrubError;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
-use crate::type_aliases::{DependencyConstraints, Map, SelectedDependencies, V};
+use crate::type_aliases::{DependencyConstraints, Map, SelectedDependencies};
 use crate::version_set::VersionSet;
 use log::{debug, info};
 
@@ -86,10 +87,10 @@ use log::{debug, info};
 pub fn resolve<DP: DependencyProvider>(
     dependency_provider: &DP,
     package: DP::P,
-    version: impl Into<V<DP>>,
+    version: impl Into<DP::V>,
 ) -> Result<SelectedDependencies<DP>, PubGrubError<DP>> {
     let mut state: State<DP> = State::init(package.clone(), version.into());
-    let mut added_dependencies: Map<DP::P, Set<V<DP>>> = Map::default();
+    let mut added_dependencies: Map<DP::P, Set<DP::V>> = Map::default();
     let mut next = package;
     loop {
         dependency_provider
@@ -209,9 +210,13 @@ pub enum Dependencies<P: Package, VS: VersionSet> {
 pub trait DependencyProvider {
     /// How this provider stores the name of the packages.
     type P: Package;
+
+    /// How this provider stores the vertions of the packages.
+    type V: Debug + Display + Clone + Ord;
+
     /// How this provider stores the version requirements for the packages.
-    /// This also specifies the representation of a version.
-    type VS: VersionSet;
+    /// The requirements must be able to process the same kind of version as this dependency provider.
+    type VS: VersionSet<V = Self::V>;
 
     /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
     /// is the process of choosing the next package
@@ -259,14 +264,14 @@ pub trait DependencyProvider {
         &self,
         package: &Self::P,
         range: &Self::VS,
-    ) -> Result<Option<V<Self>>, Self::Err>;
+    ) -> Result<Option<Self::V>, Self::Err>;
 
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
     fn get_dependencies(
         &self,
         package: &Self::P,
-        version: &V<Self>,
+        version: &Self::V,
     ) -> Result<Dependencies<Self::P, Self::VS>, Self::Err>;
 
     /// This is called fairly regularly during the resolution,
@@ -353,7 +358,7 @@ impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
 /// Versions are picked with the newest versions first.
 impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvider<P, VS> {
     type P = P;
-
+    type V = VS::V;
     type VS = VS;
 
     type Err = Infallible;

@@ -15,7 +15,7 @@ use crate::internal::small_map::SmallMap;
 use crate::package::Package;
 use crate::solver::DependencyProvider;
 use crate::term::Term;
-use crate::type_aliases::{IncompDpId, SelectedDependencies, V};
+use crate::type_aliases::{IncompDpId, SelectedDependencies};
 use crate::version_set::VersionSet;
 
 use super::small_vec::SmallVec;
@@ -158,7 +158,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Add a decision.
-    pub fn add_decision(&mut self, package: DP::P, version: V<DP>) {
+    pub fn add_decision(&mut self, package: DP::P, version: DP::V) {
         // Check that add_decision is never used in the wrong context.
         if cfg!(debug_assertions) {
             match self.package_assignments.get_mut(&package) {
@@ -350,8 +350,8 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     pub fn add_version(
         &mut self,
         package: DP::P,
-        version: V<DP>,
-        new_incompatibilities: std::ops::Range<IncompDpId<DP>>,
+        version: DP::V,
+        new_incompatibilities: std::ops::Range<IncompId<DP::P, DP::VS>>,
         store: &Arena<Incompatibility<DP::P, DP::VS>>,
     ) {
         let exact = Term::exact(version.clone());

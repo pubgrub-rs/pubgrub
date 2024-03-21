@@ -16,14 +16,14 @@ use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::internal::small_vec::SmallVec;
 use crate::report::DerivationTree;
 use crate::solver::DependencyProvider;
-use crate::type_aliases::{DependencyConstraints, IncompDpId, Map, V};
+use crate::type_aliases::{DependencyConstraints, IncompDpId, Map};
 use crate::version_set::VersionSet;
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
 pub struct State<DP: DependencyProvider> {
     root_package: DP::P,
-    root_version: V<DP>,
+    root_version: DP::V,
 
     #[allow(clippy::type_complexity)]
     incompatibilities: Map<DP::P, Vec<IncompDpId<DP>>>,
@@ -53,7 +53,7 @@ pub struct State<DP: DependencyProvider> {
 
 impl<DP: DependencyProvider> State<DP> {
     /// Initialization of PubGrub state.
-    pub fn init(root_package: DP::P, root_version: V<DP>) -> Self {
+    pub fn init(root_package: DP::P, root_version: DP::V) -> Self {
         let mut incompatibility_store = Arena::new();
         let not_root_id = incompatibility_store.alloc(Incompatibility::not_root(
             root_package.clone(),
@@ -83,7 +83,7 @@ impl<DP: DependencyProvider> State<DP> {
     pub fn add_incompatibility_from_dependencies(
         &mut self,
         package: DP::P,
-        version: V<DP>,
+        version: DP::V,
         deps: &DependencyConstraints<DP::P, DP::VS>,
     ) -> std::ops::Range<IncompDpId<DP>> {
         // Create incompatibilities and allocate them in the store.

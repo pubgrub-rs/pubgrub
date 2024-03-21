@@ -6,7 +6,6 @@ use thiserror::Error;
 
 use crate::report::DerivationTree;
 use crate::solver::DependencyProvider;
-use crate::type_aliases::V;
 
 /// Errors that may occur while solving dependencies.
 #[derive(Error)]
@@ -27,7 +26,7 @@ where
         /// Package whose dependencies we want.
         package: DP::P,
         /// Version of the package for which we want the dependencies.
-        version: V<DP>,
+        version: DP::V,
         /// Error raised by the implementer of
         /// [DependencyProvider].
         source: DP::Err,
@@ -43,7 +42,7 @@ where
         /// Package whose dependencies we want.
         package: DP::P,
         /// Version of the package for which we want the dependencies.
-        version: V<DP>,
+        version: DP::V,
     },
 
     /// Error arising when the implementer of

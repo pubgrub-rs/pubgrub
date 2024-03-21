@@ -10,8 +10,7 @@ use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, DerivationTree, External, Reporter};
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::{SelectedDependencies, V};
-#[cfg(feature = "serde")]
+use pubgrub::type_aliases::SelectedDependencies;
 use pubgrub::version::SemanticVersion;
 use pubgrub::version_set::VersionSet;
 
@@ -55,7 +54,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OldestVersionsDependency
     type Err = Infallible;
 
     type P = P;
-
+    type V = VS::V;
     type VS = VS;
 }
 
@@ -83,7 +82,7 @@ impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP
     fn get_dependencies(
         &self,
         p: &DP::P,
-        v: &V<Self>,
+        v: &DP::V,
     ) -> Result<Dependencies<DP::P, DP::VS>, DP::Err> {
         self.dp.get_dependencies(p, v)
     }
@@ -96,7 +95,7 @@ impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP
         Ok(())
     }
 
-    fn choose_version(&self, package: &DP::P, range: &DP::VS) -> Result<Option<V<Self>>, DP::Err> {
+    fn choose_version(&self, package: &DP::P, range: &DP::VS) -> Result<Option<DP::V>, DP::Err> {
         self.dp.choose_version(package, range)
     }
 
@@ -109,14 +108,14 @@ impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP
     type Err = DP::Err;
 
     type P = DP::P;
-
+    type V = <DP::VS as VersionSet>::V;
     type VS = DP::VS;
 }
 
 fn timeout_resolve<DP: DependencyProvider>(
     dependency_provider: DP,
     name: DP::P,
-    version: impl Into<V<DP>>,
+    version: impl Into<DP::V>,
 ) -> Result<
     SelectedDependencies<TimeoutDependencyProvider<DP>>,
     PubGrubError<TimeoutDependencyProvider<DP>>,
