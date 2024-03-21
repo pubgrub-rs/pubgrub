@@ -50,12 +50,12 @@ where
     /// returned an error in the method
     /// [choose_version](crate::solver::DependencyProvider::choose_version).
     #[error("Decision making failed")]
-    ErrorChoosingPackageVersion(DP::Err),
+    ErrorChoosingPackageVersion(#[source] DP::Err),
 
     /// Error arising when the implementer of [DependencyProvider]
     /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
     #[error("We should cancel")]
-    ErrorInShouldCancel(DP::Err),
+    ErrorInShouldCancel(#[source] DP::Err),
 
     /// Something unexpected happened.
     #[error("{0}")]
