@@ -48,7 +48,7 @@
 //! #
 //! # type NumVS = Range<u32>;
 //! #
-//! # fn try_main() -> Result<(), PubGrubError<&'static str, NumVS, Infallible>> {
+//! # fn try_main() -> Result<(), PubGrubError<OfflineDependencyProvider::<&'static str, NumVS>>> {
 //! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! #     let package = "root";
 //! #     let version = 1u32;
@@ -77,25 +77,24 @@ use crate::error::PubGrubError;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
-use crate::type_aliases::{DependencyConstraints, Map, SelectedDependencies};
+use crate::type_aliases::{DependencyConstraints, Map, SelectedDependencies, V};
 use crate::version_set::VersionSet;
 use log::{debug, info};
 
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
-#[allow(clippy::type_complexity)]
-pub fn resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
+pub fn resolve<DP: DependencyProvider>(
     dependency_provider: &DP,
-    package: P,
-    version: impl Into<VS::V>,
-) -> Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS, DP::Err>> {
-    let mut state = State::init(package.clone(), version.into());
-    let mut added_dependencies: Map<P, Set<VS::V>> = Map::default();
+    package: DP::P,
+    version: impl Into<V<DP>>,
+) -> Result<SelectedDependencies<DP>, PubGrubError<DP>> {
+    let mut state: State<DP> = State::init(package.clone(), version.into());
+    let mut added_dependencies: Map<DP::P, Set<V<DP>>> = Map::default();
     let mut next = package;
     loop {
         dependency_provider
             .should_cancel()
-            .map_err(|err| PubGrubError::ErrorInShouldCancel(err))?;
+            .map_err(PubGrubError::ErrorInShouldCancel)?;
 
         info!("unit_propagation: {}", &next);
         state.unit_propagation(next)?;
@@ -207,7 +206,13 @@ pub enum Dependencies<P: Package, VS: VersionSet> {
 
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
 /// An implementor needs to be supplied to the [resolve] function.
-pub trait DependencyProvider<P: Package, VS: VersionSet> {
+pub trait DependencyProvider {
+    /// How this provider stores the name of the packages.
+    type P: Package;
+    /// How this provider stores the version requirements for the packages.
+    /// This also specifies the representation of a version.
+    type VS: VersionSet;
+
     /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
     /// is the process of choosing the next package
     /// and version that will be appended to the partial solution.
@@ -234,7 +239,7 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
     ///
     /// Note: the resolver may call this even when the range has not change,
     /// if it is more efficient for the resolveres internal data structures.
-    fn prioritize(&self, package: &P, range: &VS) -> Self::Priority;
+    fn prioritize(&self, package: &Self::P, range: &Self::VS) -> Self::Priority;
     /// The type returned from `prioritize`. The resolver does not care what type this is
     /// as long as it can pick a largest one and clone it.
     ///
@@ -245,20 +250,24 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
     /// The kind of error returned from these methods.
     ///
     /// Returning this signals that resolution should fail with this error.
-    type Err: Error;
+    type Err: Error + 'static;
 
     /// Once the resolver has found the highest `Priority` package from all potential valid
     /// packages, it needs to know what vertion of that package to use. The most common pattern
     /// is to select the largest vertion that the range contains.
-    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, Self::Err>;
+    fn choose_version(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+    ) -> Result<Option<V<Self>>, Self::Err>;
 
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
     fn get_dependencies(
         &self,
-        package: &P,
-        version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Self::Err>;
+        package: &Self::P,
+        version: &V<Self>,
+    ) -> Result<Dependencies<Self::P, Self::VS>, Self::Err>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
@@ -342,7 +351,11 @@ impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
 /// Currently packages are picked with the fewest versions contained in the constraints first.
 /// But, that may change in new versions if better heuristics are found.
 /// Versions are picked with the newest versions first.
-impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependencyProvider<P, VS> {
+impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvider<P, VS> {
+    type P = P;
+
+    type VS = VS;
+
     type Err = Infallible;
 
     fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, Infallible> {

@@ -161,7 +161,7 @@ impl<P: Package, VS: VersionSet> Incompatibility<P, VS> {
                 .unwrap()
                 .unwrap_positive()
                 .union(other.get(p1).unwrap().unwrap_positive()), // It is safe to `simplify` here
-            (&p2, dep_term.map_or(&VS::empty(), |v| v.unwrap_negative())),
+            (p2, dep_term.map_or(&VS::empty(), |v| v.unwrap_negative())),
         ));
     }
 
@@ -310,7 +310,6 @@ pub mod tests {
     use super::*;
     use crate::range::Range;
     use crate::term::tests::strategy as term_strat;
-    use crate::type_aliases::Map;
     use proptest::prelude::*;
 
     proptest! {

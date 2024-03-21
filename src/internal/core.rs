@@ -3,55 +3,57 @@
 //! Core model and functions
 //! to write a functional PubGrub algorithm.
 
-use std::error::Error;
+use std::collections::HashSet as Set;
 use std::sync::Arc;
 
 use crate::error::PubGrubError;
 use crate::internal::arena::Arena;
-use crate::internal::incompatibility::{IncompId, Incompatibility, Relation};
+use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::partial_solution::SatisfierSearch::{
     DifferentDecisionLevels, SameDecisionLevels,
 };
 use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::internal::small_vec::SmallVec;
-use crate::package::Package;
 use crate::report::DerivationTree;
-use crate::type_aliases::{DependencyConstraints, Map, Set};
+use crate::solver::DependencyProvider;
+use crate::type_aliases::{DependencyConstraints, IncompDpId, Map, V};
 use crate::version_set::VersionSet;
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
-pub struct State<P: Package, VS: VersionSet, Priority: Ord + Clone> {
-    root_package: P,
-    root_version: VS::V,
+pub struct State<DP: DependencyProvider> {
+    root_package: DP::P,
+    root_version: V<DP>,
 
-    incompatibilities: Map<P, Vec<IncompId<P, VS>>>,
+    #[allow(clippy::type_complexity)]
+    incompatibilities: Map<DP::P, Vec<IncompDpId<DP>>>,
 
     /// Store the ids of incompatibilities that are already contradicted.
     /// For each one keep track of the decision level when it was found to be contradicted.
     /// These will stay contradicted until we have backtracked beyond its associated decision level.
-    contradicted_incompatibilities: Map<IncompId<P, VS>, DecisionLevel>,
+    contradicted_incompatibilities: Map<IncompDpId<DP>, DecisionLevel>,
 
     /// All incompatibilities expressing dependencies,
     /// with common dependents merged.
-    merged_dependencies: Map<(P, P), SmallVec<IncompId<P, VS>>>,
+    #[allow(clippy::type_complexity)]
+    merged_dependencies: Map<(DP::P, DP::P), SmallVec<IncompDpId<DP>>>,
 
     /// Partial solution.
     /// TODO: remove pub.
-    pub partial_solution: PartialSolution<P, VS, Priority>,
+    pub partial_solution: PartialSolution<DP>,
 
     /// The store is the reference storage for all incompatibilities.
-    pub incompatibility_store: Arena<Incompatibility<P, VS>>,
+    pub incompatibility_store: Arena<Incompatibility<DP::P, DP::VS>>,
 
     /// This is a stack of work to be done in `unit_propagation`.
     /// It can definitely be a local variable to that method, but
     /// this way we can reuse the same allocation for better performance.
-    unit_propagation_buffer: SmallVec<P>,
+    unit_propagation_buffer: SmallVec<DP::P>,
 }
 
-impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
+impl<DP: DependencyProvider> State<DP> {
     /// Initialization of PubGrub state.
-    pub fn init(root_package: P, root_version: VS::V) -> Self {
+    pub fn init(root_package: DP::P, root_version: V<DP>) -> Self {
         let mut incompatibility_store = Arena::new();
         let not_root_id = incompatibility_store.alloc(Incompatibility::not_root(
             root_package.clone(),
@@ -72,7 +74,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     }
 
     /// Add an incompatibility to the state.
-    pub fn add_incompatibility(&mut self, incompat: Incompatibility<P, VS>) {
+    pub fn add_incompatibility(&mut self, incompat: Incompatibility<DP::P, DP::VS>) {
         let id = self.incompatibility_store.alloc(incompat);
         self.merge_incompatibility(id);
     }
@@ -80,22 +82,22 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     /// Add an incompatibility to the state.
     pub fn add_incompatibility_from_dependencies(
         &mut self,
-        package: P,
-        version: VS::V,
-        deps: &DependencyConstraints<P, VS>,
-    ) -> std::ops::Range<IncompId<P, VS>> {
+        package: DP::P,
+        version: V<DP>,
+        deps: &DependencyConstraints<DP::P, DP::VS>,
+    ) -> std::ops::Range<IncompDpId<DP>> {
         // Create incompatibilities and allocate them in the store.
         let new_incompats_id_range =
             self.incompatibility_store
                 .alloc_iter(deps.iter().map(|dep| {
                     Incompatibility::from_dependency(
                         package.clone(),
-                        VS::singleton(version.clone()),
+                        <DP::VS as VersionSet>::singleton(version.clone()),
                         dep,
                     )
                 }));
         // Merge the newly created incompatibilities with the older ones.
-        for id in IncompId::range_to_iter(new_incompats_id_range.clone()) {
+        for id in IncompDpId::<DP>::range_to_iter(new_incompats_id_range.clone()) {
             self.merge_incompatibility(id);
         }
         new_incompats_id_range
@@ -103,7 +105,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
 
     /// Unit propagation is the core mechanism of the solving algorithm.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
-    pub fn unit_propagation<E: Error>(&mut self, package: P) -> Result<(), PubGrubError<P, VS, E>> {
+    pub fn unit_propagation(&mut self, package: DP::P) -> Result<(), PubGrubError<DP>> {
         self.unit_propagation_buffer.clear();
         self.unit_propagation_buffer.push(package);
         while let Some(current_package) = self.unit_propagation_buffer.pop() {
@@ -179,10 +181,10 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     /// Return the root cause and the backtracked model.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     #[allow(clippy::type_complexity)]
-    fn conflict_resolution<E: Error>(
+    fn conflict_resolution(
         &mut self,
-        incompatibility: IncompId<P, VS>,
-    ) -> Result<(P, IncompId<P, VS>), PubGrubError<P, VS, E>> {
+        incompatibility: IncompDpId<DP>,
+    ) -> Result<(DP::P, IncompDpId<DP>), PubGrubError<DP>> {
         let mut current_incompat_id = incompatibility;
         let mut current_incompat_changed = false;
         loop {
@@ -229,7 +231,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     /// Backtracking.
     fn backtrack(
         &mut self,
-        incompat: IncompId<P, VS>,
+        incompat: IncompDpId<DP>,
         incompat_changed: bool,
         decision_level: DecisionLevel,
     ) {
@@ -257,7 +259,7 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
     /// (provided that no other version of foo exists between 1.0.0 and 2.0.0).
     /// We could collapse them into { foo (1.0.0 ∪ 1.1.0), not bar ^1.0.0 }
     /// without having to check the existence of other versions though.
-    fn merge_incompatibility(&mut self, mut id: IncompId<P, VS>) {
+    fn merge_incompatibility(&mut self, mut id: IncompDpId<DP>) {
         if let Some((p1, p2)) = self.incompatibility_store[id].as_dependency() {
             // If we are a dependency, there's a good chance we can be merged with a previous dependency
             let deps_lookup = self
@@ -295,8 +297,8 @@ impl<P: Package, VS: VersionSet, Priority: Ord + Clone> State<P, VS, Priority> {
 
     // Error reporting #########################################################
 
-    fn build_derivation_tree(&self, incompat: IncompId<P, VS>) -> DerivationTree<P, VS> {
-        let mut all_ids = Set::default();
+    fn build_derivation_tree(&self, incompat: IncompDpId<DP>) -> DerivationTree<DP::P, DP::VS> {
+        let mut all_ids: Set<IncompDpId<DP>> = Set::default();
         let mut shared_ids = Set::default();
         let mut stack = vec![incompat];
         while let Some(i) = stack.pop() {

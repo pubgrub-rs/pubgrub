@@ -10,7 +10,7 @@ use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, DerivationTree, External, Reporter};
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::SelectedDependencies;
+use pubgrub::type_aliases::{SelectedDependencies, V};
 #[cfg(feature = "serde")]
 use pubgrub::version::SemanticVersion;
 use pubgrub::version_set::VersionSet;
@@ -31,9 +31,7 @@ struct OldestVersionsDependencyProvider<P: Package, VS: VersionSet>(
     OfflineDependencyProvider<P, VS>,
 );
 
-impl<P: Package, VS: VersionSet> DependencyProvider<P, VS>
-    for OldestVersionsDependencyProvider<P, VS>
-{
+impl<P: Package, VS: VersionSet> DependencyProvider for OldestVersionsDependencyProvider<P, VS> {
     fn get_dependencies(&self, p: &P, v: &VS::V) -> Result<Dependencies<P, VS>, Infallible> {
         self.0.get_dependencies(p, v)
     }
@@ -48,13 +46,17 @@ impl<P: Package, VS: VersionSet> DependencyProvider<P, VS>
             .cloned())
     }
 
-    type Priority = <OfflineDependencyProvider<P, VS> as DependencyProvider<P, VS>>::Priority;
+    type Priority = <OfflineDependencyProvider<P, VS> as DependencyProvider>::Priority;
 
     fn prioritize(&self, package: &P, range: &VS) -> Self::Priority {
         self.0.prioritize(package, range)
     }
 
     type Err = Infallible;
+
+    type P = P;
+
+    type VS = VS;
 }
 
 /// The same as DP but it has a timeout.
@@ -77,10 +79,12 @@ impl<DP> TimeoutDependencyProvider<DP> {
     }
 }
 
-impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvider<P, VS>
-    for TimeoutDependencyProvider<DP>
-{
-    fn get_dependencies(&self, p: &P, v: &VS::V) -> Result<Dependencies<P, VS>, DP::Err> {
+impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP> {
+    fn get_dependencies(
+        &self,
+        p: &DP::P,
+        v: &V<Self>,
+    ) -> Result<Dependencies<DP::P, DP::VS>, DP::Err> {
         self.dp.get_dependencies(p, v)
     }
 
@@ -92,24 +96,31 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
         Ok(())
     }
 
-    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, DP::Err> {
+    fn choose_version(&self, package: &DP::P, range: &DP::VS) -> Result<Option<V<Self>>, DP::Err> {
         self.dp.choose_version(package, range)
     }
 
     type Priority = DP::Priority;
 
-    fn prioritize(&self, package: &P, range: &VS) -> Self::Priority {
+    fn prioritize(&self, package: &DP::P, range: &DP::VS) -> Self::Priority {
         self.dp.prioritize(package, range)
     }
 
     type Err = DP::Err;
+
+    type P = DP::P;
+
+    type VS = DP::VS;
 }
 
-fn timeout_resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
+fn timeout_resolve<DP: DependencyProvider>(
     dependency_provider: DP,
-    name: P,
-    version: impl Into<VS::V>,
-) -> Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS, DP::Err>> {
+    name: DP::P,
+    version: impl Into<V<DP>>,
+) -> Result<
+    SelectedDependencies<TimeoutDependencyProvider<DP>>,
+    PubGrubError<TimeoutDependencyProvider<DP>>,
+> {
     resolve(
         &TimeoutDependencyProvider::new(dependency_provider, 50_000),
         name,
@@ -544,7 +555,7 @@ proptest! {
                     // that was not selected should not change that.
                     let smaller_dependency_provider = retain_versions(&dependency_provider, |n, v| {
                             used.get(n) == Some(v) // it was used
-                            || to_remove.get(&(*n, *v)).is_none() // or it is not one to be removed
+                            || !to_remove.contains(&(*n, *v)) // or it is not one to be removed
                         });
                     prop_assert!(
                         timeout_resolve(smaller_dependency_provider.clone(), name, ver).is_ok(),
@@ -558,7 +569,7 @@ proptest! {
                     // If resolution was unsuccessful, then it should stay unsuccessful
                     // even if any version of a crate is unpublished.
                     let smaller_dependency_provider = retain_versions(&dependency_provider, |n, v| {
-                        to_remove.get(&(*n, *v)).is_some() // it is one to be removed
+                        to_remove.contains(&(*n, *v)) // it is one to be removed
                     });
                     prop_assert!(
                         timeout_resolve(smaller_dependency_provider.clone(), name, ver).is_err(),

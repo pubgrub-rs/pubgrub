@@ -4,58 +4,95 @@
 
 use thiserror::Error;
 
-use crate::package::Package;
 use crate::report::DerivationTree;
-use crate::version_set::VersionSet;
+use crate::solver::DependencyProvider;
+use crate::type_aliases::V;
 
 /// Errors that may occur while solving dependencies.
-#[derive(Error, Debug)]
-pub enum PubGrubError<P: Package, VS: VersionSet, E: std::error::Error> {
+#[derive(Error)]
+pub enum PubGrubError<DP>
+where
+    DP: DependencyProvider,
+{
     /// There is no solution for this set of dependencies.
     #[error("No solution")]
-    NoSolution(DerivationTree<P, VS>),
+    NoSolution(DerivationTree<DP::P, DP::VS>),
 
     /// Error arising when the implementer of
-    /// [DependencyProvider](crate::solver::DependencyProvider)
+    /// [DependencyProvider]
     /// returned an error in the method
     /// [get_dependencies](crate::solver::DependencyProvider::get_dependencies).
     #[error("Retrieving dependencies of {package} {version} failed")]
     ErrorRetrievingDependencies {
         /// Package whose dependencies we want.
-        package: P,
+        package: DP::P,
         /// Version of the package for which we want the dependencies.
-        version: VS::V,
+        version: V<DP>,
         /// Error raised by the implementer of
-        /// [DependencyProvider](crate::solver::DependencyProvider).
-        source: E,
+        /// [DependencyProvider].
+        source: DP::Err,
     },
 
     /// Error arising when the implementer of
-    /// [DependencyProvider](crate::solver::DependencyProvider)
+    /// [DependencyProvider]
     /// returned a dependency on the requested package.
     /// This technically means that the package directly depends on itself,
     /// and is clearly some kind of mistake.
     #[error("{package} {version} depends on itself")]
     SelfDependency {
         /// Package whose dependencies we want.
-        package: P,
+        package: DP::P,
         /// Version of the package for which we want the dependencies.
-        version: VS::V,
+        version: V<DP>,
     },
 
     /// Error arising when the implementer of
-    /// [DependencyProvider](crate::solver::DependencyProvider)
+    /// [DependencyProvider]
     /// returned an error in the method
     /// [choose_version](crate::solver::DependencyProvider::choose_version).
     #[error("Decision making failed")]
-    ErrorChoosingPackageVersion(E),
+    ErrorChoosingPackageVersion(DP::Err),
 
-    /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
+    /// Error arising when the implementer of [DependencyProvider]
     /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
     #[error("We should cancel")]
-    ErrorInShouldCancel(E),
+    ErrorInShouldCancel(DP::Err),
 
     /// Something unexpected happened.
     #[error("{0}")]
     Failure(String),
+}
+
+impl<DP> std::fmt::Debug for PubGrubError<DP>
+where
+    DP: DependencyProvider,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoSolution(arg0) => f.debug_tuple("NoSolution").field(arg0).finish(),
+            Self::ErrorRetrievingDependencies {
+                package,
+                version,
+                source,
+            } => f
+                .debug_struct("ErrorRetrievingDependencies")
+                .field("package", package)
+                .field("version", version)
+                .field("source", source)
+                .finish(),
+            Self::SelfDependency { package, version } => f
+                .debug_struct("SelfDependency")
+                .field("package", package)
+                .field("version", version)
+                .finish(),
+            Self::ErrorChoosingPackageVersion(arg0) => f
+                .debug_tuple("ErrorChoosingPackageVersion")
+                .field(arg0)
+                .finish(),
+            Self::ErrorInShouldCancel(arg0) => {
+                f.debug_tuple("ErrorInShouldCancel").field(arg0).finish()
+            }
+            Self::Failure(arg0) => f.debug_tuple("Failure").field(arg0).finish(),
+        }
+    }
 }
