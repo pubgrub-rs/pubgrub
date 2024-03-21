@@ -256,7 +256,8 @@ impl DefaultStringReporter {
     ) {
         self.build_recursive_helper(derived, formatter);
         if let Some(id) = derived.shared_id {
-            if self.shared_with_ref.get(&id).is_none() {
+            #[allow(clippy::map_entry)] // `add_line_ref` not compatible with proposed fix.
+            if !self.shared_with_ref.contains_key(&id) {
                 self.add_line_ref();
                 self.shared_with_ref.insert(id, self.ref_count);
             }

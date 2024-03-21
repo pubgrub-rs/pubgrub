@@ -17,7 +17,7 @@ fn bench<'a, P: Package + Deserialize<'a>, VS: VersionSet + Deserialize<'a>>(
 ) where
     <VS as VersionSet>::V: Deserialize<'a>,
 {
-    let dependency_provider: OfflineDependencyProvider<P, VS> = ron::de::from_str(&case).unwrap();
+    let dependency_provider: OfflineDependencyProvider<P, VS> = ron::de::from_str(case).unwrap();
 
     b.iter(|| {
         for p in dependency_provider.packages() {

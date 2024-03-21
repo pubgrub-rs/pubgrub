@@ -82,7 +82,7 @@
 //! #
 //! type SemVS = Range<SemanticVersion>;
 //!
-//! impl DependencyProvider<String, SemVS> for MyDependencyProvider {
+//! impl DependencyProvider for MyDependencyProvider {
 //!     fn choose_version(&self, package: &String, range: &SemVS) -> Result<Option<SemanticVersion>, Infallible> {
 //!         unimplemented!()
 //!     }
@@ -101,6 +101,9 @@
 //!     }
 //!
 //!     type Err = Infallible;
+//!     type P = String;
+//!     type V = SemanticVersion;
+//!     type VS = SemVS;
 //! }
 //! ```
 //!

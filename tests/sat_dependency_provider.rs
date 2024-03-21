@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use std::convert::Infallible;
-
 use pubgrub::error::PubGrubError;
 use pubgrub::package::Package;
 use pubgrub::solver::{Dependencies, DependencyProvider, OfflineDependencyProvider};
@@ -118,7 +116,10 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
         }
     }
 
-    pub fn is_valid_solution(&mut self, pids: &SelectedDependencies<P, VS::V>) -> bool {
+    pub fn is_valid_solution<DP: DependencyProvider<P = P, VS = VS, V = VS::V>>(
+        &mut self,
+        pids: &SelectedDependencies<DP>,
+    ) -> bool {
         let mut assumption = vec![];
 
         for (p, vs) in &self.all_versions_by_p {
@@ -135,15 +136,15 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
             .expect("docs say it can't error in default config")
     }
 
-    pub fn check_resolve(
+    pub fn check_resolve<DP: DependencyProvider<P = P, VS = VS, V = VS::V>>(
         &mut self,
-        res: &Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS, Infallible>>,
+        res: &Result<SelectedDependencies<DP>, PubGrubError<DP>>,
         p: &P,
         v: &VS::V,
     ) {
         match res {
             Ok(s) => {
-                assert!(self.is_valid_solution(s));
+                assert!(self.is_valid_solution::<DP>(s));
             }
             Err(_) => {
                 assert!(!self.resolve(p, v));

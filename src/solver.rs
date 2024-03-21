@@ -27,16 +27,9 @@
 //!
 //! The algorithm is generic and works for any type of dependency system
 //! as long as packages (P) and versions (V) implement
-//! the [Package] and [Version](crate::version::Version) traits.
+//! the [Package] and Version traits.
 //! [Package] is strictly equivalent and automatically generated
-//! for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
-//! [Version](crate::version::Version) simply states that versions are ordered,
-//! that there should be
-//! a minimal [lowest](crate::version::Version::lowest) version (like 0.0.0 in semantic versions),
-//! and that for any version, it is possible to compute
-//! what the next version closest to this one is ([bump](crate::version::Version::bump)).
-//! For semantic versions, [bump](crate::version::Version::bump) corresponds to
-//! an increment of the patch number.
+//! for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display].
 //!
 //! ## API
 //!
@@ -48,7 +41,7 @@
 //! #
 //! # type NumVS = Range<u32>;
 //! #
-//! # fn try_main() -> Result<(), PubGrubError<&'static str, NumVS, Infallible>> {
+//! # fn try_main() -> Result<(), PubGrubError<OfflineDependencyProvider::<&'static str, NumVS>>> {
 //! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! #     let package = "root";
 //! #     let version = 1u32;
@@ -72,6 +65,7 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet as Set};
 use std::convert::Infallible;
 use std::error::Error;
+use std::fmt::{Debug, Display};
 
 use crate::error::PubGrubError;
 use crate::internal::core::State;
@@ -83,19 +77,18 @@ use log::{debug, info};
 
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
-#[allow(clippy::type_complexity)]
-pub fn resolve<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>(
+pub fn resolve<DP: DependencyProvider>(
     dependency_provider: &DP,
-    package: P,
-    version: impl Into<VS::V>,
-) -> Result<SelectedDependencies<P, VS::V>, PubGrubError<P, VS, DP::Err>> {
-    let mut state = State::init(package.clone(), version.into());
-    let mut added_dependencies: Map<P, Set<VS::V>> = Map::default();
+    package: DP::P,
+    version: impl Into<DP::V>,
+) -> Result<SelectedDependencies<DP>, PubGrubError<DP>> {
+    let mut state: State<DP> = State::init(package.clone(), version.into());
+    let mut added_dependencies: Map<DP::P, Set<DP::V>> = Map::default();
     let mut next = package;
     loop {
         dependency_provider
             .should_cancel()
-            .map_err(|err| PubGrubError::ErrorInShouldCancel(err))?;
+            .map_err(PubGrubError::ErrorInShouldCancel)?;
 
         info!("unit_propagation: {}", &next);
         state.unit_propagation(next)?;
@@ -207,7 +200,17 @@ pub enum Dependencies<P: Package, VS: VersionSet> {
 
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
 /// An implementor needs to be supplied to the [resolve] function.
-pub trait DependencyProvider<P: Package, VS: VersionSet> {
+pub trait DependencyProvider {
+    /// How this provider stores the name of the packages.
+    type P: Package;
+
+    /// How this provider stores the versions of the packages.
+    type V: Debug + Display + Clone + Ord;
+
+    /// How this provider stores the version requirements for the packages.
+    /// The requirements must be able to process the same kind of version as this dependency provider.
+    type VS: VersionSet<V = Self::V>;
+
     /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
     /// is the process of choosing the next package
     /// and version that will be appended to the partial solution.
@@ -234,7 +237,7 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
     ///
     /// Note: the resolver may call this even when the range has not change,
     /// if it is more efficient for the resolveres internal data structures.
-    fn prioritize(&self, package: &P, range: &VS) -> Self::Priority;
+    fn prioritize(&self, package: &Self::P, range: &Self::VS) -> Self::Priority;
     /// The type returned from `prioritize`. The resolver does not care what type this is
     /// as long as it can pick a largest one and clone it.
     ///
@@ -245,20 +248,24 @@ pub trait DependencyProvider<P: Package, VS: VersionSet> {
     /// The kind of error returned from these methods.
     ///
     /// Returning this signals that resolution should fail with this error.
-    type Err: Error;
+    type Err: Error + 'static;
 
     /// Once the resolver has found the highest `Priority` package from all potential valid
     /// packages, it needs to know what vertion of that package to use. The most common pattern
     /// is to select the largest vertion that the range contains.
-    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, Self::Err>;
+    fn choose_version(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+    ) -> Result<Option<Self::V>, Self::Err>;
 
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
     fn get_dependencies(
         &self,
-        package: &P,
-        version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Self::Err>;
+        package: &Self::P,
+        version: &Self::V,
+    ) -> Result<Dependencies<Self::P, Self::VS>, Self::Err>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
@@ -342,7 +349,11 @@ impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
 /// Currently packages are picked with the fewest versions contained in the constraints first.
 /// But, that may change in new versions if better heuristics are found.
 /// Versions are picked with the newest versions first.
-impl<P: Package, VS: VersionSet> DependencyProvider<P, VS> for OfflineDependencyProvider<P, VS> {
+impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvider<P, VS> {
+    type P = P;
+    type V = VS::V;
+    type VS = VS;
+
     type Err = Infallible;
 
     fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, Infallible> {

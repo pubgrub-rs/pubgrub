@@ -220,8 +220,6 @@ impl<'a, K: 'a, V: 'a> Iterator for IterSmallMap<'a, K, V> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            // False-positive, remove when stable is >=1.76 February 24
-            #[allow(clippy::map_identity)]
             IterSmallMap::Inline(inner) => inner.next().map(|(k, v)| (k, v)),
             IterSmallMap::Map(inner) => inner.next(),
         }

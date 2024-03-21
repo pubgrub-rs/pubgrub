@@ -2,23 +2,19 @@
 
 use std::cell::RefCell;
 
-use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::version_set::VersionSet;
 
 type NumVS = Range<u32>;
 
 // An example implementing caching dependency provider that will
 // store queried dependencies in memory and check them before querying more from remote.
-struct CachingDependencyProvider<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> {
+struct CachingDependencyProvider<DP: DependencyProvider> {
     remote_dependencies: DP,
-    cached_dependencies: RefCell<OfflineDependencyProvider<P, VS>>,
+    cached_dependencies: RefCell<OfflineDependencyProvider<DP::P, DP::VS>>,
 }
 
-impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>
-    CachingDependencyProvider<P, VS, DP>
-{
+impl<DP: DependencyProvider> CachingDependencyProvider<DP> {
     pub fn new(remote_dependencies_provider: DP) -> Self {
         CachingDependencyProvider {
             remote_dependencies: remote_dependencies_provider,
@@ -27,15 +23,13 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>>
     }
 }
 
-impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvider<P, VS>
-    for CachingDependencyProvider<P, VS, DP>
-{
+impl<DP: DependencyProvider> DependencyProvider for CachingDependencyProvider<DP> {
     // Caches dependencies if they were already queried
     fn get_dependencies(
         &self,
-        package: &P,
-        version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, DP::Err> {
+        package: &DP::P,
+        version: &DP::V,
+    ) -> Result<Dependencies<DP::P, DP::VS>, DP::Err> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
             Ok(Dependencies::Unknown) => {
@@ -58,17 +52,21 @@ impl<P: Package, VS: VersionSet, DP: DependencyProvider<P, VS>> DependencyProvid
         }
     }
 
-    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, DP::Err> {
+    fn choose_version(&self, package: &DP::P, range: &DP::VS) -> Result<Option<DP::V>, DP::Err> {
         self.remote_dependencies.choose_version(package, range)
     }
 
     type Priority = DP::Priority;
 
-    fn prioritize(&self, package: &P, range: &VS) -> Self::Priority {
+    fn prioritize(&self, package: &DP::P, range: &DP::VS) -> Self::Priority {
         self.remote_dependencies.prioritize(package, range)
     }
 
     type Err = DP::Err;
+
+    type P = DP::P;
+    type V = DP::V;
+    type VS = DP::VS;
 }
 
 fn main() {
