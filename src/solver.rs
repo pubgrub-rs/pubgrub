@@ -27,16 +27,9 @@
 //!
 //! The algorithm is generic and works for any type of dependency system
 //! as long as packages (P) and versions (V) implement
-//! the [Package] and [Version](crate::version::Version) traits.
+//! the [Package] and Version traits.
 //! [Package] is strictly equivalent and automatically generated
 //! for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display].
-//! [Version](crate::version::Version) simply states that versions are ordered,
-//! that there should be
-//! a minimal [lowest](crate::version::Version::lowest) version (like 0.0.0 in semantic versions),
-//! and that for any version, it is possible to compute
-//! what the next version closest to this one is ([bump](crate::version::Version::bump)).
-//! For semantic versions, [bump](crate::version::Version::bump) corresponds to
-//! an increment of the patch number.
 //!
 //! ## API
 //!
@@ -211,7 +204,7 @@ pub trait DependencyProvider {
     /// How this provider stores the name of the packages.
     type P: Package;
 
-    /// How this provider stores the vertions of the packages.
+    /// How this provider stores the versions of the packages.
     type V: Debug + Display + Clone + Ord;
 
     /// How this provider stores the version requirements for the packages.
