@@ -62,6 +62,6 @@ jobs:
         with:
           fetch-depth: 0
       - name: Check commit conventions
-        uses: wagoid/commitlint-github-action@v2
+        uses: wagoid/commitlint-github-action@v5
         with:
           configFile: .commitlintrc.yml
