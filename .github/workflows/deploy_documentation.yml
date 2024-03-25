@@ -4,6 +4,7 @@ name: Deploy documentation
 on:
   push:
     branches: [ dev ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,20 +20,11 @@ jobs:
           toolchain: nightly
           profile: minimal
 
-      - name: Download cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: documentation
-
       - name: Build documentation
         run: cargo +nightly doc --no-deps
 
       - name: Deploy documentation
+        if: ${{ github.event_name == 'branches' }}
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
