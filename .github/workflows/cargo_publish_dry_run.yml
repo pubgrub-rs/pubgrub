@@ -25,16 +25,5 @@ jobs:
         run: echo "::set-output name=version::$(cargo -V | tr -d ' ')"
         shell: bash
 
-      - name: Download cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ steps.cargo_version.outputs.version }}-${{ hashFiles('Cargo.toml') }}
-          restore-keys: ${{ runner.os }}-${{ steps.cargo_version.outputs.version }}
-
       - name: Run `cargo publish --dry-run`
         run: cargo publish --dry-run
