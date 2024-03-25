@@ -4,6 +4,7 @@ name: Check crate publishing works
 on:
   pull_request:
     branches: [ release ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,10 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install stable Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
+        uses: dtolnay/rust-toolchain
 
       - name: Get Cargo version
         id: cargo_version

@@ -4,6 +4,7 @@ name: Deploy documentation
 on:
   push:
     branches: [ dev ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -23,6 +24,7 @@ jobs:
         run: cargo +nightly doc --no-deps
 
       - name: Deploy documentation
+        if: ${{ github.event_name == 'branches' }}
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
