@@ -47,11 +47,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
       - name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo +nightly doc --no-deps --document-private-items
+        run: cargo doc --no-deps --document-private-items -- -D warnings
 
   check_commit_conventions:
     name: Commit messages follow project guidelines
