@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Dependencies"],"fn":["resolve"],"struct":["OfflineDependencyProvider"],"trait":["DependencyProvider"]};

@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Ranges are constraints defining sets of versions."><title>pubgrub::range - Rust</title><script> if (window.location.protocol !== "file:") document.write(`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2">`)</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-e935ef01ae1c1829.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="pubgrub" data-themes="" data-resource-suffix="" data-rustdoc-version="1.79.0-nightly (c9f8f3438 2024-03-27)" data-channel="nightly" data-search-js="search-42d8da7a6b9792c2.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-12cf3b4f4f9dc36d.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../pubgrub/index.html">pubgrub</a><span class="version">0.2.1</span></h2></div><h2 class="location"><a href="#">Module range</a></h2><div class="sidebar-elems"><section><ul class="block"><li><a href="#structs">Structs</a></li></ul></section><h2><a href="../index.html">In crate pubgrub</a></h2></div></nav><div class="sidebar-resizer"></div>
+    <main><div class="width-limiter"><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../pubgrub/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="main-heading"><h1>Module <a href="../index.html">pubgrub</a>::<wbr><a class="mod" href="#">range</a><button id="copy-path" title="Copy item path to clipboard"><img src="../../static.files/clipboard-7571035ce49a181d.svg" width="19" height="18" alt="Copy item path"></button></h1><span class="out-of-band"><a class="src" href="../../src/pubgrub/range.rs.html#3-1051">source</a> · <button id="toggle-all-docs" title="collapse all docs">[<span>&#x2212;</span>]</button></span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Ranges are constraints defining sets of versions.</p>
+<p>Concretely, those constraints correspond to any set of versions
+representable as the concatenation, union, and complement
+of the ranges building blocks.</p>
+<p>Those building blocks are:</p>
+<ul>
+<li><a href="struct.Range.html#method.empty" title="associated function pubgrub::range::Range::empty">empty()</a>: the empty set</li>
+<li><a href="struct.Range.html#method.full" title="associated function pubgrub::range::Range::full">full()</a>: the set of all possible versions</li>
+<li><a href="struct.Range.html#method.singleton" title="associated function pubgrub::range::Range::singleton">singleton(v)</a>: the set containing only the version v</li>
+<li><a href="struct.Range.html#method.higher_than" title="associated function pubgrub::range::Range::higher_than">higher_than(v)</a>: the set defined by <code>v &lt;= versions</code></li>
+<li><a href="struct.Range.html#method.strictly_higher_than" title="associated function pubgrub::range::Range::strictly_higher_than">strictly_higher_than(v)</a>: the set defined by <code>v &lt; versions</code></li>
+<li><a href="struct.Range.html#method.lower_than" title="associated function pubgrub::range::Range::lower_than">lower_than(v)</a>: the set defined by <code>versions &lt;= v</code></li>
+<li><a href="struct.Range.html#method.strictly_lower_than" title="associated function pubgrub::range::Range::strictly_lower_than">strictly_lower_than(v)</a>: the set defined by <code>versions &lt; v</code></li>
+<li><a href="struct.Range.html#method.between" title="associated function pubgrub::range::Range::between">between(v1, v2)</a>: the set defined by <code>v1 &lt;= versions &lt; v2</code></li>
+</ul>
+<p>Ranges can be created from any type that implements <a href="https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html" title="trait core::cmp::Ord"><code>Ord</code></a> + <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html" title="trait core::clone::Clone"><code>Clone</code></a>.</p>
+<p>In order to advance the solver front, comparisons of versions sets are necessary in the algorithm.
+To do those comparisons between two sets S1 and S2 we use the mathematical property that S1 ⊂ S2 if and only if S1 ∩ S2 == S1.
+We can thus compute an intersection and evaluate an equality to answer if S1 is a subset of S2.
+But this means that the implementation of equality must be correct semantically.
+In practice, if equality is derived automatically, this means sets must have unique representations.</p>
+<p>By migrating from a custom representation for discrete sets in v0.2
+to a generic bounded representation for continuous sets in v0.3
+we are potentially breaking that assumption in two ways:</p>
+<ol>
+<li>Minimal and maximal <code>Unbounded</code> values can be replaced by their equivalent if it exists.</li>
+<li>Simplifying adjacent bounds of discrete sets cannot be detected and automated in the generic intersection code.</li>
+</ol>
+<p>An example for each can be given when <code>T</code> is <code>u32</code>.
+First, we can have both segments <code>S1 = (Unbounded, Included(42u32))</code> and <code>S2 = (Included(0), Included(42u32))</code>
+that represent the same segment but are structurally different.
+Thus, a derived equality check would answer <code>false</code> to <code>S1 == S2</code> while it’s true.</p>
+<p>Second both segments <code>S1 = (Included(1), Included(5))</code> and <code>S2 = (Included(1), Included(3)) + (Included(4), Included(5))</code> are equal.
+But without asking the user to provide a <code>bump</code> function for discrete sets,
+the algorithm is not able tell that the space between the right <code>Included(3)</code> bound and the left <code>Included(4)</code> bound is empty.
+Thus the algorithm is not able to reduce S2 to its canonical S1 form while computing sets operations like intersections in the generic code.</p>
+<p>This is likely to lead to user facing theoretically correct but practically nonsensical ranges,
+like (Unbounded, Excluded(0)) or (Excluded(6), Excluded(7)).
+In general nonsensical inputs often lead to hard to track bugs.
+But as far as we can tell this should work in practice.
+So for now this crate only provides an implementation for continuous ranges.
+With the v0.3 api the user could choose to bring back the discrete implementation from v0.2, as documented in the guide.
+If doing so regularly fixes bugs seen by users, we will bring it back into the core library.
+If we do not see practical bugs, or we get a formal proof that the code cannot lead to error states, then we may remove this warning.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="struct" href="struct.Range.html" title="struct pubgrub::range::Range">Range</a></div><div class="desc docblock-short">A Range represents multiple intervals of a continuous range of monotone increasing
+values.</div></li></ul></section></div></main></body></html>

@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"pubgrub":[["impl&lt;VS: <a class=\"trait\" href=\"pubgrub/version_set/trait.VersionSet.html\" title=\"trait pubgrub::version_set::VersionSet\">VersionSet</a>&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/convert/trait.AsRef.html\" title=\"trait core::convert::AsRef\">AsRef</a>&lt;<a class=\"enum\" href=\"pubgrub/term/enum.Term.html\" title=\"enum pubgrub::term::Term\">Term</a>&lt;VS&gt;&gt; for <a class=\"enum\" href=\"pubgrub/term/enum.Term.html\" title=\"enum pubgrub::term::Term\">Term</a>&lt;VS&gt;"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
