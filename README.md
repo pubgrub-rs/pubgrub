@@ -74,8 +74,8 @@ and a book called
 by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 
 [crates]: https://crates.io/crates/pubgrub
-[guide]: https://pubgrub-rs-guide.netlify.app/
-[guide-internals]: https://pubgrub-rs-guide.netlify.app/internals/intro.html
+[guide]: https://pubgrub-rs-guide.pages.dev
+[guide-internals]: https://pubgrub-rs-guide.pages.dev/internals/intro.html
 [docs]: https://docs.rs/pubgrub
 [docs-dev]: https://pubgrub-rs.github.io/pubgrub/pubgrub/
 [medium-pubgrub]: https://medium.com/@nex3/pubgrub-2fb6470504f
