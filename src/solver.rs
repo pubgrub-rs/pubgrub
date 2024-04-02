@@ -150,10 +150,11 @@ pub fn resolve<DP: DependencyProvider>(
             })?;
 
             let known_dependencies = match dependencies {
-                Dependencies::Unknown => {
-                    state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                Dependencies::Unknown(reason) => {
+                    state.add_incompatibility(Incompatibility::custom_version(
                         p.clone(),
                         v.clone(),
+                        reason,
                     ));
                     continue;
                 }
@@ -191,9 +192,9 @@ pub fn resolve<DP: DependencyProvider>(
 /// An enum used by [DependencyProvider] that holds information about package dependencies.
 /// For each [Package] there is a set of versions allowed as a dependency.
 #[derive(Clone)]
-pub enum Dependencies<P: Package, VS: VersionSet> {
-    /// Package dependencies are unavailable.
-    Unknown,
+pub enum Dependencies<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
+    /// Package dependencies are unavailable with the reason why they are missing.
+    Unknown(M),
     /// Container for all available package versions.
     Known(DependencyConstraints<P, VS>),
 }
@@ -210,6 +211,9 @@ pub trait DependencyProvider {
     /// How this provider stores the version requirements for the packages.
     /// The requirements must be able to process the same kind of version as this dependency provider.
     type VS: VersionSet<V = Self::V>;
+
+    /// How this provider stores metadata or additional context about incompatibilities
+    type M: Eq + Clone + Debug + Display;
 
     /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
     /// is the process of choosing the next package
@@ -265,7 +269,7 @@ pub trait DependencyProvider {
         &self,
         package: &Self::P,
         version: &Self::V,
-    ) -> Result<Dependencies<Self::P, Self::VS>, Self::Err>;
+    ) -> Result<Dependencies<Self::P, Self::VS, Self::M>, Self::Err>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
@@ -353,6 +357,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
     type P = P;
     type V = VS::V;
     type VS = VS;
+    type M = String;
 
     type Err = Infallible;
 
@@ -377,9 +382,9 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Infallible> {
+    ) -> Result<Dependencies<P, VS, Self::M>, Infallible> {
         Ok(match self.dependencies(package, version) {
-            None => Dependencies::Unknown,
+            None => Dependencies::Unknown("its dependencies could not be determined".to_string()),
             Some(dependencies) => Dependencies::Known(dependencies),
         })
     }

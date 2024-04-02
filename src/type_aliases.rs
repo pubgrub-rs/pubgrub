@@ -22,5 +22,8 @@ pub type SelectedDependencies<DP> =
 /// while the latter means they could not be fetched by the [DependencyProvider].
 pub type DependencyConstraints<P, VS> = Map<P, VS>;
 
-pub(crate) type IncompDpId<DP> =
-    IncompId<<DP as DependencyProvider>::P, <DP as DependencyProvider>::VS>;
+pub(crate) type IncompDpId<DP> = IncompId<
+    <DP as DependencyProvider>::P,
+    <DP as DependencyProvider>::VS,
+    <DP as DependencyProvider>::M,
+>;

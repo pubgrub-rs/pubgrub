@@ -29,7 +29,7 @@ impl Display for Package {
 #[derive(Debug, Default)]
 struct CustomReportFormatter;
 
-impl ReportFormatter<Package, Range<SemanticVersion>> for CustomReportFormatter {
+impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFormatter {
     type Output = String;
 
     fn format_terms(&self, terms: &Map<Package, Term<Range<SemanticVersion>>>) -> String {
@@ -49,10 +49,12 @@ impl ReportFormatter<Package, Range<SemanticVersion>> for CustomReportFormatter 
                 format!("{package} {range} is mandatory")
             }
             [(p1, Term::Positive(r1)), (p2, Term::Negative(r2))] => {
-                External::FromDependencyOf(p1, r1.clone(), p2, r2.clone()).to_string()
+                External::<_, _, String>::FromDependencyOf(p1, r1.clone(), p2, r2.clone())
+                    .to_string()
             }
             [(p1, Term::Negative(r1)), (p2, Term::Positive(r2))] => {
-                External::FromDependencyOf(p2, r2.clone(), p1, r1.clone()).to_string()
+                External::<_, _, String>::FromDependencyOf(p2, r2.clone(), p1, r1.clone())
+                    .to_string()
             }
             slice => {
                 let str_terms: Vec<_> = slice.iter().map(|(p, t)| format!("{p} {t}")).collect();
@@ -61,7 +63,10 @@ impl ReportFormatter<Package, Range<SemanticVersion>> for CustomReportFormatter 
         }
     }
 
-    fn format_external(&self, external: &External<Package, Range<SemanticVersion>>) -> String {
+    fn format_external(
+        &self,
+        external: &External<Package, Range<SemanticVersion>, String>,
+    ) -> String {
         match external {
             External::NotRoot(package, version) => {
                 format!("we are solving dependencies of {package} {version}")
@@ -73,11 +78,11 @@ impl ReportFormatter<Package, Range<SemanticVersion>> for CustomReportFormatter 
                     format!("there is no version of {package} in {set}")
                 }
             }
-            External::UnavailableDependencies(package, set) => {
+            External::Custom(package, set, reason) => {
                 if set == &Range::full() {
-                    format!("dependencies of {package} are unavailable")
+                    format!("dependencies of {package} are unavailable because {reason}")
                 } else {
-                    format!("dependencies of {package} at version {set} are unavailable")
+                    format!("dependencies of {package} at version {set} are unavailable because {reason}")
                 }
             }
             External::FromDependencyOf(package, package_set, dependency, dependency_set) => {
