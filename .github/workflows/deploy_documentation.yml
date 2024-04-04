@@ -14,14 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
+      - uses: dtolnay/rust-toolchain@stable
 
       - name: Build documentation
-        run: cargo +nightly doc --no-deps
+        run: cargo doc --no-deps
 
       - name: Deploy documentation
         if: ${{ github.event_name == 'branches' }}
