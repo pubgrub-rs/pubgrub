@@ -862,7 +862,8 @@ pub mod tests {
 
     proptest! {
 
-        // Testing negate ----------------------------------
+        // Testing serde ----------------------------------
+
         #[cfg(feature = "serde")]
         #[test]
         fn serde_round_trip(range in strategy()) {
@@ -870,6 +871,8 @@ pub mod tests {
             let r = ron::de::from_str(&s).unwrap();
             assert_eq!(range, r);
         }
+
+        // Testing negate ----------------------------------
 
         #[test]
         fn negate_is_different(range in strategy()) {
