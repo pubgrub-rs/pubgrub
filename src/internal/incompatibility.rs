@@ -114,6 +114,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
     }
 
     /// Create an incompatibility for a reason outside pubgrub.
+    #[allow(dead_code)] // Used by uv
     pub fn custom_term(package: P, term: Term<VS>, metadata: M) -> Self {
         let set = match &term {
             Term::Positive(r) => r.clone(),

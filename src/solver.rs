@@ -265,6 +265,7 @@ pub trait DependencyProvider {
 
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
+    #[allow(clippy::type_complexity)]
     fn get_dependencies(
         &self,
         package: &Self::P,

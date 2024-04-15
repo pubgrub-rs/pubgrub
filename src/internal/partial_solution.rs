@@ -47,6 +47,7 @@ pub struct PartialSolution<DP: DependencyProvider> {
     /// 3. `[changed_this_decision_level..]` Containes all packages that **have** had there assignments changed since
     ///    the last time `prioritize` has bean called. The inverse is not necessarily true, some packages in the range
     ///    did not have a change. Within this range there is no sorting.
+    #[allow(clippy::type_complexity)]
     package_assignments: FnvIndexMap<DP::P, PackageAssignments<DP::P, DP::VS, DP::M>>,
     /// `prioritized_potential_packages` is primarily a HashMap from a package with no desition and a positive assignment
     /// to its `Priority`. But, it also maintains a max heap of packages by `Priority` order.
@@ -396,6 +397,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Figure out if the satisfier and previous satisfier are of different decision levels.
+    #[allow(clippy::type_complexity)]
     pub fn satisfier_search<'i>(
         &self,
         incompat: &'i Incompatibility<DP::P, DP::VS, DP::M>,
@@ -434,6 +436,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     /// Question: This is possible since we added a "global_index" to every dated_derivation.
     /// It would be nice if we could get rid of it, but I don't know if then it will be possible
     /// to return a coherent previous_satisfier_level.
+    #[allow(clippy::type_complexity)]
     fn find_satisfier<'i>(
         incompat: &'i Incompatibility<DP::P, DP::VS, DP::M>,
         package_assignments: &FnvIndexMap<DP::P, PackageAssignments<DP::P, DP::VS, DP::M>>,
@@ -449,6 +452,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     /// Earliest assignment in the partial solution before satisfier
     /// such that incompatibility is satisfied by the partial solution up to
     /// and including that assignment plus satisfier.
+    #[allow(clippy::type_complexity)]
     fn find_previous_satisfier<'i>(
         incompat: &Incompatibility<DP::P, DP::VS, DP::M>,
         satisfier_package: &'i DP::P,
