@@ -212,7 +212,14 @@ pub trait DependencyProvider {
     /// The requirements must be able to process the same kind of version as this dependency provider.
     type VS: VersionSet<V = Self::V>;
 
-    /// How this provider stores metadata or additional context about incompatibilities
+    /// Type for custom incompatibilities.
+    ///
+    /// There are reasons in user code outside pubgrub that can cause packages or versions
+    /// to be unavailable. Examples:
+    /// * The version would require building the package, but builds are disabled.
+    /// * The package is not available in the cache, but internet access has been disabled.
+    /// The intended use is to track them in an enum and assign them to this type. This also
+    /// supports collapsing custom incompatibilities in error messages.
     type M: Eq + Clone + Debug + Display;
 
     /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
