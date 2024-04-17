@@ -206,10 +206,14 @@ pub trait DependencyProvider {
     type P: Package;
 
     /// How this provider stores the versions of the packages.
+    ///
+    /// A common choice is [`SemanticVersion`][crate::version::SemanticVersion].
     type V: Debug + Display + Clone + Ord;
 
     /// How this provider stores the version requirements for the packages.
     /// The requirements must be able to process the same kind of version as this dependency provider.
+    ///
+    /// A common choice is [`Range`][crate::range::Range].
     type VS: VersionSet<V = Self::V>;
 
     /// Type for custom incompatibilities.
@@ -218,8 +222,10 @@ pub trait DependencyProvider {
     /// to be unavailable. Examples:
     /// * The version would require building the package, but builds are disabled.
     /// * The package is not available in the cache, but internet access has been disabled.
-    /// The intended use is to track them in an enum and assign them to this type. This also
-    /// supports collapsing custom incompatibilities in error messages.
+    /// * The package uses a legacy format not supported anymore.
+    ///
+    /// The intended use is to track them in an enum and assign them to this type. You can also
+    /// assign [`String`] as placeholder.
     type M: Eq + Clone + Debug + Display;
 
     /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
