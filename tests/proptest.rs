@@ -11,6 +11,7 @@ use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, DerivationTree, External, Reporter};
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
 use pubgrub::type_aliases::SelectedDependencies;
+#[cfg(feature = "serde")]
 use pubgrub::version::SemanticVersion;
 use pubgrub::version_set::VersionSet;
 
