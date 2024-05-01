@@ -23,16 +23,16 @@ impl<DP: DependencyProvider> CachingDependencyProvider<DP> {
     }
 }
 
-impl<DP: DependencyProvider> DependencyProvider for CachingDependencyProvider<DP> {
+impl<DP: DependencyProvider<M = String>> DependencyProvider for CachingDependencyProvider<DP> {
     // Caches dependencies if they were already queried
     fn get_dependencies(
         &self,
         package: &DP::P,
         version: &DP::V,
-    ) -> Result<Dependencies<DP::P, DP::VS>, DP::Err> {
+    ) -> Result<Dependencies<DP::P, DP::VS, DP::M>, DP::Err> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
-            Ok(Dependencies::Unknown) => {
+            Ok(Dependencies::Unknown(_)) => {
                 let dependencies = self.remote_dependencies.get_dependencies(package, version);
                 match dependencies {
                     Ok(Dependencies::Known(dependencies)) => {
@@ -43,7 +43,7 @@ impl<DP: DependencyProvider> DependencyProvider for CachingDependencyProvider<DP
                         );
                         Ok(Dependencies::Known(dependencies))
                     }
-                    Ok(Dependencies::Unknown) => Ok(Dependencies::Unknown),
+                    Ok(Dependencies::Unknown(reason)) => Ok(Dependencies::Unknown(reason)),
                     error @ Err(_) => error,
                 }
             }
@@ -67,6 +67,7 @@ impl<DP: DependencyProvider> DependencyProvider for CachingDependencyProvider<DP
     type P = DP::P;
     type V = DP::V;
     type VS = DP::VS;
+    type M = DP::M;
 }
 
 fn main() {

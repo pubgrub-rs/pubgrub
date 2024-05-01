@@ -15,7 +15,7 @@ where
 {
     /// There is no solution for this set of dependencies.
     #[error("No solution")]
-    NoSolution(DerivationTree<DP::P, DP::VS>),
+    NoSolution(DerivationTree<DP::P, DP::VS, DP::M>),
 
     /// Error arising when the implementer of
     /// [DependencyProvider]

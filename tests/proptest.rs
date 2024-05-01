@@ -4,6 +4,7 @@
 
 use std::collections::BTreeSet as Set;
 use std::convert::Infallible;
+use std::fmt::{Debug, Display};
 
 use pubgrub::error::PubGrubError;
 use pubgrub::package::Package;
@@ -32,7 +33,11 @@ struct OldestVersionsDependencyProvider<P: Package, VS: VersionSet>(
 );
 
 impl<P: Package, VS: VersionSet> DependencyProvider for OldestVersionsDependencyProvider<P, VS> {
-    fn get_dependencies(&self, p: &P, v: &VS::V) -> Result<Dependencies<P, VS>, Infallible> {
+    fn get_dependencies(
+        &self,
+        p: &P,
+        v: &VS::V,
+    ) -> Result<Dependencies<P, VS, Self::M>, Infallible> {
         self.0.get_dependencies(p, v)
     }
 
@@ -57,6 +62,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OldestVersionsDependency
     type P = P;
     type V = VS::V;
     type VS = VS;
+    type M = String;
 }
 
 /// The same as DP but it has a timeout.
@@ -84,7 +90,7 @@ impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP
         &self,
         p: &DP::P,
         v: &DP::V,
-    ) -> Result<Dependencies<DP::P, DP::VS>, DP::Err> {
+    ) -> Result<Dependencies<DP::P, DP::VS, DP::M>, DP::Err> {
         self.dp.get_dependencies(p, v)
     }
 
@@ -111,6 +117,7 @@ impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP
     type P = DP::P;
     type V = <DP::VS as VersionSet>::V;
     type VS = DP::VS;
+    type M = DP::M;
 }
 
 fn timeout_resolve<DP: DependencyProvider>(
@@ -315,7 +322,7 @@ fn retain_versions<N: Package + Ord, VS: VersionSet>(
                 continue;
             }
             let deps = match dependency_provider.get_dependencies(n, v).unwrap() {
-                Dependencies::Unknown => panic!(),
+                Dependencies::Unknown(_) => panic!(),
                 Dependencies::Known(deps) => deps,
             };
             smaller_dependency_provider.add_dependencies(n.clone(), v.clone(), deps)
@@ -339,7 +346,7 @@ fn retain_dependencies<N: Package + Ord, VS: VersionSet>(
     for n in dependency_provider.packages() {
         for v in dependency_provider.versions(n).unwrap() {
             let deps = match dependency_provider.get_dependencies(n, v).unwrap() {
-                Dependencies::Unknown => panic!(),
+                Dependencies::Unknown(_) => panic!(),
                 Dependencies::Known(deps) => deps,
             };
             smaller_dependency_provider.add_dependencies(
@@ -369,9 +376,9 @@ fn errors_the_same_with_only_report_dependencies<N: Package + Ord>(
         return;
     };
 
-    fn recursive<N: Package + Ord, VS: VersionSet>(
+    fn recursive<N: Package + Ord, VS: VersionSet, M: Eq + Clone + Debug + Display>(
         to_retain: &mut Vec<(N, VS, N)>,
-        tree: &DerivationTree<N, VS>,
+        tree: &DerivationTree<N, VS, M>,
     ) {
         match tree {
             DerivationTree::External(External::FromDependencyOf(n1, vs1, n2, _)) => {
@@ -510,7 +517,7 @@ proptest! {
                 .get_dependencies(package, version)
                 .unwrap()
             {
-                Dependencies::Unknown => panic!(),
+                Dependencies::Unknown(_) => panic!(),
                 Dependencies::Known(d) => d.into_iter().collect(),
             };
             if !dependencies.is_empty() {

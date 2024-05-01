@@ -150,10 +150,11 @@ pub fn resolve<DP: DependencyProvider>(
             })?;
 
             let known_dependencies = match dependencies {
-                Dependencies::Unknown => {
-                    state.add_incompatibility(Incompatibility::unavailable_dependencies(
+                Dependencies::Unknown(reason) => {
+                    state.add_incompatibility(Incompatibility::custom_version(
                         p.clone(),
                         v.clone(),
+                        reason,
                     ));
                     continue;
                 }
@@ -191,9 +192,9 @@ pub fn resolve<DP: DependencyProvider>(
 /// An enum used by [DependencyProvider] that holds information about package dependencies.
 /// For each [Package] there is a set of versions allowed as a dependency.
 #[derive(Clone)]
-pub enum Dependencies<P: Package, VS: VersionSet> {
-    /// Package dependencies are unavailable.
-    Unknown,
+pub enum Dependencies<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
+    /// Package dependencies are unavailable with the reason why they are missing.
+    Unknown(M),
     /// Container for all available package versions.
     Known(DependencyConstraints<P, VS>),
 }
@@ -205,11 +206,27 @@ pub trait DependencyProvider {
     type P: Package;
 
     /// How this provider stores the versions of the packages.
+    ///
+    /// A common choice is [`SemanticVersion`][crate::version::SemanticVersion].
     type V: Debug + Display + Clone + Ord;
 
     /// How this provider stores the version requirements for the packages.
     /// The requirements must be able to process the same kind of version as this dependency provider.
+    ///
+    /// A common choice is [`Range`][crate::range::Range].
     type VS: VersionSet<V = Self::V>;
+
+    /// Type for custom incompatibilities.
+    ///
+    /// There are reasons in user code outside pubgrub that can cause packages or versions
+    /// to be unavailable. Examples:
+    /// * The version would require building the package, but builds are disabled.
+    /// * The package is not available in the cache, but internet access has been disabled.
+    /// * The package uses a legacy format not supported anymore.
+    ///
+    /// The intended use is to track them in an enum and assign them to this type. You can also
+    /// assign [`String`] as placeholder.
+    type M: Eq + Clone + Debug + Display;
 
     /// [Decision making](https://github.com/dart-lang/pub/blob/master/doc/solver.md#decision-making)
     /// is the process of choosing the next package
@@ -261,11 +278,12 @@ pub trait DependencyProvider {
 
     /// Retrieves the package dependencies.
     /// Return [Dependencies::Unknown] if its dependencies are unknown.
+    #[allow(clippy::type_complexity)]
     fn get_dependencies(
         &self,
         package: &Self::P,
         version: &Self::V,
-    ) -> Result<Dependencies<Self::P, Self::VS>, Self::Err>;
+    ) -> Result<Dependencies<Self::P, Self::VS, Self::M>, Self::Err>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
@@ -353,6 +371,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
     type P = P;
     type V = VS::V;
     type VS = VS;
+    type M = String;
 
     type Err = Infallible;
 
@@ -377,9 +396,9 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<Dependencies<P, VS>, Infallible> {
+    ) -> Result<Dependencies<P, VS, Self::M>, Infallible> {
         Ok(match self.dependencies(package, version) {
-            None => Dependencies::Unknown,
+            None => Dependencies::Unknown("its dependencies could not be determined".to_string()),
             Some(dependencies) => Dependencies::Known(dependencies),
         })
     }

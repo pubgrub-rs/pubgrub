@@ -43,7 +43,7 @@ pub struct State<DP: DependencyProvider> {
     pub partial_solution: PartialSolution<DP>,
 
     /// The store is the reference storage for all incompatibilities.
-    pub incompatibility_store: Arena<Incompatibility<DP::P, DP::VS>>,
+    pub incompatibility_store: Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
 
     /// This is a stack of work to be done in `unit_propagation`.
     /// It can definitely be a local variable to that method, but
@@ -74,7 +74,7 @@ impl<DP: DependencyProvider> State<DP> {
     }
 
     /// Add an incompatibility to the state.
-    pub fn add_incompatibility(&mut self, incompat: Incompatibility<DP::P, DP::VS>) {
+    pub fn add_incompatibility(&mut self, incompat: Incompatibility<DP::P, DP::VS, DP::M>) {
         let id = self.incompatibility_store.alloc(incompat);
         self.merge_incompatibility(id);
     }
@@ -297,7 +297,10 @@ impl<DP: DependencyProvider> State<DP> {
 
     // Error reporting #########################################################
 
-    fn build_derivation_tree(&self, incompat: IncompDpId<DP>) -> DerivationTree<DP::P, DP::VS> {
+    fn build_derivation_tree(
+        &self,
+        incompat: IncompDpId<DP>,
+    ) -> DerivationTree<DP::P, DP::VS, DP::M> {
         let mut all_ids: Set<IncompDpId<DP>> = Set::default();
         let mut shared_ids = Set::default();
         let mut stack = vec![incompat];

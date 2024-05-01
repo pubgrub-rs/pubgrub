@@ -96,7 +96,7 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Dependencies<String, SemVS>, Infallible> {
+//!     ) -> Result<Dependencies<String, SemVS, Self::M>, Infallible> {
 //!         unimplemented!()
 //!     }
 //!
@@ -104,6 +104,7 @@
 //!     type P = String;
 //!     type V = SemanticVersion;
 //!     type VS = SemVS;
+//!     type M = String;
 //! }
 //! ```
 //!
@@ -162,11 +163,12 @@
 //! # use pubgrub::package::Package;
 //! # use pubgrub::version_set::VersionSet;
 //! # use pubgrub::report::DerivationTree;
+//! # use std::fmt::{Debug, Display};
 //! #
-//! pub trait Reporter<P: Package, VS: VersionSet> {
+//! pub trait Reporter<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
 //!     type Output;
 //!
-//!     fn report(derivation_tree: &DerivationTree<P, VS>) -> Self::Output;
+//!     fn report(derivation_tree: &DerivationTree<P, VS, M>) -> Self::Output;
 //! }
 //! ```
 //! Implementing a [Reporter](crate::report::Reporter) may involve a lot of heuristics
