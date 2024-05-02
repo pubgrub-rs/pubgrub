@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install stable Rust
-        uses: dtolnay/rust-toolchain
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Get Cargo version
         id: cargo_version
