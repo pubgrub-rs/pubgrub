@@ -121,7 +121,6 @@
 //!
 //! The third method [get_dependencies](crate::solver::DependencyProvider::get_dependencies)
 //! aims at retrieving the dependencies of a given package at a given version.
-//! Returns [None] if dependencies are unknown.
 //!
 //! In a real scenario, these two methods may involve reading the file system
 //! or doing network request, so you may want to hold a cache in your
@@ -151,7 +150,7 @@
 //! External incompatibilities have reasons that are independent
 //! of the way this algorithm is implemented such as
 //!  - dependencies: "package_a" at version 1 depends on "package_b" at version 4
-//!  - missing dependencies: dependencies of "package_a" are unknown
+//!  - missing dependencies: dependencies of "package_a" are unavailable
 //!  - absence of version: there is no version of "package_a" in the range [3.1.0  4.0.0[
 //!
 //! Derived incompatibilities are obtained during the algorithm execution by deduction,

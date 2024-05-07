@@ -322,8 +322,8 @@ fn retain_versions<N: Package + Ord, VS: VersionSet>(
                 continue;
             }
             let deps = match dependency_provider.get_dependencies(n, v).unwrap() {
-                Dependencies::Unknown(_) => panic!(),
-                Dependencies::Known(deps) => deps,
+                Dependencies::Unavailable(_) => panic!(),
+                Dependencies::Available(deps) => deps,
             };
             smaller_dependency_provider.add_dependencies(n.clone(), v.clone(), deps)
         }
@@ -346,8 +346,8 @@ fn retain_dependencies<N: Package + Ord, VS: VersionSet>(
     for n in dependency_provider.packages() {
         for v in dependency_provider.versions(n).unwrap() {
             let deps = match dependency_provider.get_dependencies(n, v).unwrap() {
-                Dependencies::Unknown(_) => panic!(),
-                Dependencies::Known(deps) => deps,
+                Dependencies::Unavailable(_) => panic!(),
+                Dependencies::Available(deps) => deps,
             };
             smaller_dependency_provider.add_dependencies(
                 n.clone(),
@@ -517,8 +517,8 @@ proptest! {
                 .get_dependencies(package, version)
                 .unwrap()
             {
-                Dependencies::Unknown(_) => panic!(),
-                Dependencies::Known(d) => d.into_iter().collect(),
+                Dependencies::Unavailable(_) => panic!(),
+                Dependencies::Available(d) => d.into_iter().collect(),
             };
             if !dependencies.is_empty() {
                 to_remove.insert((package, **version, dep_idx.get(&dependencies).0));
