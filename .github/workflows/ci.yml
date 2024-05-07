@@ -52,16 +52,3 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --document-private-items
-
-  check_commit_conventions:
-    name: Commit messages follow project guidelines
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || github.event.action == 'enqueued'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Check commit conventions
-        uses: wagoid/commitlint-github-action@v6
-        with:
-          configFile: .commitlintrc.yml
