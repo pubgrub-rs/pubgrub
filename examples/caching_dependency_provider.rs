@@ -32,18 +32,18 @@ impl<DP: DependencyProvider<M = String>> DependencyProvider for CachingDependenc
     ) -> Result<Dependencies<DP::P, DP::VS, DP::M>, DP::Err> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
-            Ok(Dependencies::Unknown(_)) => {
+            Ok(Dependencies::Unavailable(_)) => {
                 let dependencies = self.remote_dependencies.get_dependencies(package, version);
                 match dependencies {
-                    Ok(Dependencies::Known(dependencies)) => {
+                    Ok(Dependencies::Available(dependencies)) => {
                         cache.add_dependencies(
                             package.clone(),
                             version.clone(),
                             dependencies.clone(),
                         );
-                        Ok(Dependencies::Known(dependencies))
+                        Ok(Dependencies::Available(dependencies))
                     }
-                    Ok(Dependencies::Unknown(reason)) => Ok(Dependencies::Unknown(reason)),
+                    Ok(Dependencies::Unavailable(reason)) => Ok(Dependencies::Unavailable(reason)),
                     error @ Err(_) => error,
                 }
             }

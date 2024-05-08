@@ -149,8 +149,8 @@ pub fn resolve<DP: DependencyProvider>(
                 }
             })?;
 
-            let known_dependencies = match dependencies {
-                Dependencies::Unknown(reason) => {
+            let dependencies = match dependencies {
+                Dependencies::Unavailable(reason) => {
                     state.add_incompatibility(Incompatibility::custom_version(
                         p.clone(),
                         v.clone(),
@@ -158,21 +158,18 @@ pub fn resolve<DP: DependencyProvider>(
                     ));
                     continue;
                 }
-                Dependencies::Known(x) if x.contains_key(p) => {
+                Dependencies::Available(x) if x.contains_key(p) => {
                     return Err(PubGrubError::SelfDependency {
                         package: p.clone(),
                         version: v,
                     });
                 }
-                Dependencies::Known(x) => x,
+                Dependencies::Available(x) => x,
             };
 
             // Add that package and version if the dependencies are not problematic.
-            let dep_incompats = state.add_incompatibility_from_dependencies(
-                p.clone(),
-                v.clone(),
-                &known_dependencies,
-            );
+            let dep_incompats =
+                state.add_incompatibility_from_dependencies(p.clone(), v.clone(), &dependencies);
 
             state.partial_solution.add_version(
                 p.clone(),
@@ -194,9 +191,9 @@ pub fn resolve<DP: DependencyProvider>(
 #[derive(Clone)]
 pub enum Dependencies<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     /// Package dependencies are unavailable with the reason why they are missing.
-    Unknown(M),
+    Unavailable(M),
     /// Container for all available package versions.
-    Known(DependencyConstraints<P, VS>),
+    Available(DependencyConstraints<P, VS>),
 }
 
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
@@ -277,7 +274,7 @@ pub trait DependencyProvider {
     ) -> Result<Option<Self::V>, Self::Err>;
 
     /// Retrieves the package dependencies.
-    /// Return [Dependencies::Unknown] if its dependencies are unknown.
+    /// Return [Dependencies::Unavailable] if its dependencies are unavailable.
     #[allow(clippy::type_complexity)]
     fn get_dependencies(
         &self,
@@ -398,8 +395,10 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
         version: &VS::V,
     ) -> Result<Dependencies<P, VS, Self::M>, Infallible> {
         Ok(match self.dependencies(package, version) {
-            None => Dependencies::Unknown("its dependencies could not be determined".to_string()),
-            Some(dependencies) => Dependencies::Known(dependencies),
+            None => {
+                Dependencies::Unavailable("its dependencies could not be determined".to_string())
+            }
+            Some(dependencies) => Dependencies::Available(dependencies),
         })
     }
 }
