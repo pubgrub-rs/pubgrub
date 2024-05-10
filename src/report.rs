@@ -7,11 +7,9 @@ use std::fmt::{self, Debug, Display};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use rustc_hash::FxHashSet;
-
 use crate::package::Package;
 use crate::term::Term;
-use crate::type_aliases::Map;
+use crate::type_aliases::{Map, Set};
 use crate::version_set::VersionSet;
 
 /// Reporter trait.
@@ -74,8 +72,8 @@ pub struct Derived<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> 
 
 impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree<P, VS, M> {
     /// Get all packages referred to in the derivation tree.
-    pub fn packages(&self) -> FxHashSet<&P> {
-        let mut packages = FxHashSet::default();
+    pub fn packages(&self) -> Set<&P> {
+        let mut packages = Set::default();
         match self {
             Self::External(external) => match external {
                 External::FromDependencyOf(p, _, p2, _) => {
@@ -89,6 +87,8 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
                 }
             },
             Self::Derived(derived) => {
+                // Less efficient than recursing with a `&mut Set<&P>`, but it's sufficient for
+                // small to medium-sized inputs such as a single `DerivationTree`.
                 packages.extend(derived.terms.keys());
                 packages.extend(derived.cause1.packages().iter());
                 packages.extend(derived.cause2.packages().iter());
