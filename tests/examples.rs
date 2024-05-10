@@ -4,7 +4,7 @@ use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, Reporter as _};
 use pubgrub::solver::{resolve, OfflineDependencyProvider};
-use pubgrub::type_aliases::Map;
+use pubgrub::type_aliases::{Map, Set};
 use pubgrub::version::SemanticVersion;
 
 type NumVS = Range<u32>;
@@ -217,12 +217,19 @@ fn confusing_with_lots_of_holes() {
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 
     // root depends on foo...
-    dependency_provider.add_dependencies("root", 1u32, vec![("foo", Range::full())]);
+    dependency_provider.add_dependencies(
+        "root",
+        1u32,
+        vec![("foo", Range::full()), ("baz", Range::full())],
+    );
 
     for i in 1..6 {
         // foo depends on bar...
         dependency_provider.add_dependencies("foo", i as u32, vec![("bar", Range::full())]);
     }
+
+    // This package is part of the dependency tree, but it's not part of the conflict
+    dependency_provider.add_dependencies("baz", 1u32, vec![]);
 
     let Err(PubGrubError::NoSolution(mut derivation_tree)) =
         resolve(&dependency_provider, "root", 1u32)
@@ -238,5 +245,10 @@ And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5
     assert_eq!(
         &DefaultStringReporter::report(&derivation_tree),
         "Because foo depends on bar and root 1 depends on foo, root 1 is forbidden."
+    );
+    assert_eq!(
+        derivation_tree.packages(),
+        // baz isn't shown.
+        Set::from_iter(&["root", "foo", "bar"])
     );
 }
