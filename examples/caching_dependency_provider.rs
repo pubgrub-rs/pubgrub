@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use std::cell::RefCell;
-
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
+use pubgrub::type_aliases::Map;
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 
 type NumVS = Range<u32>;
 
@@ -11,44 +12,45 @@ type NumVS = Range<u32>;
 // store queried dependencies in memory and check them before querying more from remote.
 struct CachingDependencyProvider<DP: DependencyProvider> {
     remote_dependencies: DP,
-    cached_dependencies: RefCell<OfflineDependencyProvider<DP::P, DP::VS>>,
+    #[allow(clippy::type_complexity)]
+    cached_dependencies: RefCell<Map<DP::P, BTreeMap<DP::V, Vec<(DP::P, DP::VS)>>>>,
 }
 
 impl<DP: DependencyProvider> CachingDependencyProvider<DP> {
     pub fn new(remote_dependencies_provider: DP) -> Self {
         CachingDependencyProvider {
             remote_dependencies: remote_dependencies_provider,
-            cached_dependencies: RefCell::new(OfflineDependencyProvider::new()),
+            cached_dependencies: RefCell::default(),
         }
     }
 }
 
-impl<DP: DependencyProvider<M = String>> DependencyProvider for CachingDependencyProvider<DP> {
+impl<DP: DependencyProvider> DependencyProvider for CachingDependencyProvider<DP> {
     // Caches dependencies if they were already queried
     fn get_dependencies(
         &self,
         package: &DP::P,
         version: &DP::V,
-    ) -> Result<Dependencies<DP::P, DP::VS, DP::M>, DP::Err> {
+    ) -> Result<Dependencies<impl IntoIterator<Item = (DP::P, DP::VS)> + Clone, DP::M>, DP::Err>
+    {
         let mut cache = self.cached_dependencies.borrow_mut();
-        match cache.get_dependencies(package, version) {
-            Ok(Dependencies::Unavailable(_)) => {
-                let dependencies = self.remote_dependencies.get_dependencies(package, version);
-                match dependencies {
-                    Ok(Dependencies::Available(dependencies)) => {
-                        cache.add_dependencies(
-                            package.clone(),
-                            version.clone(),
-                            dependencies.clone(),
-                        );
-                        Ok(Dependencies::Available(dependencies))
-                    }
-                    Ok(Dependencies::Unavailable(reason)) => Ok(Dependencies::Unavailable(reason)),
-                    error @ Err(_) => error,
-                }
+        if let Some(deps) = cache.get(package).and_then(|s| s.get(version)) {
+            return Ok(Dependencies::Available(deps.clone().into_iter()));
+        }
+        let dependencies = self.remote_dependencies.get_dependencies(package, version);
+        match dependencies {
+            Ok(Dependencies::Available(dependencies)) => {
+                let dependencies: Vec<(DP::P, DP::VS)> = dependencies.into_iter().collect();
+                cache
+                    .entry(package.clone())
+                    .or_default()
+                    .entry(version.clone())
+                    .or_default()
+                    .clone_from(&dependencies);
+                Ok(Dependencies::Available(dependencies.into_iter()))
             }
-            Ok(dependencies) => Ok(dependencies),
-            Err(_) => unreachable!(),
+            Ok(Dependencies::Unavailable(reason)) => Ok(Dependencies::Unavailable(reason)),
+            Err(e) => Err(e),
         }
     }
 
