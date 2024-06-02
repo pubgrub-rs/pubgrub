@@ -29,26 +29,36 @@ impl<DP: DependencyProvider<M = String>> DependencyProvider for CachingDependenc
         &self,
         package: &DP::P,
         version: &DP::V,
-    ) -> Result<Dependencies<DP::P, DP::VS, DP::M>, DP::Err> {
+    ) -> Result<Dependencies<impl IntoIterator<Item = (DP::P, DP::VS)> + Clone, Self::M>, DP::Err>
+    {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
             Ok(Dependencies::Unavailable(_)) => {
-                let dependencies = self.remote_dependencies.get_dependencies(package, version);
-                match dependencies {
-                    Ok(Dependencies::Available(dependencies)) => {
-                        cache.add_dependencies(
-                            package.clone(),
-                            version.clone(),
-                            dependencies.clone(),
-                        );
-                        Ok(Dependencies::Available(dependencies))
-                    }
-                    Ok(Dependencies::Unavailable(reason)) => Ok(Dependencies::Unavailable(reason)),
-                    error @ Err(_) => error,
-                }
+                // Code below to end the borrow.
             }
-            Ok(dependencies) => Ok(dependencies),
+            Ok(dependencies) => {
+                return Ok(match dependencies {
+                    Dependencies::Unavailable(reason) => Dependencies::Unavailable(reason),
+                    Dependencies::Available(available) => Dependencies::Available(
+                        available.into_iter().collect::<Vec<(Self::P, Self::VS)>>(),
+                    ),
+                })
+            }
             Err(_) => unreachable!(),
+        }
+        let dependencies = self.remote_dependencies.get_dependencies(package, version);
+        match dependencies {
+            Ok(Dependencies::Available(dependencies)) => {
+                cache.add_dependencies(package.clone(), version.clone(), dependencies.clone());
+                Ok(Dependencies::Available(
+                    dependencies
+                        .clone()
+                        .into_iter()
+                        .collect::<Vec<(Self::P, Self::VS)>>(),
+                ))
+            }
+            Ok(Dependencies::Unavailable(reason)) => Ok(Dependencies::Unavailable(reason)),
+            Err(err) => Err(err),
         }
     }
 
