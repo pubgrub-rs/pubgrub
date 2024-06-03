@@ -86,9 +86,15 @@ impl<T: fmt::Debug> fmt::Debug for Arena<T> {
     }
 }
 
+impl<T> Default for Arena<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Arena<T> {
-    pub fn new() -> Arena<T> {
-        Arena { data: Vec::new() }
+    pub fn new() -> Self {
+        Self { data: Vec::new() }
     }
 
     pub fn alloc(&mut self, value: T) -> Id<T> {
