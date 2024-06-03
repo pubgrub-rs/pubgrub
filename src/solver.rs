@@ -404,7 +404,9 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
             None => {
                 Dependencies::Unavailable("its dependencies could not be determined".to_string())
             }
-            Some(dependencies) => Dependencies::Available(dependencies.clone()),
+            Some(dependencies) => {
+                Dependencies::Available(dependencies.iter().map(|(p, vs)| (p.clone(), vs.clone())))
+            }
         })
     }
 }
