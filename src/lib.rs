@@ -73,7 +73,7 @@
 //! # use pubgrub::solver::{DependencyProvider, Dependencies};
 //! # use pubgrub::version::SemanticVersion;
 //! # use pubgrub::range::Range;
-//! # use pubgrub::type_aliases::Map;
+//! # use pubgrub::type_aliases::{DependencyConstraints, Map};
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
 //! # use std::convert::Infallible;
@@ -96,8 +96,8 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Dependencies<impl IntoIterator<Item = (String, SemVS)> + Clone, Self::M>, Infallible> {
-//!         Ok(Dependencies::Available([]))
+//!     ) -> Result<Dependencies<DependencyConstraints<String, SemVS>, Self::M>, Infallible> {
+//!         Ok(Dependencies::Available(DependencyConstraints::default()))
 //!     }
 //!
 //!     type Err = Infallible;

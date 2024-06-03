@@ -11,7 +11,7 @@ use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, DerivationTree, External, Reporter};
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::SelectedDependencies;
+use pubgrub::type_aliases::{DependencyConstraints, SelectedDependencies};
 #[cfg(feature = "serde")]
 use pubgrub::version::SemanticVersion;
 use pubgrub::version_set::VersionSet;
@@ -37,7 +37,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OldestVersionsDependency
         &self,
         p: &P,
         v: &VS::V,
-    ) -> Result<Dependencies<impl IntoIterator<Item = (P, VS)> + Clone, Self::M>, Infallible> {
+    ) -> Result<Dependencies<DependencyConstraints<Self::P, Self::VS>, Self::M>, Infallible> {
         self.0.get_dependencies(p, v)
     }
 
@@ -90,8 +90,7 @@ impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP
         &self,
         p: &DP::P,
         v: &DP::V,
-    ) -> Result<Dependencies<impl IntoIterator<Item = (DP::P, DP::VS)> + Clone, DP::M>, DP::Err>
-    {
+    ) -> Result<Dependencies<DependencyConstraints<DP::P, DP::VS>, DP::M>, DP::Err> {
         self.dp.get_dependencies(p, v)
     }
 

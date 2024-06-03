@@ -71,7 +71,7 @@ use crate::error::PubGrubError;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
-use crate::type_aliases::{Map, SelectedDependencies};
+use crate::type_aliases::{DependencyConstraints, Map, SelectedDependencies};
 use crate::version_set::VersionSet;
 use log::{debug, info};
 
@@ -280,10 +280,7 @@ pub trait DependencyProvider {
         &self,
         package: &Self::P,
         version: &Self::V,
-    ) -> Result<
-        Dependencies<impl IntoIterator<Item = (Self::P, Self::VS)> + Clone, Self::M>,
-        Self::Err,
-    >;
+    ) -> Result<Dependencies<DependencyConstraints<Self::P, Self::VS>, Self::M>, Self::Err>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
@@ -357,8 +354,8 @@ impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
 
     /// Lists dependencies of a given package and version.
     /// Returns [None] if no information is available regarding that package and version pair.
-    fn dependencies(&self, package: &P, version: &VS::V) -> Option<&Map<P, VS>> {
-        self.dependencies.get(package)?.get(version)
+    fn dependencies(&self, package: &P, version: &VS::V) -> Option<DependencyConstraints<P, VS>> {
+        self.dependencies.get(package)?.get(version).cloned()
     }
 }
 
@@ -396,17 +393,12 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<
-        Dependencies<impl IntoIterator<Item = (Self::P, Self::VS)> + Clone, Self::M>,
-        Self::Err,
-    > {
+    ) -> Result<Dependencies<DependencyConstraints<Self::P, Self::VS>, Self::M>, Self::Err> {
         Ok(match self.dependencies(package, version) {
             None => {
                 Dependencies::Unavailable("its dependencies could not be determined".to_string())
             }
-            Some(dependencies) => {
-                Dependencies::Available(dependencies.iter().map(|(p, vs)| (p.clone(), vs.clone())))
-            }
+            Some(dependencies) => Dependencies::Available(dependencies),
         })
     }
 }

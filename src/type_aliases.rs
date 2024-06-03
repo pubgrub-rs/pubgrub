@@ -14,6 +14,13 @@ pub type Set<V> = rustc_hash::FxHashSet<V>;
 pub type SelectedDependencies<DP> =
     Map<<DP as DependencyProvider>::P, <DP as DependencyProvider>::V>;
 
+/// Holds information about all possible versions a given package can accept.
+/// There is a difference in semantics between an empty map
+/// inside [DependencyConstraints] and [Dependencies::Unavailable](crate::solver::Dependencies::Unavailable):
+/// the former means the package has no dependency and it is a known fact,
+/// while the latter means they could not be fetched by the [DependencyProvider].
+pub type DependencyConstraints<P, VS> = Map<P, VS>;
+
 pub(crate) type IncompDpId<DP> = IncompId<
     <DP as DependencyProvider>::P,
     <DP as DependencyProvider>::VS,
