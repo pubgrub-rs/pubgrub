@@ -250,7 +250,7 @@ pub trait DependencyProvider {
     /// > But there's likely room for improvement in these heuristics.
     ///
     /// Note: the resolver may call this even when the range has not change,
-    /// if it is more efficient for the resolveres internal data structures.
+    /// if it is more efficient for the resolvers internal data structures.
     fn prioritize(&self, package: &Self::P, range: &Self::VS) -> Self::Priority;
     /// The type returned from `prioritize`. The resolver does not care what type this is
     /// as long as it can pick a largest one and clone it.
@@ -265,8 +265,8 @@ pub trait DependencyProvider {
     type Err: Error + 'static;
 
     /// Once the resolver has found the highest `Priority` package from all potential valid
-    /// packages, it needs to know what vertion of that package to use. The most common pattern
-    /// is to select the largest vertion that the range contains.
+    /// packages, it needs to know what version of that package to use. The most common pattern
+    /// is to select the largest version that the range contains.
     fn choose_version(
         &self,
         package: &Self::P,
