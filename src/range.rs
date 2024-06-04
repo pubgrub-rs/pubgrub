@@ -610,21 +610,26 @@ impl<V: Ord + Clone> Range<V> {
         true
     }
 
-    /// Returns a simpler Range that contains the same versions
+    /// Returns a simpler Range that contains the same versions.
     ///
-    /// For every one of the Versions provided in versions the existing range and
-    /// the simplified range will agree on whether it is contained.
+    /// For every one of the Versions provided in versions the existing range and the simplified range will agree on whether it is contained.
     /// The simplified version may include or exclude versions that are not in versions as the implementation wishes.
-    /// For example:
-    ///  - If all the versions are contained in the original than the range will be simplified to `full`.
-    ///  - If none of the versions are contained in the original than the range will be simplified to `empty`.
     ///
-    /// If versions are not sorted the correctness of this function is not guaranteed.
+    /// If none of the versions are contained in the original than the range will be returned unmodified.
+    /// If the range includes a single version, it will be returned unmodified.
+    /// If all the versions are contained in the original than the range will be simplified to `full`.
+    ///
+    /// If the given versions are not sorted the correctness of this function is not guaranteed.
     pub fn simplify<'s, I, BV>(&self, versions: I) -> Self
     where
         I: Iterator<Item = BV> + 's,
         BV: Borrow<V> + 's,
     {
+        // Do not simplify singletons
+        if self.as_singleton().is_some() {
+            return self.clone();
+        }
+
         #[cfg(debug_assertions)]
         let mut last: Option<BV> = None;
         // Return the segment index in the range for each version in the range, None otherwise
@@ -651,7 +656,13 @@ impl<V: Ord + Clone> Range<V> {
             }
             Some(None)
         });
-        let kept_segments = group_adjacent_locations(version_locations);
+        let mut kept_segments = group_adjacent_locations(version_locations).peekable();
+
+        // Do not return null sets
+        if kept_segments.peek().is_none() {
+            return self.clone();
+        }
+
         self.keep_segments(kept_segments)
     }
 
