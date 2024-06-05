@@ -158,10 +158,10 @@ pub fn resolve<DP: DependencyProvider>(
                     ));
                     continue;
                 }
-                Dependencies::Available(x) if x.clone().into_iter().any(|(d, _)| &d == p) => {
+                Dependencies::Available(x) if x.contains_key(p) => {
                     return Err(PubGrubError::SelfDependency {
                         package: p.clone(),
-                        version: v.clone(),
+                        version: v,
                     });
                 }
                 Dependencies::Available(x) => x,
@@ -189,11 +189,11 @@ pub fn resolve<DP: DependencyProvider>(
 /// An enum used by [DependencyProvider] that holds information about package dependencies.
 /// For each [Package] there is a set of versions allowed as a dependency.
 #[derive(Clone)]
-pub enum Dependencies<T, M: Eq + Clone + Debug + Display> {
+pub enum Dependencies<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     /// Package dependencies are unavailable with the reason why they are missing.
     Unavailable(M),
     /// Container for all available package versions.
-    Available(T),
+    Available(DependencyConstraints<P, VS>),
 }
 
 /// Trait that allows the algorithm to retrieve available packages and their dependencies.
@@ -280,7 +280,7 @@ pub trait DependencyProvider {
         &self,
         package: &Self::P,
         version: &Self::V,
-    ) -> Result<Dependencies<DependencyConstraints<Self::P, Self::VS>, Self::M>, Self::Err>;
+    ) -> Result<Dependencies<Self::P, Self::VS, Self::M>, Self::Err>;
 
     /// This is called fairly regularly during the resolution,
     /// if it returns an Err then resolution will be terminated.
@@ -304,7 +304,7 @@ pub trait DependencyProvider {
 )]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct OfflineDependencyProvider<P: Package, VS: VersionSet> {
-    dependencies: Map<P, BTreeMap<VS::V, Map<P, VS>>>,
+    dependencies: Map<P, BTreeMap<VS::V, DependencyConstraints<P, VS>>>,
 }
 
 impl<P: Package, VS: VersionSet> OfflineDependencyProvider<P, VS> {
@@ -393,7 +393,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
         &self,
         package: &P,
         version: &VS::V,
-    ) -> Result<Dependencies<DependencyConstraints<Self::P, Self::VS>, Self::M>, Self::Err> {
+    ) -> Result<Dependencies<P, VS, Self::M>, Infallible> {
         Ok(match self.dependencies(package, version) {
             None => {
                 Dependencies::Unavailable("its dependencies could not be determined".to_string())

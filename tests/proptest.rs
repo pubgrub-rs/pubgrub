@@ -11,7 +11,7 @@ use pubgrub::package::Package;
 use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, DerivationTree, External, Reporter};
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::{DependencyConstraints, SelectedDependencies};
+use pubgrub::type_aliases::SelectedDependencies;
 #[cfg(feature = "serde")]
 use pubgrub::version::SemanticVersion;
 use pubgrub::version_set::VersionSet;
@@ -37,7 +37,7 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OldestVersionsDependency
         &self,
         p: &P,
         v: &VS::V,
-    ) -> Result<Dependencies<DependencyConstraints<Self::P, Self::VS>, Self::M>, Infallible> {
+    ) -> Result<Dependencies<P, VS, Self::M>, Infallible> {
         self.0.get_dependencies(p, v)
     }
 
@@ -90,7 +90,7 @@ impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP
         &self,
         p: &DP::P,
         v: &DP::V,
-    ) -> Result<Dependencies<DependencyConstraints<DP::P, DP::VS>, DP::M>, DP::Err> {
+    ) -> Result<Dependencies<DP::P, DP::VS, DP::M>, DP::Err> {
         self.dp.get_dependencies(p, v)
     }
 
@@ -352,8 +352,8 @@ fn retain_dependencies<N: Package + Ord, VS: VersionSet>(
             smaller_dependency_provider.add_dependencies(
                 n.clone(),
                 v.clone(),
-                deps.into_iter().filter_map(|(dep, range)| {
-                    if !retain(n, v, &dep) {
+                deps.iter().filter_map(|(dep, range)| {
+                    if !retain(n, v, dep) {
                         None
                     } else {
                         Some((dep.clone(), range.clone()))

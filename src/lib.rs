@@ -96,7 +96,7 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Dependencies<DependencyConstraints<String, SemVS>, Self::M>, Infallible> {
+//!     ) -> Result<Dependencies<String, SemVS, Self::M>, Infallible> {
 //!         Ok(Dependencies::Available(DependencyConstraints::default()))
 //!     }
 //!

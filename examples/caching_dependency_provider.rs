@@ -4,7 +4,6 @@ use std::cell::RefCell;
 
 use pubgrub::range::Range;
 use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::DependencyConstraints;
 
 type NumVS = Range<u32>;
 
@@ -30,7 +29,7 @@ impl<DP: DependencyProvider<M = String>> DependencyProvider for CachingDependenc
         &self,
         package: &DP::P,
         version: &DP::V,
-    ) -> Result<Dependencies<DependencyConstraints<DP::P, DP::VS>, DP::M>, DP::Err> {
+    ) -> Result<Dependencies<DP::P, DP::VS, DP::M>, DP::Err> {
         let mut cache = self.cached_dependencies.borrow_mut();
         match cache.get_dependencies(package, version) {
             Ok(Dependencies::Unavailable(_)) => {
