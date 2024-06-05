@@ -73,7 +73,7 @@
 //! # use pubgrub::solver::{DependencyProvider, Dependencies};
 //! # use pubgrub::version::SemanticVersion;
 //! # use pubgrub::range::Range;
-//! # use pubgrub::type_aliases::Map;
+//! # use pubgrub::type_aliases::{DependencyConstraints, Map};
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
 //! # use std::convert::Infallible;
@@ -97,7 +97,7 @@
 //!         package: &String,
 //!         version: &SemanticVersion,
 //!     ) -> Result<Dependencies<String, SemVS, Self::M>, Infallible> {
-//!         unimplemented!()
+//!         Ok(Dependencies::Available(DependencyConstraints::default()))
 //!     }
 //!
 //!     type Err = Infallible;
