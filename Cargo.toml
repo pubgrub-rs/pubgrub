@@ -25,7 +25,7 @@ priority-queue = "2.0.3"
 thiserror = "1.0"
 rustc-hash = "1.1.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
-log = "0.4.14" # for debug logs in tests
+log = "0.4.22" # for debug logs in tests
 
 [dev-dependencies]
 proptest = "1.4.0"
