@@ -23,7 +23,7 @@ include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples
 indexmap = "2.2.6"
 priority-queue = "2.0.3"
 thiserror = "1.0"
-rustc-hash = "2.0.0"
+rustc-hash = ">=1.0.0, <3.0.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
 log = "0.4.14" # for debug logs in tests
 
