@@ -7,15 +7,19 @@ use thiserror::Error;
 use crate::report::DerivationTree;
 use crate::solver::DependencyProvider;
 
+/// There is no solution for this set of dependencies.
+pub type NoSolutionError<DP> = DerivationTree<
+    <DP as DependencyProvider>::P,
+    <DP as DependencyProvider>::VS,
+    <DP as DependencyProvider>::M,
+>;
+
 /// Errors that may occur while solving dependencies.
 #[derive(Error)]
-pub enum PubGrubError<DP>
-where
-    DP: DependencyProvider,
-{
+pub enum PubGrubError<DP: DependencyProvider> {
     /// There is no solution for this set of dependencies.
     #[error("No solution")]
-    NoSolution(DerivationTree<DP::P, DP::VS, DP::M>),
+    NoSolution(NoSolutionError<DP>),
 
     /// Error arising when the implementer of
     /// [DependencyProvider]
@@ -62,13 +66,19 @@ where
     Failure(String),
 }
 
+impl<DP: DependencyProvider> From<NoSolutionError<DP>> for PubGrubError<DP> {
+    fn from(err: NoSolutionError<DP>) -> Self {
+        Self::NoSolution(err)
+    }
+}
+
 impl<DP> std::fmt::Debug for PubGrubError<DP>
 where
     DP: DependencyProvider,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoSolution(arg0) => f.debug_tuple("NoSolution").field(arg0).finish(),
+            Self::NoSolution(err) => f.debug_tuple("NoSolution").field(&err).finish(),
             Self::ErrorRetrievingDependencies {
                 package,
                 version,

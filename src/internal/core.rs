@@ -6,7 +6,7 @@
 use std::collections::HashSet as Set;
 use std::sync::Arc;
 
-use crate::error::PubGrubError;
+use crate::error::NoSolutionError;
 use crate::internal::arena::Arena;
 use crate::internal::incompatibility::{Incompatibility, Relation};
 use crate::internal::partial_solution::SatisfierSearch::{
@@ -105,7 +105,7 @@ impl<DP: DependencyProvider> State<DP> {
 
     /// Unit propagation is the core mechanism of the solving algorithm.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
-    pub fn unit_propagation(&mut self, package: DP::P) -> Result<(), PubGrubError<DP>> {
+    pub fn unit_propagation(&mut self, package: DP::P) -> Result<(), NoSolutionError<DP>> {
         self.unit_propagation_buffer.clear();
         self.unit_propagation_buffer.push(package);
         while let Some(current_package) = self.unit_propagation_buffer.pop() {
@@ -184,16 +184,14 @@ impl<DP: DependencyProvider> State<DP> {
     fn conflict_resolution(
         &mut self,
         incompatibility: IncompDpId<DP>,
-    ) -> Result<(DP::P, IncompDpId<DP>), PubGrubError<DP>> {
+    ) -> Result<(DP::P, IncompDpId<DP>), NoSolutionError<DP>> {
         let mut current_incompat_id = incompatibility;
         let mut current_incompat_changed = false;
         loop {
             if self.incompatibility_store[current_incompat_id]
                 .is_terminal(&self.root_package, &self.root_version)
             {
-                return Err(PubGrubError::NoSolution(
-                    self.build_derivation_tree(current_incompat_id),
-                ));
+                return Err(self.build_derivation_tree(current_incompat_id));
             } else {
                 let (package, satisfier_search_result) = self.partial_solution.satisfier_search(
                     &self.incompatibility_store[current_incompat_id],
