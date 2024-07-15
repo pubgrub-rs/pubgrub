@@ -159,7 +159,11 @@ impl<DP: DependencyProvider> State<DP> {
                 }
             }
             if let Some(incompat_id) = conflict_id {
-                let (package_almost, root_cause) = self.conflict_resolution(incompat_id)?;
+                let (package_almost, root_cause) =
+                    self.conflict_resolution(incompat_id)
+                        .map_err(|terminal_incompat_id| {
+                            self.build_derivation_tree(terminal_incompat_id)
+                        })?;
                 self.unit_propagation_buffer.clear();
                 self.unit_propagation_buffer.push(package_almost.clone());
                 // Add to the partial solution with incompat as cause.
@@ -178,20 +182,20 @@ impl<DP: DependencyProvider> State<DP> {
         Ok(())
     }
 
-    /// Return the root cause and the backtracked model.
+    /// Return the root cause or the terminal incompatibility.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     #[allow(clippy::type_complexity)]
     fn conflict_resolution(
         &mut self,
         incompatibility: IncompDpId<DP>,
-    ) -> Result<(DP::P, IncompDpId<DP>), NoSolutionError<DP>> {
+    ) -> Result<(DP::P, IncompDpId<DP>), IncompDpId<DP>> {
         let mut current_incompat_id = incompatibility;
         let mut current_incompat_changed = false;
         loop {
             if self.incompatibility_store[current_incompat_id]
                 .is_terminal(&self.root_package, &self.root_version)
             {
-                return Err(self.build_derivation_tree(current_incompat_id));
+                return Err(current_incompat_id);
             } else {
                 let (package, satisfier_search_result) = self.partial_solution.satisfier_search(
                     &self.incompatibility_store[current_incompat_id],
