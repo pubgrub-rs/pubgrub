@@ -11,10 +11,10 @@
 //! # Package and Version traits
 //!
 //! All the code in this crate is manipulating packages and versions, and for this to work
-//! we defined a [Package](package::Package) trait
+//! we defined a [Package] trait
 //! that is used as bounds on most of the exposed types and functions.
 //!
-//! Package identifiers needs to implement our [Package](package::Package) trait,
+//! Package identifiers needs to implement our [Package] trait,
 //! which is automatic if the type already implements
 //! [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
 //! So things like [String] will work out of the box.
@@ -22,7 +22,7 @@
 //! TODO! This is all wrong. Need to talk about VS, not Version.
 //! Our Version trait requires
 //! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display).
-//! For convenience, this library provides [SemanticVersion](version::SemanticVersion)
+//! For convenience, this library provides [SemanticVersion]
 //! that implements semantic versioning rules.
 //!
 //! # Basic example
@@ -40,15 +40,16 @@
 //!
 //! We can model that scenario with this library as follows
 //! ```
-//! # use pubgrub::solver::{OfflineDependencyProvider, resolve};
-//! # use pubgrub::range::Range;
+//! # use pubgrub::{OfflineDependencyProvider, resolve, Range};
 //!
 //! type NumVS = Range<u32>;
 //!
 //! let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //!
 //! dependency_provider.add_dependencies(
-//!     "root", 1u32, [("menu", Range::full()), ("icons", Range::full())],
+//!     "root",
+//!     1u32,
+//!     [("menu", Range::full()), ("icons", Range::full())],
 //! );
 //! dependency_provider.add_dependencies("menu", 1u32, [("dropdown", Range::full())]);
 //! dependency_provider.add_dependencies("dropdown", 1u32, [("icons", Range::full())]);
@@ -61,19 +62,16 @@
 //! # DependencyProvider trait
 //!
 //! In our previous example we used the
-//! [OfflineDependencyProvider](solver::OfflineDependencyProvider),
-//! which is a basic implementation of the [DependencyProvider](solver::DependencyProvider) trait.
+//! [OfflineDependencyProvider],
+//! which is a basic implementation of the [DependencyProvider] trait.
 //!
-//! But we might want to implement the [DependencyProvider](solver::DependencyProvider)
+//! But we might want to implement the [DependencyProvider]
 //! trait for our own type.
 //! Let's say that we will use [String] for packages,
-//! and [SemanticVersion](version::SemanticVersion) for versions.
+//! and [SemanticVersion] for versions.
 //! This may be done quite easily by implementing the three following functions.
 //! ```
-//! # use pubgrub::solver::{DependencyProvider, Dependencies};
-//! # use pubgrub::version::SemanticVersion;
-//! # use pubgrub::range::Range;
-//! # use pubgrub::type_aliases::{DependencyConstraints, Map};
+//! # use pubgrub::{DependencyProvider, Dependencies, SemanticVersion,Range, DependencyConstraints, Map};
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
 //! # use std::convert::Infallible;
@@ -124,10 +122,10 @@
 //!
 //! In a real scenario, these two methods may involve reading the file system
 //! or doing network request, so you may want to hold a cache in your
-//! [DependencyProvider](solver::DependencyProvider) implementation.
+//! [DependencyProvider] implementation.
 //! How exactly this could be achieved is shown in `CachingDependencyProvider`
 //! (see `examples/caching_dependency_provider.rs`).
-//! You could also use the [OfflineDependencyProvider](solver::OfflineDependencyProvider)
+//! You could also use the [OfflineDependencyProvider]
 //! type defined by the crate as guidance,
 //! but you are free to use whatever approach makes sense in your situation.
 //!
@@ -156,12 +154,12 @@
 //! Derived incompatibilities are obtained during the algorithm execution by deduction,
 //! such as if "a" depends on "b" and "b" depends on "c", "a" depends on "c".
 //!
-//! This crate defines a [Reporter](crate::report::Reporter) trait, with an associated
+//! This crate defines a [Reporter] trait, with an associated
 //! [Output](crate::report::Reporter::Output) type and a single method.
 //! ```
-//! # use pubgrub::package::Package;
-//! # use pubgrub::version_set::VersionSet;
-//! # use pubgrub::report::DerivationTree;
+//! # use pubgrub::Package;
+//! # use pubgrub::VersionSet;
+//! # use pubgrub::DerivationTree;
 //! # use std::fmt::{Debug, Display};
 //! #
 //! pub trait Reporter<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
@@ -170,17 +168,13 @@
 //!     fn report(derivation_tree: &DerivationTree<P, VS, M>) -> Self::Output;
 //! }
 //! ```
-//! Implementing a [Reporter](crate::report::Reporter) may involve a lot of heuristics
+//! Implementing a [Reporter] may involve a lot of heuristics
 //! to make the output human-readable and natural.
 //! For convenience, we provide a default implementation
-//! [DefaultStringReporter](crate::report::DefaultStringReporter)
-//! that outputs the report as a [String].
+//! [DefaultStringReporter] that outputs the report as a [String].
 //! You may use it as follows:
 //! ```
-//! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
-//! # use pubgrub::report::{DefaultStringReporter, Reporter};
-//! # use pubgrub::error::PubGrubError;
-//! # use pubgrub::range::Range;
+//! # use pubgrub::{resolve, OfflineDependencyProvider, DefaultStringReporter, Reporter, PubGrubError, Range};
 //! #
 //! # type NumVS = Range<u32>;
 //! #
@@ -218,14 +212,27 @@
 
 #![warn(missing_docs)]
 
-pub mod error;
-pub mod package;
-pub mod range;
-pub mod report;
-pub mod solver;
-pub mod term;
-pub mod type_aliases;
-pub mod version;
-pub mod version_set;
+mod error;
+mod package;
+mod range;
+mod report;
+mod solver;
+mod term;
+mod type_aliases;
+mod version;
+mod version_set;
+
+pub use error::PubGrubError;
+pub use package::Package;
+pub use range::Range;
+pub use report::{
+    DefaultStringReportFormatter, DefaultStringReporter, DerivationTree, Derived, External,
+    ReportFormatter, Reporter,
+};
+pub use solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
+pub use term::Term;
+pub use type_aliases::{DependencyConstraints, Map, SelectedDependencies, Set};
+pub use version::{SemanticVersion, VersionParseError};
+pub use version_set::VersionSet;
 
 mod internal;

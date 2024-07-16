@@ -1,9 +1,7 @@
-use std::{
-    fmt,
-    hash::{Hash, Hasher},
-    marker::PhantomData,
-    ops::{Index, Range},
-};
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
+use std::ops::{Index, Range};
 
 /// The index of a value allocated in an arena that holds `T`s.
 ///

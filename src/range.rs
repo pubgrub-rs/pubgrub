@@ -50,14 +50,13 @@
 //! If doing so regularly fixes bugs seen by users, we will bring it back into the core library.
 //! If we do not see practical bugs, or we get a formal proof that the code cannot lead to error states, then we may remove this warning.
 
-use crate::{internal::small_vec::SmallVec, version_set::VersionSet};
+use crate::internal::small_vec::SmallVec;
+use crate::version_set::VersionSet;
 use std::borrow::Borrow;
 use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter};
+use std::ops::Bound::{self, Excluded, Included, Unbounded};
 use std::ops::RangeBounds;
-use std::{
-    fmt::{Debug, Display, Formatter},
-    ops::Bound::{self, Excluded, Included, Unbounded},
-};
 
 /// A Range represents multiple intervals of a continuous range of monotone increasing
 /// values.
