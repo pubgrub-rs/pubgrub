@@ -3,8 +3,9 @@
 //! A term is the fundamental unit of operation of the PubGrub algorithm.
 //! It is a positive or negative expression regarding a set of versions.
 
-use crate::version_set::VersionSet;
 use std::fmt::{self, Display};
+
+use crate::VersionSet;
 
 /// A positive or negative expression regarding a set of versions.
 ///

@@ -157,9 +157,7 @@
 //! This crate defines a [Reporter] trait, with an associated
 //! [Output](crate::report::Reporter::Output) type and a single method.
 //! ```
-//! # use pubgrub::Package;
-//! # use pubgrub::VersionSet;
-//! # use pubgrub::DerivationTree;
+//! # use pubgrub::{Package, VersionSet, DerivationTree};
 //! # use std::fmt::{Debug, Display};
 //! #
 //! pub trait Reporter<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
