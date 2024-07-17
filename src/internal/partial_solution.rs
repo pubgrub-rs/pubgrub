@@ -43,9 +43,9 @@ pub struct PartialSolution<DP: DependencyProvider> {
     /// 1. `[..current_decision_level]` Are packages that have had a decision made sorted by the `decision_level`.
     ///    This makes it very efficient to extract the solution, And to backtrack to a particular decision level.
     /// 2. `[current_decision_level..changed_this_decision_level]` Are packages that have **not** had there assignments
-    ///    changed since the last time `prioritize` has bean called. Within this range there is no sorting.
-    /// 3. `[changed_this_decision_level..]` Containes all packages that **have** had there assignments changed since
-    ///    the last time `prioritize` has bean called. The inverse is not necessarily true, some packages in the range
+    ///    changed since the last time `prioritize` has been called. Within this range there is no sorting.
+    /// 3. `[changed_this_decision_level..]` Contains all packages that **have** had there assignments changed since
+    ///    the last time `prioritize` has been called. The inverse is not necessarily true, some packages in the range
     ///    did not have a change. Within this range there is no sorting.
     #[allow(clippy::type_complexity)]
     package_assignments: FnvIndexMap<DP::P, PackageAssignments<DP::P, DP::VS, DP::M>>,
@@ -66,7 +66,7 @@ impl<DP: DependencyProvider> Display for PartialSolution<DP> {
         assignments.sort();
         write!(
             f,
-            "next_global_index: {}\ncurrent_decision_level: {:?}\npackage_assignements:\n{}",
+            "next_global_index: {}\ncurrent_decision_level: {:?}\npackage_assignments:\n{}",
             self.next_global_index,
             self.current_decision_level,
             assignments.join("\t\n")
@@ -171,7 +171,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
                 Some(pa) => match &pa.assignments_intersection {
                     // Cannot be called when a decision has already been taken.
                     AssignmentsIntersection::Decision(_) => panic!("Already existing decision"),
-                    // Cannot be called if the versions is not contained in the terms intersection.
+                    // Cannot be called if the versions is not contained in the terms' intersection.
                     AssignmentsIntersection::Derivations(term) => {
                         debug_assert!(
                             term.contains(&version),
@@ -275,10 +275,10 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
             .unwrap()
             .iter()
             .filter(|(_, pa)| {
-                // We only actually need to update the package if its Been changed
+                // We only actually need to update the package if it has been changed
                 // since the last time we called prioritize.
                 // Which means it's highest decision level is the current decision level,
-                // or if we backtracked in the mean time.
+                // or if we backtracked in the meantime.
                 check_all || pa.highest_decision_level == current_decision_level
             })
             .filter_map(|(p, pa)| pa.assignments_intersection.potential_package_filter(p))

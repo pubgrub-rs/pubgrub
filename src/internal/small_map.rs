@@ -150,7 +150,7 @@ impl<K: Clone + PartialEq + Eq + Hash, V: Clone> SmallMap<K, V> {
     /// When a key is common to both,
     /// apply the provided function to both values.
     /// If the result is None, remove that key from the merged map,
-    /// otherwise add the content of the Some(_).
+    /// otherwise add the content of the `Some(_)`.
     pub fn merge<'a>(
         &'a mut self,
         map_2: impl Iterator<Item = (&'a K, &'a V)>,

@@ -41,7 +41,7 @@
 //! #
 //! # type NumVS = Range<u32>;
 //! #
-//! # fn try_main() -> Result<(), PubGrubError<OfflineDependencyProvider::<&'static str, NumVS>>> {
+//! # fn try_main() -> Result<(), PubGrubError<OfflineDependencyProvider<&'static str, NumVS>>> {
 //! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! #     let package = "root";
 //! #     let version = 1u32;
@@ -249,7 +249,7 @@ pub trait DependencyProvider {
     /// > since these packages will run out of versions to try more quickly.
     /// > But there's likely room for improvement in these heuristics.
     ///
-    /// Note: the resolver may call this even when the range has not change,
+    /// Note: the resolver may call this even when the range has not changed,
     /// if it is more efficient for the resolvers internal data structures.
     fn prioritize(&self, package: &Self::P, range: &Self::VS) -> Self::Priority;
     /// The type returned from `prioritize`. The resolver does not care what type this is
