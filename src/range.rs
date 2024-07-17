@@ -38,7 +38,7 @@
 //!
 //! Second both segments `S1 = (Included(1), Included(5))` and `S2 = (Included(1), Included(3)) + (Included(4), Included(5))` are equal.
 //! But without asking the user to provide a `bump` function for discrete sets,
-//! the algorithm is not able tell that the space between the right `Included(3)` bound and the left `Included(4)` bound is empty.
+//! the algorithm is not able to tell that the space between the right `Included(3)` bound and the left `Included(4)` bound is empty.
 //! Thus the algorithm is not able to reduce S2 to its canonical S1 form while computing sets operations like intersections in the generic code.
 //!
 //! This is likely to lead to user facing theoretically correct but practically nonsensical ranges,
@@ -516,7 +516,7 @@ impl<V: Ord + Clone> Range<V> {
             // `start` will either come from the input `end` came from or the other input, whichever one is larger.
             // The intersection is invalid if `start` > `end`.
             // But, we already know that the segments in our input are valid.
-            // So we do not need to check if the `start`  from the input `end` came from is smaller then `end`.
+            // So we do not need to check if the `start` from the input `end` came from is smaller than `end`.
             // If the `other_start` is larger than end, then the intersection will be invalid.
             if !valid_segment(other_start, end) {
                 // Note: We can call `this_iter.next_if(!valid_segment(other_start, this_end))` in a loop.
