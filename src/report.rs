@@ -7,7 +7,7 @@ use std::fmt::{self, Debug, Display};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::{Package, Set, Term, VersionSet};
+use crate::{Map, Package, Set, Term, VersionSet};
 
 /// Reporter trait.
 pub trait Reporter<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
