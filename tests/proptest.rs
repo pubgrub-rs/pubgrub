@@ -6,18 +6,16 @@ use std::collections::BTreeSet as Set;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 
-#[cfg(feature = "serde")]
-use pubgrub::SemanticVersion;
+use proptest::collection::{btree_map, btree_set, vec};
+use proptest::prelude::*;
+use proptest::sample::Index;
+use proptest::string::string_regex;
+
 use pubgrub::{
     resolve, DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, External,
     OfflineDependencyProvider, Package, PubGrubError, Range, Reporter, SelectedDependencies,
     VersionSet,
 };
-
-use proptest::collection::{btree_map, btree_set, vec};
-use proptest::prelude::*;
-use proptest::sample::Index;
-use proptest::string::string_regex;
 
 use crate::sat_dependency_provider::SatResolve;
 
@@ -134,8 +132,6 @@ fn timeout_resolve<DP: DependencyProvider>(
 }
 
 type NumVS = Range<u32>;
-#[cfg(feature = "serde")]
-type SemVS = Range<SemanticVersion>;
 
 #[test]
 #[should_panic]
@@ -609,8 +605,10 @@ fn large_case() {
                 }
             }
         } else if name.ends_with("str_SemanticVersion.ron") {
-            let dependency_provider: OfflineDependencyProvider<&str, SemVS> =
-                ron::de::from_str(&data).unwrap();
+            let dependency_provider: OfflineDependencyProvider<
+                &str,
+                Range<pubgrub::SemanticVersion>,
+            > = ron::de::from_str(&data).unwrap();
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {
                 for v in dependency_provider.versions(p).unwrap() {

@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 use std::time::Duration;
 
-extern crate criterion;
-use self::criterion::*;
-
-use pubgrub::package::Package;
-use pubgrub::range::Range;
-use pubgrub::solver::{resolve, OfflineDependencyProvider};
-use pubgrub::version::SemanticVersion;
-use pubgrub::version_set::VersionSet;
+use criterion::*;
 use serde::de::Deserialize;
+
+use pubgrub::{resolve, OfflineDependencyProvider, Package, Range, SemanticVersion, VersionSet};
 
 fn bench<'a, P: Package + Deserialize<'a>, VS: VersionSet + Deserialize<'a>>(
     b: &mut Bencher,

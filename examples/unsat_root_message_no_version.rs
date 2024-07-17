@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::{
-    resolve, Derived, OfflineDependencyProvider, PubGrubError, Range, Reporter, SemanticVersion,
-};
-
-use pubgrub::{DefaultStringReporter, External, Map, ReportFormatter, Term};
 use std::fmt::{self, Display};
+
+use pubgrub::{
+    resolve, DefaultStringReporter, Derived, External, Map, OfflineDependencyProvider,
+    PubGrubError, Range, ReportFormatter, Reporter, SemanticVersion, Term,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Package {

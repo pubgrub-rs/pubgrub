@@ -65,13 +65,10 @@ use std::convert::Infallible;
 use std::error::Error;
 use std::fmt::{Debug, Display};
 
-use crate::error::PubGrubError;
-use crate::internal::core::State;
-use crate::internal::incompatibility::Incompatibility;
-use crate::package::Package;
-use crate::type_aliases::{DependencyConstraints, Map, SelectedDependencies};
-use crate::version_set::VersionSet;
 use log::{debug, info};
+
+use crate::internal::{Incompatibility, State};
+use crate::{DependencyConstraints, Map, Package, PubGrubError, SelectedDependencies, VersionSet};
 
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
@@ -253,7 +250,7 @@ pub trait DependencyProvider {
     /// The type returned from `prioritize`. The resolver does not care what type this is
     /// as long as it can pick a largest one and clone it.
     ///
-    /// [std::cmp::Reverse] can be useful if you want to pick the package with
+    /// [Reverse] can be useful if you want to pick the package with
     /// the fewest versions that match the outstanding constraint.
     type Priority: Ord + Clone;
 

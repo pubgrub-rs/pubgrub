@@ -220,7 +220,7 @@ mod type_aliases;
 mod version;
 mod version_set;
 
-pub use error::PubGrubError;
+pub use error::{NoSolutionError, PubGrubError};
 pub use package::Package;
 pub use range::Range;
 pub use report::{

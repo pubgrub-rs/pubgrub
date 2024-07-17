@@ -4,8 +4,7 @@
 
 use thiserror::Error;
 
-use crate::report::DerivationTree;
-use crate::solver::DependencyProvider;
+use crate::{DependencyProvider, DerivationTree};
 
 /// There is no solution for this set of dependencies.
 pub type NoSolutionError<DP> = DerivationTree<

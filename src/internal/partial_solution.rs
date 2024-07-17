@@ -9,24 +9,17 @@ use std::hash::BuildHasherDefault;
 use priority_queue::PriorityQueue;
 use rustc_hash::FxHasher;
 
-use crate::internal::arena::Arena;
-use crate::internal::incompatibility::{IncompId, Incompatibility, Relation};
-use crate::internal::small_map::SmallMap;
-use crate::package::Package;
-use crate::solver::DependencyProvider;
-use crate::term::Term;
-use crate::type_aliases::{IncompDpId, SelectedDependencies};
-use crate::version_set::VersionSet;
-
 use super::small_vec::SmallVec;
+use crate::internal::{Arena, IncompDpId, IncompId, Incompatibility, Relation, SmallMap};
+use crate::{DependencyProvider, Package, SelectedDependencies, Term, VersionSet};
 
-type FnvIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
+type FnvIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct DecisionLevel(pub u32);
+pub(crate) struct DecisionLevel(pub(crate) u32);
 
 impl DecisionLevel {
-    pub fn increment(self) -> Self {
+    pub(crate) fn increment(self) -> Self {
         Self(self.0 + 1)
     }
 }
@@ -34,7 +27,7 @@ impl DecisionLevel {
 /// The partial solution contains all package assignments,
 /// organized by package and historically ordered.
 #[derive(Clone, Debug)]
-pub struct PartialSolution<DP: DependencyProvider> {
+pub(crate) struct PartialSolution<DP: DependencyProvider> {
     next_global_index: u32,
     current_decision_level: DecisionLevel,
     /// `package_assignments` is primarily a HashMap from a package to its
@@ -106,7 +99,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Display
 }
 
 #[derive(Clone, Debug)]
-pub struct DatedDerivation<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
+struct DatedDerivation<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     global_index: u32,
     decision_level: DecisionLevel,
     cause: IncompId<P, VS, M>,
@@ -139,7 +132,7 @@ impl<VS: VersionSet> Display for AssignmentsIntersection<VS> {
 }
 
 #[derive(Clone, Debug)]
-pub enum SatisfierSearch<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
+pub(crate) enum SatisfierSearch<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     DifferentDecisionLevels {
         previous_satisfier_level: DecisionLevel,
     },
@@ -152,7 +145,7 @@ type SatisfiedMap<'i, P, VS, M> = SmallMap<&'i P, (Option<IncompId<P, VS, M>>, u
 
 impl<DP: DependencyProvider> PartialSolution<DP> {
     /// Initialize an empty PartialSolution.
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             next_global_index: 0,
             current_decision_level: DecisionLevel(0),
@@ -163,7 +156,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Add a decision.
-    pub fn add_decision(&mut self, package: DP::P, version: DP::V) {
+    pub(crate) fn add_decision(&mut self, package: DP::P, version: DP::V) {
         // Check that add_decision is never used in the wrong context.
         if cfg!(debug_assertions) {
             match self.package_assignments.get_mut(&package) {
@@ -208,7 +201,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Add a derivation.
-    pub fn add_derivation(
+    pub(crate) fn add_derivation(
         &mut self,
         package: DP::P,
         cause: IncompDpId<DP>,
@@ -262,7 +255,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         }
     }
 
-    pub fn pick_highest_priority_pkg(
+    pub(crate) fn pick_highest_priority_pkg(
         &mut self,
         prioritizer: impl Fn(&DP::P, &DP::VS) -> DP::Priority,
     ) -> Option<DP::P> {
@@ -293,7 +286,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     /// If a partial solution has, for every positive derivation,
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
-    pub fn extract_solution(&self) -> SelectedDependencies<DP> {
+    pub(crate) fn extract_solution(&self) -> SelectedDependencies<DP> {
         self.package_assignments
             .iter()
             .take(self.current_decision_level.0 as usize)
@@ -307,7 +300,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Backtrack the partial solution to a given decision level.
-    pub fn backtrack(&mut self, decision_level: DecisionLevel) {
+    pub(crate) fn backtrack(&mut self, decision_level: DecisionLevel) {
         self.current_decision_level = decision_level;
         self.package_assignments.retain(|_p, pa| {
             if pa.smallest_decision_level > decision_level {
@@ -352,7 +345,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     /// In practice I think it can only produce a conflict if one of the dependencies
     /// (which are used to make the new incompatibilities)
     /// is already in the partial solution with an incompatible version.
-    pub fn add_version(
+    pub(crate) fn add_version(
         &mut self,
         package: DP::P,
         version: DP::V,
@@ -385,12 +378,15 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Check if the terms in the partial solution satisfy the incompatibility.
-    pub fn relation(&self, incompat: &Incompatibility<DP::P, DP::VS, DP::M>) -> Relation<DP::P> {
+    pub(crate) fn relation(
+        &self,
+        incompat: &Incompatibility<DP::P, DP::VS, DP::M>,
+    ) -> Relation<DP::P> {
         incompat.relation(|package| self.term_intersection_for_package(package))
     }
 
     /// Retrieve intersection of terms related to package.
-    pub fn term_intersection_for_package(&self, package: &DP::P) -> Option<&Term<DP::VS>> {
+    pub(crate) fn term_intersection_for_package(&self, package: &DP::P) -> Option<&Term<DP::VS>> {
         self.package_assignments
             .get(package)
             .map(|pa| pa.assignments_intersection.term())
@@ -398,7 +394,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
 
     /// Figure out if the satisfier and previous satisfier are of different decision levels.
     #[allow(clippy::type_complexity)]
-    pub fn satisfier_search<'i>(
+    pub(crate) fn satisfier_search<'i>(
         &self,
         incompat: &'i Incompatibility<DP::P, DP::VS, DP::M>,
         store: &Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
@@ -493,7 +489,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         decision_level.max(DecisionLevel(1))
     }
 
-    pub fn current_decision_level(&self) -> DecisionLevel {
+    pub(crate) fn current_decision_level(&self) -> DecisionLevel {
         self.current_decision_level
     }
 }
