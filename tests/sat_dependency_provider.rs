@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::error::PubGrubError;
-use pubgrub::package::Package;
-use pubgrub::solver::{Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::{Map, SelectedDependencies};
-use pubgrub::version_set::VersionSet;
+use pubgrub::{
+    Dependencies, DependencyProvider, Map, OfflineDependencyProvider, Package, PubGrubError,
+    SelectedDependencies, VersionSet,
+};
 use varisat::ExtendFormula;
 
 fn sat_at_most_one(solver: &mut impl varisat::ExtendFormula, vars: &[varisat::Var]) {

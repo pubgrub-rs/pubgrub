@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::error::PubGrubError;
-use pubgrub::range::Range;
-use pubgrub::report::{Derived, Reporter};
-use pubgrub::solver::{resolve, OfflineDependencyProvider};
-use pubgrub::version::SemanticVersion;
+use pubgrub::{
+    resolve, Derived, OfflineDependencyProvider, PubGrubError, Range, Reporter, SemanticVersion,
+};
 
-use pubgrub::report::{DefaultStringReporter, External, ReportFormatter};
-use pubgrub::term::Term;
-use pubgrub::type_aliases::Map;
+use pubgrub::{DefaultStringReporter, External, Map, ReportFormatter, Term};
 use std::fmt::{self, Display};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

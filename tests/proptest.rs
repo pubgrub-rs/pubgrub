@@ -6,15 +6,13 @@ use std::collections::BTreeSet as Set;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 
-use pubgrub::error::PubGrubError;
-use pubgrub::package::Package;
-use pubgrub::range::Range;
-use pubgrub::report::{DefaultStringReporter, DerivationTree, External, Reporter};
-use pubgrub::solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
-use pubgrub::type_aliases::SelectedDependencies;
 #[cfg(feature = "serde")]
-use pubgrub::version::SemanticVersion;
-use pubgrub::version_set::VersionSet;
+use pubgrub::SemanticVersion;
+use pubgrub::{
+    resolve, DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, External,
+    OfflineDependencyProvider, Package, PubGrubError, Range, Reporter, SelectedDependencies,
+    VersionSet,
+};
 
 use proptest::collection::{btree_map, btree_set, vec};
 use proptest::prelude::*;

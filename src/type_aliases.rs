@@ -2,7 +2,8 @@
 
 //! Publicly exported type aliases.
 
-use crate::{internal::incompatibility::IncompId, solver::DependencyProvider};
+use crate::internal::incompatibility::IncompId;
+use crate::DependencyProvider;
 
 /// Map implementation used by the library.
 pub type Map<K, V> = rustc_hash::FxHashMap<K, V>;

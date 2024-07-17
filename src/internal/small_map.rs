@@ -1,5 +1,6 @@
-use crate::type_aliases::Map;
 use std::hash::Hash;
+
+use crate::Map;
 
 #[derive(Debug, Clone)]
 pub enum SmallMap<K, V> {
