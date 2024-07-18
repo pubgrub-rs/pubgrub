@@ -66,7 +66,7 @@ use std::error::Error;
 use std::fmt::{Debug, Display};
 
 use crate::error::PubGrubError;
-use crate::internal::arena::Id;
+use crate::internal::arena::IdMap;
 use crate::internal::core::State;
 use crate::internal::incompatibility::Incompatibility;
 use crate::package::Package;
@@ -82,7 +82,7 @@ pub fn resolve<DP: DependencyProvider>(
     version: impl Into<DP::V>,
 ) -> Result<SelectedDependencies<DP>, PubGrubError<DP>> {
     let mut state: State<DP> = State::init(package.clone(), version.into());
-    let mut added_dependencies: Map<Id<DP::P>, Set<DP::V>> = Map::default();
+    let mut added_dependencies: IdMap<DP::P, Set<DP::V>> = IdMap::default();
     let mut next = state.root_package;
     loop {
         dependency_provider
@@ -140,10 +140,7 @@ pub fn resolve<DP: DependencyProvider>(
             ));
         }
 
-        let is_new_dependency = added_dependencies
-            .entry(next)
-            .or_default()
-            .insert(v.clone());
+        let is_new_dependency = added_dependencies.get_or_defalt(next).insert(v.clone());
 
         if is_new_dependency {
             // Retrieve that package dependencies.

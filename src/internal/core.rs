@@ -16,10 +16,10 @@ use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
 use crate::internal::small_vec::SmallVec;
 use crate::report::DerivationTree;
 use crate::solver::DependencyProvider;
-use crate::type_aliases::{IncompDpId, Map};
+use crate::type_aliases::{IncompDp, IncompDpId, Map};
 use crate::version_set::VersionSet;
 
-use super::arena::{HashArena, Id};
+use super::arena::{HashArena, Id, IdMap};
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
@@ -28,12 +28,12 @@ pub struct State<DP: DependencyProvider> {
     root_version: DP::V,
 
     #[allow(clippy::type_complexity)]
-    incompatibilities: Map<Id<DP::P>, Vec<IncompDpId<DP>>>,
+    incompatibilities: IdMap<DP::P, Vec<IncompDpId<DP>>>,
 
     /// Store the ids of incompatibilities that are already contradicted.
     /// For each one keep track of the decision level when it was found to be contradicted.
     /// These will stay contradicted until we have backtracked beyond its associated decision level.
-    contradicted_incompatibilities: Map<IncompDpId<DP>, DecisionLevel>,
+    contradicted_incompatibilities: IdMap<IncompDp<DP>, DecisionLevel>,
 
     /// All incompatibilities expressing dependencies,
     /// with common dependents merged.
@@ -66,13 +66,13 @@ impl<DP: DependencyProvider> State<DP> {
             root_package,
             root_version.clone(),
         ));
-        let mut incompatibilities = Map::default();
+        let mut incompatibilities = IdMap::default();
         incompatibilities.insert(root_package, vec![not_root_id]);
         Self {
             root_package,
             root_version,
             incompatibilities,
-            contradicted_incompatibilities: Map::default(),
+            contradicted_incompatibilities: IdMap::default(),
             partial_solution: PartialSolution::empty(),
             incompatibility_store,
             package_store,
@@ -122,10 +122,11 @@ impl<DP: DependencyProvider> State<DP> {
             // to evaluate first the newest incompatibilities.
             let mut conflict_id = None;
             // We only care about incompatibilities if it contains the current package.
-            for &incompat_id in self.incompatibilities[&current_package].iter().rev() {
+            for &incompat_id in self.incompatibilities[current_package].iter().rev() {
                 if self
                     .contradicted_incompatibilities
-                    .contains_key(&incompat_id)
+                    .get(incompat_id)
+                    .is_some()
                 {
                     continue;
                 }
@@ -281,8 +282,7 @@ impl<DP: DependencyProvider> State<DP> {
                 let new = self.incompatibility_store.alloc(merged);
                 for (&pkg, _) in self.incompatibility_store[new].iter() {
                     self.incompatibilities
-                        .entry(pkg)
-                        .or_default()
+                        .get_or_defalt(pkg)
                         .retain(|id| id != past);
                 }
                 *past = new;
@@ -295,7 +295,7 @@ impl<DP: DependencyProvider> State<DP> {
             if cfg!(debug_assertions) {
                 assert_ne!(term, &crate::term::Term::any());
             }
-            self.incompatibilities.entry(pkg).or_default().push(id);
+            self.incompatibilities.get_or_defalt(pkg).push(id);
         }
     }
 
@@ -324,7 +324,7 @@ impl<DP: DependencyProvider> State<DP> {
         // It happens to be that sorting by their ID maintains this property.
         let mut sorted_ids = all_ids.into_iter().collect::<Vec<_>>();
         sorted_ids.sort_unstable_by_key(|id| id.into_raw());
-        let mut precomputed = Map::default();
+        let mut precomputed = IdMap::default();
         for id in sorted_ids {
             let tree = Incompatibility::build_derivation_tree(
                 id,
@@ -336,6 +336,6 @@ impl<DP: DependencyProvider> State<DP> {
             precomputed.insert(id, Arc::new(tree));
         }
         // Now the user can refer to the entire tree from its root.
-        Arc::into_inner(precomputed.remove(&incompat).unwrap()).unwrap()
+        Arc::into_inner(precomputed.remove(incompat).unwrap()).unwrap()
     }
 }

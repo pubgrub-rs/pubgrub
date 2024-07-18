@@ -2,7 +2,8 @@
 
 //! Publicly exported type aliases.
 
-use crate::internal::incompatibility::IncompId;
+use crate::internal::arena::Id;
+use crate::internal::incompatibility::Incompatibility;
 use crate::DependencyProvider;
 
 /// Map implementation used by the library.
@@ -23,8 +24,10 @@ pub type SelectedDependencies<DP> =
 /// while the latter means they could not be fetched by the [DependencyProvider].
 pub type DependencyConstraints<P, VS> = Map<P, VS>;
 
-pub(crate) type IncompDpId<DP> = IncompId<
+pub(crate) type IncompDp<DP> = Incompatibility<
     <DP as DependencyProvider>::P,
     <DP as DependencyProvider>::VS,
     <DP as DependencyProvider>::M,
 >;
+
+pub(crate) type IncompDpId<DP> = Id<IncompDp<DP>>;

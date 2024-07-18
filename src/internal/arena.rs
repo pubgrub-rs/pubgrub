@@ -177,3 +177,67 @@ impl<T: Hash + Eq> Index<Id<T>> for HashArena<T> {
         &self.data[id.raw as usize]
     }
 }
+
+#[derive(Clone)]
+pub struct IdMap<K, V> {
+    inner: Vec<Option<V>>,
+    _ty: PhantomData<K>,
+}
+
+impl<K, V> IdMap<K, V> {
+    pub fn new() -> Self {
+        Self {
+            inner: Vec::new(),
+            _ty: PhantomData,
+        }
+    }
+
+    pub fn get(&self, id: Id<K>) -> Option<&V> {
+        self.inner.get(id.into_raw())?.as_ref()
+    }
+
+    pub fn insert(&mut self, id: Id<K>, value: V) {
+        for _ in self.inner.len()..=id.into_raw() {
+            self.inner.push(None);
+        }
+        self.inner[id.into_raw()] = Some(value);
+    }
+
+    pub fn retain<F: FnMut(Id<K>, &mut V) -> bool>(&mut self, mut f: F) {
+        self.inner.iter_mut().enumerate().for_each(|(i, v)| {
+            if v.is_some() && !f(Id::from(i as u32), v.as_mut().unwrap()) {
+                *v = None;
+            }
+        });
+    }
+
+    pub fn remove(&mut self, id: Id<K>) -> Option<V> {
+        self.inner.get_mut(id.into_raw())?.take()
+    }
+}
+
+impl<K, V: Default> IdMap<K, V> {
+    pub fn get_or_defalt(&mut self, id: Id<K>) -> &mut V {
+        for _ in self.inner.len()..=id.into_raw() {
+            self.inner.push(None);
+        }
+        let out = &mut self.inner[id.into_raw()];
+        if out.is_none() {
+            *out = Some(V::default());
+        }
+        out.as_mut().unwrap()
+    }
+}
+
+impl<K, V> Index<Id<K>> for IdMap<K, V> {
+    type Output = V;
+    fn index(&self, id: Id<K>) -> &V {
+        self.inner[id.into_raw()].as_ref().unwrap()
+    }
+}
+
+impl<K, V> Default for IdMap<K, V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
