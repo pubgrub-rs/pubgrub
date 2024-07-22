@@ -21,7 +21,7 @@ pub enum PubGrubError<DP: DependencyProvider> {
     NoSolution(NoSolutionError<DP>),
 
     /// Error arising when the implementer of [DependencyProvider] returned an error in the method
-    /// [get_dependencies](vecDependencyProvider::get_dependencies).
+    /// [get_dependencies](DependencyProvider::get_dependencies).
     #[error("Retrieving dependencies of {package} {version} failed")]
     ErrorRetrievingDependencies {
         /// Package whose dependencies we want.
