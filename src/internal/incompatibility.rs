@@ -336,7 +336,7 @@ impl<'a, P: Package, VS: VersionSet + 'a, M: Eq + Clone + Debug + Display + 'a>
     }
 }
 
-impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> fmt::Display
+impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Display
     for Incompatibility<P, VS, M>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

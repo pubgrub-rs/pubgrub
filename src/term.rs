@@ -66,7 +66,7 @@ impl<VS: VersionSet> Term<VS> {
     pub(crate) fn contains(&self, v: &VS::V) -> bool {
         match self {
             Self::Positive(set) => set.contains(v),
-            Self::Negative(set) => !(set.contains(v)),
+            Self::Negative(set) => !set.contains(v),
         }
     }
 
