@@ -241,10 +241,10 @@ impl<DP: DependencyProvider> State<DP> {
 
     /// Add this incompatibility into the set of all incompatibilities.
     ///
-    /// pub(crate)collapses identical dependencies from adjacent package versions
+    /// PubGrub collapses identical dependencies from adjacent package versions
     /// into individual incompatibilities.
     /// This substantially reduces the total number of incompatibilities
-    /// and makes it much easier for pub(crate)to reason about multiple versions of packages at once.
+    /// and makes it much easier for PubGrub to reason about multiple versions of packages at once.
     ///
     /// For example, rather than representing
     /// foo 1.0.0 depends on bar ^1.0.0 and
