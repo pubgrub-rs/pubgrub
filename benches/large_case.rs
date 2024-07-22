@@ -4,11 +4,11 @@ use std::time::Duration;
 extern crate criterion;
 use self::criterion::*;
 
-use pubgrub::package::Package;
-use pubgrub::range::Range;
-use pubgrub::solver::{resolve, OfflineDependencyProvider};
-use pubgrub::version::SemanticVersion;
-use pubgrub::version_set::VersionSet;
+use pubgrub::Package;
+use pubgrub::Range;
+use pubgrub::SemanticVersion;
+use pubgrub::VersionSet;
+use pubgrub::{resolve, OfflineDependencyProvider};
 use serde::de::Deserialize;
 
 fn bench<'a, P: Package + Deserialize<'a>, VS: VersionSet + Deserialize<'a>>(
