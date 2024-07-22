@@ -358,8 +358,8 @@ pub(crate) mod tests {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::range::Range;
     use crate::term::tests::strategy as term_strat;
+    use crate::Range;
 
     proptest! {
 

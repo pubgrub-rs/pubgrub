@@ -223,7 +223,7 @@ pub mod tests {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::range::Range;
+    use crate::Range;
 
     pub fn strategy() -> impl Strategy<Value = Term<Range<u32>>> {
         prop_oneof![
