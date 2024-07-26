@@ -6,10 +6,11 @@
 use std::collections::HashSet as Set;
 use std::sync::Arc;
 
-use crate::internal::{
-    Arena, DecisionLevel, IncompDpId, Incompatibility, PartialSolution, Relation, SatisfierSearch,
-    SmallVec,
-};
+use crate::internal::arena::Arena;
+use crate::internal::incompatibility::{Incompatibility, Relation};
+use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
+use crate::internal::small_vec::SmallVec;
+use crate::internal::{IncompDpId, SatisfierSearch};
 use crate::{DependencyProvider, DerivationTree, Map, NoSolutionError, VersionSet};
 
 /// Current state of the PubGrub algorithm.
