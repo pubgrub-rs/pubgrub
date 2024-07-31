@@ -10,9 +10,7 @@ use priority_queue::PriorityQueue;
 use rustc_hash::FxHasher;
 
 use super::small_vec::SmallVec;
-use crate::internal::arena::Arena;
-use crate::internal::incompatibility::{IncompDpId, IncompId, Incompatibility, Relation};
-use crate::internal::small_map::SmallMap;
+use crate::internal::{Arena, IncompDpId, IncompId, Incompatibility, Relation, SmallMap};
 use crate::{DependencyProvider, Package, SelectedDependencies, Term, VersionSet};
 
 type FnvIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;

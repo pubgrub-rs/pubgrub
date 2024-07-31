@@ -6,8 +6,7 @@
 use std::fmt::{self, Debug, Display};
 use std::sync::Arc;
 
-use crate::internal::arena::{Arena, Id};
-use crate::internal::small_map::SmallMap;
+use crate::internal::{Arena, Id, SmallMap};
 use crate::{
     term, DefaultStringReportFormatter, DependencyProvider, DerivationTree, Derived, External, Map,
     Package, ReportFormatter, Set, Term, VersionSet,
