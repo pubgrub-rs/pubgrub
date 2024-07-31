@@ -206,8 +206,9 @@ impl<T> Iterator for SmallVecIntoIter<T> {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
     use proptest::prelude::*;
+
+    use super::*;
 
     proptest! {
         #[test]

@@ -66,7 +66,7 @@ impl<VS: VersionSet> Term<VS> {
     pub(crate) fn contains(&self, v: &VS::V) -> bool {
         match self {
             Self::Positive(set) => set.contains(v),
-            Self::Negative(set) => !(set.contains(v)),
+            Self::Negative(set) => !set.contains(v),
         }
     }
 
@@ -220,9 +220,10 @@ impl<VS: VersionSet + Display> Display for Term<VS> {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    use crate::range::Range;
     use proptest::prelude::*;
+
+    use super::*;
+    use crate::Range;
 
     pub fn strategy() -> impl Strategy<Value = Term<Range<u32>>> {
         prop_oneof![

@@ -4,8 +4,7 @@
 
 use thiserror::Error;
 
-use crate::report::DerivationTree;
-use crate::solver::DependencyProvider;
+use crate::{DependencyProvider, DerivationTree};
 
 /// There is no solution for this set of dependencies.
 pub type NoSolutionError<DP> = DerivationTree<
@@ -21,10 +20,8 @@ pub enum PubGrubError<DP: DependencyProvider> {
     #[error("No solution")]
     NoSolution(NoSolutionError<DP>),
 
-    /// Error arising when the implementer of
-    /// [DependencyProvider]
-    /// returned an error in the method
-    /// [get_dependencies](crate::solver::DependencyProvider::get_dependencies).
+    /// Error arising when the implementer of [DependencyProvider] returned an error in the method
+    /// [get_dependencies](DependencyProvider::get_dependencies).
     #[error("Retrieving dependencies of {package} {version} failed")]
     ErrorRetrievingDependencies {
         /// Package whose dependencies we want.
@@ -49,15 +46,13 @@ pub enum PubGrubError<DP: DependencyProvider> {
         version: DP::V,
     },
 
-    /// Error arising when the implementer of
-    /// [DependencyProvider]
-    /// returned an error in the method
-    /// [choose_version](crate::solver::DependencyProvider::choose_version).
+    /// Error arising when the implementer of [DependencyProvider] returned an error in the method
+    /// [choose_version](DependencyProvider::choose_version).
     #[error("Decision making failed")]
     ErrorChoosingPackageVersion(#[source] DP::Err),
 
     /// Error arising when the implementer of [DependencyProvider]
-    /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
+    /// returned an error in the method [should_cancel](DependencyProvider::should_cancel).
     #[error("We should cancel")]
     ErrorInShouldCancel(#[source] DP::Err),
 

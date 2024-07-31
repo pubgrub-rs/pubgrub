@@ -107,17 +107,17 @@
 //! ```
 //!
 //! The first method
-//! [choose_version](crate::solver::DependencyProvider::choose_version)
+//! [choose_version](DependencyProvider::choose_version)
 //! chooses a version compatible with the provided range for a package.
 //! The second method
-//! [prioritize](crate::solver::DependencyProvider::prioritize)
+//! [prioritize](DependencyProvider::prioritize)
 //! in which order different packages should be chosen.
 //! Usually prioritizing packages
 //! with the fewest number of compatible versions speeds up resolution.
 //! But in general you are free to employ whatever strategy suits you best
 //! to pick a package and a version.
 //!
-//! The third method [get_dependencies](crate::solver::DependencyProvider::get_dependencies)
+//! The third method [get_dependencies](DependencyProvider::get_dependencies)
 //! aims at retrieving the dependencies of a given package at a given version.
 //!
 //! In a real scenario, these two methods may involve reading the file system
@@ -134,10 +134,10 @@
 //! When everything goes well, the algorithm finds and returns the complete
 //! set of direct and indirect dependencies satisfying all the constraints.
 //! The packages and versions selected are returned as
-//! [SelectedDepedencies<P, V>](type_aliases::SelectedDependencies).
+//! [SelectedDependencies<P, V>](SelectedDependencies).
 //! But sometimes there is no solution because dependencies are incompatible.
-//! In such cases, [resolve(...)](solver::resolve) returns a
-//! [PubGrubError::NoSolution(derivation_tree)](error::PubGrubError::NoSolution),
+//! In such cases, [resolve(...)](resolve) returns a
+//! [PubGrubError::NoSolution(derivation_tree)](PubGrubError::NoSolution),
 //! where the provided derivation tree is a custom binary tree
 //! containing the full chain of reasons why there is no solution.
 //!
@@ -155,7 +155,7 @@
 //! such as if "a" depends on "b" and "b" depends on "c", "a" depends on "c".
 //!
 //! This crate defines a [Reporter] trait, with an associated
-//! [Output](crate::report::Reporter::Output) type and a single method.
+//! [Output](Reporter::Output) type and a single method.
 //! ```
 //! # use pubgrub::{Package, VersionSet, DerivationTree};
 //! # use std::fmt::{Debug, Display};
@@ -190,9 +190,9 @@
 //! };
 //! ```
 //! Notice that we also used
-//! [collapse_no_versions()](crate::report::DerivationTree::collapse_no_versions) above.
+//! [collapse_no_versions()](DerivationTree::collapse_no_versions) above.
 //! This method simplifies the derivation tree to get rid of the
-//! [NoVersions](crate::report::External::NoVersions)
+//! [NoVersions](External::NoVersions)
 //! external incompatibilities in the derivation tree.
 //! So instead of seeing things like this in the report:
 //! ```txt
@@ -220,7 +220,7 @@ mod type_aliases;
 mod version;
 mod version_set;
 
-pub use error::PubGrubError;
+pub use error::{NoSolutionError, PubGrubError};
 pub use package::Package;
 pub use range::Range;
 pub use report::{

@@ -167,9 +167,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
     }
 }
 
-impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> fmt::Display
-    for External<P, VS, M>
-{
+impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Display for External<P, VS, M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotRoot(package, version) => {

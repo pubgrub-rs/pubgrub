@@ -4,6 +4,7 @@
 
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
+
 use thiserror::Error;
 
 /// Type for semantic versions: major.minor.patch.

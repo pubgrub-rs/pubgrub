@@ -6,18 +6,16 @@ use std::collections::BTreeSet as Set;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 
-#[cfg(feature = "serde")]
-use pubgrub::SemanticVersion;
+use proptest::collection::{btree_map, btree_set, vec};
+use proptest::prelude::*;
+use proptest::sample::Index;
+use proptest::string::string_regex;
+
 use pubgrub::{
     resolve, DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, External,
     OfflineDependencyProvider, Package, PubGrubError, Range, Reporter, SelectedDependencies,
     VersionSet,
 };
-
-use proptest::collection::{btree_map, btree_set, vec};
-use proptest::prelude::*;
-use proptest::sample::Index;
-use proptest::string::string_regex;
 
 use crate::sat_dependency_provider::SatResolve;
 
@@ -134,8 +132,6 @@ fn timeout_resolve<DP: DependencyProvider>(
 }
 
 type NumVS = Range<u32>;
-#[cfg(feature = "serde")]
-type SemVS = Range<SemanticVersion>;
 
 #[test]
 #[should_panic]
@@ -217,7 +213,7 @@ pub fn registry_strategy<N: Package + Ord>(
                     let (a, b) = order_index(a, b, len_all_pkgid);
                     let (a, b) = if reverse_alphabetical { (b, a) } else { (a, b) };
                     let ((dep_name, _), _) = list_of_pkgid[a].to_owned();
-                    if (list_of_pkgid[b].0).0 == dep_name {
+                    if list_of_pkgid[b].0 .0 == dep_name {
                         continue;
                     }
                     let s = &crate_vers_by_name[&dep_name];
@@ -330,7 +326,7 @@ fn retain_versions<N: Package + Ord, VS: VersionSet>(
 }
 
 /// Removes dependencies from the dependency provider where the retain function returns false.
-/// Solutions are constraned by having to fulfill all the dependencies.
+/// Solutions are constrained by having to fulfill all the dependencies.
 /// If there are fewer dependencies required, there are more valid solutions.
 /// If there was a solution to a resolution in the original dependency provider,
 /// then there must still be a solution after dependencies are removed.
@@ -501,7 +497,7 @@ proptest! {
     #[test]
     fn prop_removing_a_dep_cant_break(
         (dependency_provider, cases) in registry_strategy(0u16..665),
-        indexes_to_remove in prop::collection::vec((any::<prop::sample::Index>(), any::<prop::sample::Index>(), any::<prop::sample::Index>()), 1..10)
+        indexes_to_remove in vec((any::<Index>(), any::<Index>(), any::<Index>()), 1..10)
     ) {
         let packages: Vec<_> = dependency_provider.packages().collect();
         let mut to_remove = Set::new();
@@ -541,7 +537,7 @@ proptest! {
     #[test]
     fn prop_limited_independence_of_irrelevant_alternatives(
         (dependency_provider, cases) in registry_strategy(0u16..665),
-        indexes_to_remove in prop::collection::vec(any::<prop::sample::Index>(), 1..10)
+        indexes_to_remove in vec(any::<Index>(), 1..10)
     )  {
         let all_versions: Vec<(u16, u32)> = dependency_provider
             .packages()
@@ -609,8 +605,10 @@ fn large_case() {
                 }
             }
         } else if name.ends_with("str_SemanticVersion.ron") {
-            let dependency_provider: OfflineDependencyProvider<&str, SemVS> =
-                ron::de::from_str(&data).unwrap();
+            let dependency_provider: OfflineDependencyProvider<
+                &str,
+                Range<pubgrub::SemanticVersion>,
+            > = ron::de::from_str(&data).unwrap();
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {
                 for v in dependency_provider.versions(p).unwrap() {

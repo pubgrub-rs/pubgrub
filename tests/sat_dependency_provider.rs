@@ -6,7 +6,7 @@ use pubgrub::{
 };
 use varisat::ExtendFormula;
 
-fn sat_at_most_one(solver: &mut impl varisat::ExtendFormula, vars: &[varisat::Var]) {
+fn sat_at_most_one(solver: &mut impl ExtendFormula, vars: &[varisat::Var]) {
     if vars.len() <= 1 {
         return;
     } else if vars.len() == 2 {

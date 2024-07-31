@@ -6,22 +6,15 @@
 use std::collections::HashSet as Set;
 use std::sync::Arc;
 
-use crate::error::NoSolutionError;
-use crate::internal::arena::Arena;
-use crate::internal::incompatibility::{Incompatibility, Relation};
-use crate::internal::partial_solution::SatisfierSearch::{
-    DifferentDecisionLevels, SameDecisionLevels,
+use crate::internal::{
+    Arena, DecisionLevel, IncompDpId, Incompatibility, PartialSolution, Relation, SatisfierSearch,
+    SmallVec,
 };
-use crate::internal::partial_solution::{DecisionLevel, PartialSolution};
-use crate::internal::small_vec::SmallVec;
-use crate::report::DerivationTree;
-use crate::solver::DependencyProvider;
-use crate::type_aliases::{IncompDpId, Map};
-use crate::version_set::VersionSet;
+use crate::{DependencyProvider, DerivationTree, Map, NoSolutionError, VersionSet};
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
-pub struct State<DP: DependencyProvider> {
+pub(crate) struct State<DP: DependencyProvider> {
     root_package: DP::P,
     root_version: DP::V,
 
@@ -40,10 +33,10 @@ pub struct State<DP: DependencyProvider> {
 
     /// Partial solution.
     /// TODO: remove pub.
-    pub partial_solution: PartialSolution<DP>,
+    pub(crate) partial_solution: PartialSolution<DP>,
 
     /// The store is the reference storage for all incompatibilities.
-    pub incompatibility_store: Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
+    pub(crate) incompatibility_store: Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
 
     /// This is a stack of work to be done in `unit_propagation`.
     /// It can definitely be a local variable to that method, but
@@ -53,7 +46,7 @@ pub struct State<DP: DependencyProvider> {
 
 impl<DP: DependencyProvider> State<DP> {
     /// Initialization of PubGrub state.
-    pub fn init(root_package: DP::P, root_version: DP::V) -> Self {
+    pub(crate) fn init(root_package: DP::P, root_version: DP::V) -> Self {
         let mut incompatibility_store = Arena::new();
         let not_root_id = incompatibility_store.alloc(Incompatibility::not_root(
             root_package.clone(),
@@ -74,13 +67,13 @@ impl<DP: DependencyProvider> State<DP> {
     }
 
     /// Add an incompatibility to the state.
-    pub fn add_incompatibility(&mut self, incompat: Incompatibility<DP::P, DP::VS, DP::M>) {
+    pub(crate) fn add_incompatibility(&mut self, incompat: Incompatibility<DP::P, DP::VS, DP::M>) {
         let id = self.incompatibility_store.alloc(incompat);
         self.merge_incompatibility(id);
     }
 
     /// Add an incompatibility to the state.
-    pub fn add_incompatibility_from_dependencies(
+    pub(crate) fn add_incompatibility_from_dependencies(
         &mut self,
         package: DP::P,
         version: DP::V,
@@ -105,7 +98,7 @@ impl<DP: DependencyProvider> State<DP> {
 
     /// Unit propagation is the core mechanism of the solving algorithm.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
-    pub fn unit_propagation(&mut self, package: DP::P) -> Result<(), NoSolutionError<DP>> {
+    pub(crate) fn unit_propagation(&mut self, package: DP::P) -> Result<(), NoSolutionError<DP>> {
         self.unit_propagation_buffer.clear();
         self.unit_propagation_buffer.push(package);
         while let Some(current_package) = self.unit_propagation_buffer.pop() {
@@ -202,7 +195,7 @@ impl<DP: DependencyProvider> State<DP> {
                     &self.incompatibility_store,
                 );
                 match satisfier_search_result {
-                    DifferentDecisionLevels {
+                    SatisfierSearch::DifferentDecisionLevels {
                         previous_satisfier_level,
                     } => {
                         let package = package.clone();
@@ -214,7 +207,7 @@ impl<DP: DependencyProvider> State<DP> {
                         log::info!("backtrack to {:?}", previous_satisfier_level);
                         return Ok((package, current_incompat_id));
                     }
-                    SameDecisionLevels { satisfier_cause } => {
+                    SatisfierSearch::SameDecisionLevels { satisfier_cause } => {
                         let prior_cause = Incompatibility::prior_cause(
                             current_incompat_id,
                             satisfier_cause,
@@ -248,10 +241,10 @@ impl<DP: DependencyProvider> State<DP> {
 
     /// Add this incompatibility into the set of all incompatibilities.
     ///
-    /// Pub collapses identical dependencies from adjacent package versions
+    /// PubGrub collapses identical dependencies from adjacent package versions
     /// into individual incompatibilities.
     /// This substantially reduces the total number of incompatibilities
-    /// and makes it much easier for Pub to reason about multiple versions of packages at once.
+    /// and makes it much easier for PubGrub to reason about multiple versions of packages at once.
     ///
     /// For example, rather than representing
     /// foo 1.0.0 depends on bar ^1.0.0 and

@@ -10,7 +10,7 @@ use std::ops::{Index, Range};
 /// that we actually don't need since it is phantom.
 ///
 /// <https://github.com/rust-lang/rust/issues/26925>
-pub struct Id<T> {
+pub(crate) struct Id<T> {
     raw: u32,
     _ty: PhantomData<fn() -> T>,
 }
@@ -48,7 +48,7 @@ impl<T> fmt::Debug for Id<T> {
 }
 
 impl<T> Id<T> {
-    pub fn into_raw(self) -> usize {
+    pub(crate) fn into_raw(self) -> usize {
         self.raw as usize
     }
     fn from(n: u32) -> Self {
@@ -57,7 +57,7 @@ impl<T> Id<T> {
             _ty: PhantomData,
         }
     }
-    pub fn range_to_iter(range: Range<Self>) -> impl Iterator<Item = Self> {
+    pub(crate) fn range_to_iter(range: Range<Self>) -> impl Iterator<Item = Self> {
         let start = range.start.raw;
         let end = range.end.raw;
         (start..end).map(Self::from)
@@ -71,7 +71,7 @@ impl<T> Id<T> {
 /// to have references between those items.
 /// They are all dropped at once when the arena is dropped.
 #[derive(Clone, PartialEq, Eq)]
-pub struct Arena<T> {
+pub(crate) struct Arena<T> {
     data: Vec<T>,
 }
 
@@ -91,17 +91,17 @@ impl<T> Default for Arena<T> {
 }
 
 impl<T> Arena<T> {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self { data: Vec::new() }
     }
 
-    pub fn alloc(&mut self, value: T) -> Id<T> {
+    pub(crate) fn alloc(&mut self, value: T) -> Id<T> {
         let raw = self.data.len();
         self.data.push(value);
         Id::from(raw as u32)
     }
 
-    pub fn alloc_iter<I: Iterator<Item = T>>(&mut self, values: I) -> Range<Id<T>> {
+    pub(crate) fn alloc_iter<I: Iterator<Item = T>>(&mut self, values: I) -> Range<Id<T>> {
         let start = Id::from(self.data.len() as u32);
         values.for_each(|v| {
             self.alloc(v);

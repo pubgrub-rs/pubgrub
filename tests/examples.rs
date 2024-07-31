@@ -8,8 +8,9 @@ use pubgrub::{
 type NumVS = Range<u32>;
 type SemVS = Range<SemanticVersion>;
 
-use log::LevelFilter;
 use std::io::Write;
+
+use log::LevelFilter;
 
 fn init_log() {
     let _ = env_logger::builder()
