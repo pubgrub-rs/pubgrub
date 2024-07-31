@@ -153,12 +153,6 @@ pub fn resolve<DP: DependencyProvider>(
                     ));
                     continue;
                 }
-                Dependencies::Available(x) if x.contains_key(p) => {
-                    return Err(PubGrubError::SelfDependency {
-                        package: p.clone(),
-                        version: v,
-                    });
-                }
                 Dependencies::Available(x) => x,
             };
 
