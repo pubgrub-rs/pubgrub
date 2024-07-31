@@ -347,6 +347,20 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     #[cold]
+    pub fn prioritized_packages(&self) -> impl Iterator<Item = (Id<DP::P>, &DP::VS)> {
+        // TODO(konsti): Should we use `self.outdated_priorities` instead?
+        let current_decision_level = self.current_decision_level;
+        self.package_assignments
+            .get_range(self.current_decision_level.get() as usize..)
+            .unwrap()
+            .iter()
+            .filter(move |(_, pa)| pa.highest_decision_level == current_decision_level)
+            .filter_map(|(&p, pa)| {
+                Some((p, pa.assignments_intersection.potential_package_filter()?))
+            })
+    }
+
+    #[cold]
     pub fn pick_highest_priority_pkg(
         &mut self,
         mut prioritizer: impl FnMut(Id<DP::P>, &DP::VS) -> DP::Priority,
