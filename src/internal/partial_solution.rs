@@ -63,7 +63,7 @@ const _: () = assert!(std::mem::size_of::<Option<DecisionLevel>>() == std::mem::
 /// The partial solution contains all package assignments,
 /// organized by package and historically ordered.
 #[derive(Clone, Debug)]
-pub(crate) struct PartialSolution<DP: DependencyProvider> {
+pub struct PartialSolution<DP: DependencyProvider> {
     next_global_index: u32,
     /// The number of decisions that have been made, equal to the number of packages with decisions.
     current_decision_level: DecisionLevel,
@@ -258,7 +258,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Add a decision.
-    pub(crate) fn add_decision(&mut self, package: Id<DP::P>, version: DP::V) {
+    pub fn add_decision(&mut self, package: Id<DP::P>, version: DP::V) {
         // Check that add_decision is never used in the wrong context.
         if cfg!(debug_assertions) {
             match self.package_assignments.get_mut(&package) {
@@ -347,7 +347,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     #[cold]
-    pub(crate) fn pick_highest_priority_pkg(
+    pub fn pick_highest_priority_pkg(
         &mut self,
         mut prioritizer: impl FnMut(Id<DP::P>, &DP::VS) -> DP::Priority,
     ) -> Option<(Id<DP::P>, &DP::VS)> {
@@ -376,7 +376,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     /// If a partial solution has, for every positive derivation,
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
-    pub(crate) fn extract_solution(&self) -> impl Iterator<Item = (Id<DP::P>, DP::V)> + '_ {
+    pub fn extract_solution(&self) -> impl Iterator<Item = (Id<DP::P>, DP::V)> + '_ {
         self.package_assignments
             .iter()
             .take(self.current_decision_level.get() as usize)
@@ -526,10 +526,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Retrieve intersection of terms related to package.
-    pub(crate) fn term_intersection_for_package(
-        &self,
-        package: Id<DP::P>,
-    ) -> Option<&Term<DP::VS>> {
+    pub fn term_intersection_for_package(&self, package: Id<DP::P>) -> Option<&Term<DP::VS>> {
         self.package_assignments
             .get(&package)
             .map(|pa| pa.assignments_intersection.term())

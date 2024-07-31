@@ -55,9 +55,10 @@ impl ContradictionCache {
 /// during conflict resolution. More about all this in
 /// [PubGrub documentation](https://github.com/dart-lang/pub/blob/master/doc/solver.md#incompatibility).
 #[derive(Debug, Clone)]
-pub(crate) struct Incompatibility<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
+pub struct Incompatibility<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     package_terms: SmallMap<Id<P>, Term<VS>>,
-    kind: Kind<P, VS, M>,
+    /// The reason for the incompatibility.
+    pub kind: Kind<P, VS, M>,
     contradiction_cache: ContradictionCache,
 }
 
@@ -70,8 +71,9 @@ pub(crate) type IncompDpId<DP> = IncompId<
     <DP as DependencyProvider>::M,
 >;
 
+/// The reason for the incompatibility.
 #[derive(Debug, Clone)]
-enum Kind<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
+pub enum Kind<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     /// Initial incompatibility aiming at picking the root package for the first decision.
     ///
     /// This incompatibility drives the resolution, it requires that we pick the (virtual) root
@@ -133,7 +135,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
     }
 
     /// Create an incompatibility to remember that a given set does not contain any version.
-    pub(crate) fn no_versions(package: Id<P>, term: Term<VS>) -> Self {
+    pub fn no_versions(package: Id<P>, term: Term<VS>) -> Self {
         let set = match &term {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
@@ -147,7 +149,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
 
     /// Create an incompatibility for a reason outside pubgrub.
     #[allow(dead_code)] // Used by uv
-    pub(crate) fn custom_term(package: Id<P>, term: Term<VS>, metadata: M) -> Self {
+    pub fn custom_term(package: Id<P>, term: Term<VS>, metadata: M) -> Self {
         let set = match &term {
             Term::Positive(r) => r.clone(),
             Term::Negative(_) => panic!("No version should have a positive term"),
@@ -160,7 +162,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
     }
 
     /// Create an incompatibility for a reason outside pubgrub.
-    pub(crate) fn custom_version(package: Id<P>, version: VS::V, metadata: M) -> Self {
+    pub fn custom_version(package: Id<P>, version: VS::V, metadata: M) -> Self {
         let set = VS::singleton(version);
         let term = Term::Positive(set.clone());
         Self {
@@ -171,7 +173,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
     }
 
     /// Build an incompatibility from a given dependency.
-    pub(crate) fn from_dependency(package: Id<P>, versions: VS, dep: (Id<P>, VS)) -> Self {
+    pub fn from_dependency(package: Id<P>, versions: VS, dep: (Id<P>, VS)) -> Self {
         let (p2, set2) = dep;
         Self {
             package_terms: if set2 == VS::empty() {
@@ -427,6 +429,7 @@ impl<'a, P: Package, VS: VersionSet + 'a, M: Eq + Clone + Debug + Display + 'a>
 }
 
 impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibility<P, VS, M> {
+    /// Display the incompatibility.
     pub fn display<'a>(&'a self, package_store: &'a HashArena<P>) -> impl Display + 'a {
         match self.iter().collect::<Vec<_>>().as_slice() {
             [] => "version solving failed".into(),
