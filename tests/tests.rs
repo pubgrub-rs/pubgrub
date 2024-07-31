@@ -43,11 +43,10 @@ fn should_always_find_a_satisfier() {
 }
 
 #[test]
-fn cannot_depend_on_self() {
+fn depend_on_self() {
     let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
     dependency_provider.add_dependencies("a", 0u32, [("a", Range::full())]);
-    assert!(matches!(
-        resolve(&dependency_provider, "a", 0u32),
-        Err(PubGrubError::SelfDependency { .. })
-    ));
+    assert!(resolve(&dependency_provider, "a", 0u32).is_ok());
+    dependency_provider.add_dependencies("a", 66u32, [("a", Range::singleton(111u32))]);
+    assert!(resolve(&dependency_provider, "a", 66u32).is_err());
 }

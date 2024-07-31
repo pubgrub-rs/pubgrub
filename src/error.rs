@@ -33,19 +33,6 @@ pub enum PubGrubError<DP: DependencyProvider> {
         source: DP::Err,
     },
 
-    /// Error arising when the implementer of
-    /// [DependencyProvider]
-    /// returned a dependency on the requested package.
-    /// This technically means that the package directly depends on itself,
-    /// and is clearly some kind of mistake.
-    #[error("{package} {version} depends on itself")]
-    SelfDependency {
-        /// Package whose dependencies we want.
-        package: DP::P,
-        /// Version of the package for which we want the dependencies.
-        version: DP::V,
-    },
-
     /// Error arising when the implementer of [DependencyProvider] returned an error in the method
     /// [choose_version](DependencyProvider::choose_version).
     #[error("Decision making failed")]
@@ -83,11 +70,6 @@ where
                 .field("package", package)
                 .field("version", version)
                 .field("source", source)
-                .finish(),
-            Self::SelfDependency { package, version } => f
-                .debug_struct("SelfDependency")
-                .field("package", package)
-                .field("version", version)
                 .finish(),
             Self::ErrorChoosingPackageVersion(arg0) => f
                 .debug_tuple("ErrorChoosingPackageVersion")
