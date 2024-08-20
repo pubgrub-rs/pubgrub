@@ -308,6 +308,104 @@ impl<V: Ord> Range<V> {
     }
 }
 
+/// Implementing `PartialOrd` for start `Bound` of an interval.
+///
+/// Legend: `∞` is unbounded, `[1,2]` is `>=1,<=2`, `]1,2[` is `>1,<2`.
+///
+/// ```text
+/// left:   ∞-------]
+/// right:    [-----]
+/// left is smaller, since it starts earlier.
+///
+/// left:   [-----]
+/// right:  ]-----]
+/// left is smaller, since it starts earlier.
+/// ```
+fn cmp_bounds_start<V: PartialOrd>(left: Bound<&V>, right: Bound<&V>) -> Option<Ordering> {
+    match (left, right) {
+        (Unbounded, Unbounded) => Some(Ordering::Equal),
+        (Included(_left), Unbounded) => Some(Ordering::Greater),
+        (Excluded(_left), Unbounded) => Some(Ordering::Greater),
+        (Unbounded, Included(_right)) => Some(Ordering::Less),
+        (Included(left), Included(right)) => left.partial_cmp(right),
+        (Excluded(left), Included(right)) => match left.partial_cmp(right)? {
+            Ordering::Less => Some(Ordering::Less),
+            Ordering::Equal => Some(Ordering::Greater),
+            Ordering::Greater => Some(Ordering::Greater),
+        },
+        (Unbounded, Excluded(_right)) => Some(Ordering::Less),
+        (Included(left), Excluded(right)) => match left.partial_cmp(right)? {
+            Ordering::Less => Some(Ordering::Less),
+            Ordering::Equal => Some(Ordering::Less),
+            Ordering::Greater => Some(Ordering::Greater),
+        },
+        (Excluded(left), Excluded(right)) => left.partial_cmp(right),
+    }
+}
+
+/// Implementing `PartialOrd` for end `Bound` of an interval.
+///
+/// We flip the unbounded ranges from `-∞` to `∞`, while `V`-valued bounds checks remain the same.
+///
+/// Legend: `∞` is unbounded, `[1,2]` is `>=1,<=2`, `]1,2[` is `>1,<2`.
+///
+/// ```text
+/// left:   [--------∞
+/// right:  [-----]
+/// left is greater, since it starts earlier.
+///
+/// left:   [-----[
+/// right:  [-----]
+/// left is smaller, since it ends earlier.
+/// ```
+fn cmp_bounds_end<V: PartialOrd>(left: Bound<&V>, right: Bound<&V>) -> Option<Ordering> {
+    match (left, right) {
+        (Unbounded, Unbounded) => Some(Ordering::Equal),
+        (Included(_left), Unbounded) => Some(Ordering::Less),
+        (Excluded(_left), Unbounded) => Some(Ordering::Less),
+        (Unbounded, Included(_right)) => Some(Ordering::Greater),
+        (Included(left), Included(right)) => left.partial_cmp(right),
+        (Excluded(left), Included(right)) => match left.partial_cmp(right)? {
+            Ordering::Less => Some(Ordering::Less),
+            Ordering::Equal => Some(Ordering::Less),
+            Ordering::Greater => Some(Ordering::Greater),
+        },
+        (Unbounded, Excluded(_right)) => Some(Ordering::Greater),
+        (Included(left), Excluded(right)) => match left.partial_cmp(right)? {
+            Ordering::Less => Some(Ordering::Less),
+            Ordering::Equal => Some(Ordering::Greater),
+            Ordering::Greater => Some(Ordering::Greater),
+        },
+        (Excluded(left), Excluded(right)) => left.partial_cmp(right),
+    }
+}
+
+impl<V: PartialOrd> PartialOrd for Range<V> {
+    /// A simple ordering scheme where we zip the segments and compare all bounds in order. If all
+    /// bounds are equal, the longer range is considered greater. (And if all zipped bounds are
+    /// equal and we have the same number of segments, the ranges are equal).
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        for (left, right) in self.segments.iter().zip(other.segments.iter()) {
+            let start_cmp = cmp_bounds_start(left.start_bound(), right.start_bound())?;
+            if start_cmp != Ordering::Equal {
+                return Some(start_cmp);
+            }
+            let end_cmp = cmp_bounds_end(left.end_bound(), right.end_bound())?;
+            if end_cmp != Ordering::Equal {
+                return Some(end_cmp);
+            }
+        }
+        Some(self.segments.len().cmp(&other.segments.len()))
+    }
+}
+
+impl<V: Ord> Ord for Range<V> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other)
+            .expect("PartialOrd must be `Some(Ordering)` for types that implement `Ord`")
+    }
+}
+
 /// The ordering of the version wrt to the interval.
 /// ```text
 ///      |-------|
@@ -1068,5 +1166,27 @@ pub mod tests {
             range.simplify(versions.iter()),
             range.simplify(versions.into_iter())
         );
+    }
+
+    #[test]
+    fn version_ord() {
+        let versions: &[Range<u32>] = &[
+            Range::strictly_lower_than(1u32),
+            Range::lower_than(1u32),
+            Range::singleton(1u32),
+            Range::between(1u32, 3u32),
+            Range::higher_than(1u32),
+            Range::strictly_higher_than(1u32),
+            Range::singleton(2u32),
+            Range::singleton(2u32).union(&Range::singleton(3u32)),
+            Range::singleton(2u32)
+                .union(&Range::singleton(3u32))
+                .union(&Range::singleton(4u32)),
+            Range::singleton(2u32).union(&Range::singleton(4u32)),
+            Range::singleton(3u32),
+        ];
+        let mut versions_sorted = versions.to_vec();
+        versions_sorted.sort();
+        assert_eq!(versions_sorted, versions);
     }
 }
