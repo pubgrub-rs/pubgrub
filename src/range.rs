@@ -322,25 +322,51 @@ impl<V: Ord> Range<V> {
 /// left is smaller, since it starts earlier.
 /// ```
 fn cmp_bounds_start<V: PartialOrd>(left: Bound<&V>, right: Bound<&V>) -> Option<Ordering> {
-    match (left, right) {
-        (Unbounded, Unbounded) => Some(Ordering::Equal),
-        (Included(_left), Unbounded) => Some(Ordering::Greater),
-        (Excluded(_left), Unbounded) => Some(Ordering::Greater),
-        (Unbounded, Included(_right)) => Some(Ordering::Less),
-        (Included(left), Included(right)) => left.partial_cmp(right),
+    Some(match (left, right) {
+        // left:   ∞-----
+        // right:  ∞-----
+        (Unbounded, Unbounded) => Ordering::Equal,
+        // left:     [---
+        // right:  ∞-----
+        (Included(_left), Unbounded) => Ordering::Greater,
+        // left:     ]---
+        // right:  ∞-----
+        (Excluded(_left), Unbounded) => Ordering::Greater,
+        // left:   ∞-----
+        // right:    [---
+        (Unbounded, Included(_right)) => Ordering::Less,
+        // left:   [----- OR [----- OR   [-----
+        // right:    [--- OR [----- OR [---
+        (Included(left), Included(right)) => left.partial_cmp(right)?,
         (Excluded(left), Included(right)) => match left.partial_cmp(right)? {
-            Ordering::Less => Some(Ordering::Less),
-            Ordering::Equal => Some(Ordering::Greater),
-            Ordering::Greater => Some(Ordering::Greater),
+            // left:   ]-----
+            // right:    [---
+            Ordering::Less => Ordering::Less,
+            // left:   ]-----
+            // right:  [---
+            Ordering::Equal => Ordering::Greater,
+            // left:     ]---
+            // right:  [-----
+            Ordering::Greater => Ordering::Greater,
         },
-        (Unbounded, Excluded(_right)) => Some(Ordering::Less),
+        // left:   ∞-----
+        // right:    ]---
+        (Unbounded, Excluded(_right)) => Ordering::Less,
         (Included(left), Excluded(right)) => match left.partial_cmp(right)? {
-            Ordering::Less => Some(Ordering::Less),
-            Ordering::Equal => Some(Ordering::Less),
-            Ordering::Greater => Some(Ordering::Greater),
+            // left:   [-----
+            // right:    ]---
+            Ordering::Less => Ordering::Less,
+            // left:   [-----
+            // right:  ]---
+            Ordering::Equal => Ordering::Less,
+            // left:     [---
+            // right:  ]-----
+            Ordering::Greater => Ordering::Greater,
         },
-        (Excluded(left), Excluded(right)) => left.partial_cmp(right),
-    }
+        // left:   ]----- OR ]----- OR   ]---
+        // right:    ]--- OR ]----- OR ]-----
+        (Excluded(left), Excluded(right)) => left.partial_cmp(right)?,
+    })
 }
 
 /// Implementing `PartialOrd` for end `Bound` of an interval.
@@ -359,25 +385,49 @@ fn cmp_bounds_start<V: PartialOrd>(left: Bound<&V>, right: Bound<&V>) -> Option<
 /// left is smaller, since it ends earlier.
 /// ```
 fn cmp_bounds_end<V: PartialOrd>(left: Bound<&V>, right: Bound<&V>) -> Option<Ordering> {
-    match (left, right) {
-        (Unbounded, Unbounded) => Some(Ordering::Equal),
-        (Included(_left), Unbounded) => Some(Ordering::Less),
-        (Excluded(_left), Unbounded) => Some(Ordering::Less),
-        (Unbounded, Included(_right)) => Some(Ordering::Greater),
-        (Included(left), Included(right)) => left.partial_cmp(right),
+    Some(match (left, right) {
+        // left:   -----∞
+        // right:  -----∞
+        (Unbounded, Unbounded) => Ordering::Equal,
+        // left:   ---]
+        // right:  -----∞
+        (Included(_left), Unbounded) => Ordering::Less,
+        // left:   ---[
+        // right:  -----∞
+        (Excluded(_left), Unbounded) => Ordering::Less,
+        // left:  -----∞
+        // right: ---]
+        (Unbounded, Included(_right)) => Ordering::Greater,
+        // left:   -----] OR -----] OR ---]
+        // right:    ---] OR -----] OR -----]
+        (Included(left), Included(right)) => left.partial_cmp(right)?,
         (Excluded(left), Included(right)) => match left.partial_cmp(right)? {
-            Ordering::Less => Some(Ordering::Less),
-            Ordering::Equal => Some(Ordering::Less),
-            Ordering::Greater => Some(Ordering::Greater),
+            // left:   ---[
+            // right:  -----]
+            Ordering::Less => Ordering::Less,
+            // left:   -----[
+            // right:  -----]
+            Ordering::Equal => Ordering::Less,
+            // left:   -----[
+            // right:  ---]
+            Ordering::Greater => Ordering::Greater,
         },
-        (Unbounded, Excluded(_right)) => Some(Ordering::Greater),
+        (Unbounded, Excluded(_right)) => Ordering::Greater,
         (Included(left), Excluded(right)) => match left.partial_cmp(right)? {
-            Ordering::Less => Some(Ordering::Less),
-            Ordering::Equal => Some(Ordering::Greater),
-            Ordering::Greater => Some(Ordering::Greater),
+            // left:   ---]
+            // right:  -----[
+            Ordering::Less => Ordering::Less,
+            // left:   -----]
+            // right:  -----[
+            Ordering::Equal => Ordering::Greater,
+            // left:   -----]
+            // right:  ---[
+            Ordering::Greater => Ordering::Greater,
         },
-        (Excluded(left), Excluded(right)) => left.partial_cmp(right),
-    }
+        // left:   -----[ OR -----[ OR ---[
+        // right:  ---[   OR -----[ OR -----[
+        (Excluded(left), Excluded(right)) => left.partial_cmp(right)?,
+    })
 }
 
 impl<V: PartialOrd> PartialOrd for Range<V> {
