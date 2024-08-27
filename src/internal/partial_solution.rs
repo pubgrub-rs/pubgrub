@@ -3,6 +3,7 @@
 //! A Memory acts like a structured partial solution
 //! where terms are regrouped by package in a [Map](crate::type_aliases::Map).
 
+use std::cell::LazyCell;
 use std::fmt::{Debug, Display};
 use std::hash::BuildHasherDefault;
 
@@ -47,6 +48,7 @@ pub(crate) struct PartialSolution<DP: DependencyProvider> {
     prioritized_potential_packages:
         PriorityQueue<DP::P, DP::Priority, BuildHasherDefault<FxHasher>>,
     changed_this_decision_level: usize,
+    has_ever_backtracked: bool,
 }
 
 impl<DP: DependencyProvider> Display for PartialSolution<DP> {
@@ -152,6 +154,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
             package_assignments: FnvIndexMap::default(),
             prioritized_potential_packages: PriorityQueue::default(),
             changed_this_decision_level: 0,
+            has_ever_backtracked: false,
         }
     }
 
@@ -338,6 +341,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         // Throw away all stored priority levels, And mark that they all need to be recomputed.
         self.prioritized_potential_packages.clear();
         self.changed_this_decision_level = self.current_decision_level.0.saturating_sub(1) as usize;
+        self.has_ever_backtracked = true;
     }
 
     /// We can add the version to the partial solution as a decision
@@ -352,7 +356,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         new_incompatibilities: std::ops::Range<IncompId<DP::P, DP::VS, DP::M>>,
         store: &Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
     ) {
-        let exact = Term::exact(version.clone());
+        let exact = LazyCell::new(|| Term::exact(version.clone()));
         let not_satisfied = |incompat: &Incompatibility<DP::P, DP::VS, DP::M>| {
             incompat.relation(|p| {
                 if p == &package {
@@ -365,7 +369,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
 
         // Check none of the dependencies (new_incompatibilities)
         // would create a conflict (be satisfied).
-        if store[new_incompatibilities].iter().all(not_satisfied) {
+        if !self.has_ever_backtracked || store[new_incompatibilities].iter().all(not_satisfied) {
             log::info!("add_decision: {} @ {}", package, version);
             self.add_decision(package, version);
         } else {
