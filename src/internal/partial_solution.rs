@@ -3,7 +3,6 @@
 //! A Memory acts like a structured partial solution
 //! where terms are regrouped by package in a [Map](crate::type_aliases::Map).
 
-use std::cell::LazyCell;
 use std::fmt::{Debug, Display};
 use std::hash::BuildHasherDefault;
 
@@ -356,28 +355,37 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         new_incompatibilities: std::ops::Range<IncompId<DP::P, DP::VS, DP::M>>,
         store: &Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
     ) {
-        let exact = LazyCell::new(|| Term::exact(version.clone()));
-        let not_satisfied = |incompat: &Incompatibility<DP::P, DP::VS, DP::M>| {
-            incompat.relation(|p| {
-                if p == &package {
-                    Some(&exact)
-                } else {
-                    self.term_intersection_for_package(p)
-                }
-            }) != Relation::Satisfied
-        };
-
-        // Check none of the dependencies (new_incompatibilities)
-        // would create a conflict (be satisfied).
-        if !self.has_ever_backtracked || store[new_incompatibilities].iter().all(not_satisfied) {
-            log::info!("add_decision: {} @ {}", package, version);
+        if !self.has_ever_backtracked {
+            // Nothing has yet gone wrong during this resolution. This call is unlikely to be the first problem.
+            // So let's live with a little bit of risk and add the decision without checking the dependencies.
+            // The worst that can happen is we will have to do a full backtrack which only removes this one decision.
+            log::info!("add_decision: {package} @ {version} without checking dependencies");
             self.add_decision(package, version);
         } else {
-            log::info!(
-                "not adding {} @ {} because of its dependencies",
-                package,
-                version
-            );
+            // Check if any of the new dependencies preclude deciding on this crate version.
+            let exact = Term::exact(version.clone());
+            let not_satisfied = |incompat: &Incompatibility<DP::P, DP::VS, DP::M>| {
+                incompat.relation(|p| {
+                    if p == &package {
+                        Some(&exact)
+                    } else {
+                        self.term_intersection_for_package(p)
+                    }
+                }) != Relation::Satisfied
+            };
+
+            // Check none of the dependencies (new_incompatibilities)
+            // would create a conflict (be satisfied).
+            if store[new_incompatibilities].iter().all(not_satisfied) {
+                log::info!("add_decision: {} @ {}", package, version);
+                self.add_decision(package, version);
+            } else {
+                log::info!(
+                    "not adding {} @ {} because of its dependencies",
+                    package,
+                    version
+                );
+            }
         }
     }
 
