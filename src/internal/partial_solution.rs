@@ -485,12 +485,16 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
             .get(satisfier_package)
             .expect("satisfier package not in incompat");
 
+        let start_term = accum_term.intersection(&incompat_term.negate());
+        let out = satisfier_pa.satisfier(satisfier_package, &start_term);
+
         satisfied_map.insert(
             satisfier_package,
-            satisfier_pa.satisfier(
-                satisfier_package,
-                &accum_term.intersection(&incompat_term.negate()),
-            ),
+            if accum_term.subset_of(incompat_term) {
+                (None, 0, DecisionLevel(1))
+            } else {
+                out
+            },
         );
 
         // Finally, let's identify the decision level of that previous satisfier.
