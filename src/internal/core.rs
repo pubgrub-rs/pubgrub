@@ -31,6 +31,11 @@ pub(crate) struct State<DP: DependencyProvider> {
     #[allow(clippy::type_complexity)]
     merged_dependencies: Map<(DP::P, DP::P), SmallVec<IncompDpId<DP>>>,
 
+    /// All incompatibilities expressing basic facts,
+    /// with common dependents merged.
+    #[allow(clippy::type_complexity)]
+    merged_unitary_incompats: Map<DP::P, SmallVec<IncompDpId<DP>>>,
+
     /// Partial solution.
     /// TODO: remove pub.
     pub(crate) partial_solution: PartialSolution<DP>,
@@ -63,6 +68,7 @@ impl<DP: DependencyProvider> State<DP> {
             incompatibility_store,
             unit_propagation_buffer: SmallVec::Empty,
             merged_dependencies: Map::default(),
+            merged_unitary_incompats: Map::default(),
         }
     }
 
@@ -254,6 +260,26 @@ impl<DP: DependencyProvider> State<DP> {
     /// We could collapse them into { foo (1.0.0 ∪ 1.1.0), not bar ^1.0.0 }
     /// without having to check the existence of other versions though.
     fn merge_incompatibility(&mut self, mut id: IncompDpId<DP>) {
+        if let Some(p) = self.incompatibility_store[id].as_unitary() {
+            // If we are unitary, there's a good chance we can be merged with a previous unitary
+            let lookup = self.merged_unitary_incompats.entry(p.clone()).or_default();
+            if let Some((past, merged)) = lookup.as_mut_slice().iter_mut().find_map(|past| {
+                self.incompatibility_store[id]
+                    .merge_unitary(&self.incompatibility_store[*past])
+                    .map(|m| (past, m))
+            }) {
+                let p = p.clone();
+                let new = self.incompatibility_store.alloc(merged);
+                self.incompatibilities
+                    .entry(p)
+                    .or_default()
+                    .retain(|id| id != past);
+                *past = new;
+                id = new;
+            } else {
+                lookup.push(id);
+            }
+        }
         if let Some((p1, p2)) = self.incompatibility_store[id].as_dependency() {
             // If we are a dependency, there's a good chance we can be merged with a previous dependency
             let deps_lookup = self

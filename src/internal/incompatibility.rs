@@ -116,7 +116,6 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
     }
 
     /// Create an incompatibility for a reason outside pubgrub.
-    #[allow(dead_code)] // Used by uv
     pub(crate) fn custom_term(package: P, term: Term<VS>, metadata: M) -> Self {
         let set = match &term {
             Term::Positive(r) => r.clone(),
@@ -197,6 +196,60 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
                 dep_term.map_or(VS::empty(), |v| v.unwrap_negative().clone()),
             ),
         ));
+    }
+
+    pub fn as_unitary(&self) -> Option<&P> {
+        if self.package_terms.len() == 1 {
+            self.package_terms.iter().next().map(|(p, _)| p)
+        } else {
+            None
+        }
+    }
+
+    /// Merge unavailable versions of the same package.
+    ///
+    /// When multiple versions of a package are unavailable,
+    /// we can merge the two into a single incompatibility.
+    /// For example, if a@1 is unavailable and a@2 is unavailable, we can say instead
+    /// a@1||2 is unavailable.
+    ///
+    /// It is a special case of prior cause computation.
+    pub fn merge_unitary(&self, other: &Self) -> Option<Self> {
+        // It is almost certainly a bug to call this method without checking that self is a unitary
+        debug_assert!(self.as_unitary().is_some());
+        // Check that both incompatibilities are of the shape.
+        let p = self.as_unitary()?;
+        if p != other.as_unitary()? {
+            return None;
+        }
+        match (&self.kind, &other.kind) {
+            (Kind::FromDependencyOf(_, _, _, _), _) | (_, Kind::FromDependencyOf(_, _, _, _)) => {
+                None // Should be covered by merge_dependents
+            }
+            (Kind::DerivedFrom(_, _), _) | (_, Kind::DerivedFrom(_, _)) => {
+                None // The canonical case for prior_cause
+            }
+            (Kind::NotRoot(_, _), _) | (_, Kind::NotRoot(_, _)) => {
+                // There are never two rootes to be merged with each other,
+                // nor can a root emerged with anything else.
+                None
+            }
+            (Kind::NoVersions(_, _), Kind::NoVersions(_, _)) => Some(Self::no_versions(
+                p.clone(),
+                self.get(p).unwrap().union(other.get(p).unwrap()), // It is safe to `simplify` here
+            )),
+            (Kind::Custom(_, _, m1), Kind::Custom(_, _, m2)) => {
+                if m1 != m2 {
+                    return None;
+                }
+                Some(Self::custom_term(
+                    p.clone(),
+                    self.get(p).unwrap().union(other.get(p).unwrap()), // It is safe to `simplify` here
+                    m1.clone(),
+                ))
+            }
+            (_, _) => None, // When they're not the same kind we definitely cannot merge.
+        }
     }
 
     /// Prior cause of two incompatibilities using the rule of resolution.
