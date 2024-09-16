@@ -251,3 +251,51 @@ And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5
         Set::from_iter(&["root", "foo", "bar"])
     );
 }
+
+#[test]
+fn confusing_with_lots_of_holes_from_eq() {
+    let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
+
+    // root depends on foo...
+    dependency_provider.add_dependencies("root", 1u32, vec![("foo", Range::full())]);
+
+    for i in 1..6 {
+        // foo depends on bar...
+        dependency_provider.add_dependencies(
+            "foo",
+            i as u32,
+            vec![("bar", Range::singleton(i as u32))],
+        );
+    }
+
+    let Err(PubGrubError::NoSolution(mut derivation_tree)) =
+        resolve(&dependency_provider, "root", 1u32)
+    else {
+        unreachable!()
+    };
+    assert_eq!(
+        &DefaultStringReporter::report(&derivation_tree),
+        r#"Because there is no version of bar in 1 and foo 1 depends on bar 1, foo 1 is forbidden.
+And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5 | >5, foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 is forbidden. (1)
+
+Because there is no version of bar in 2 and foo 2 depends on bar 2, foo 2 is forbidden.
+And because foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 is forbidden (1), foo <3 | >3, <4 | >4, <5 | >5 is forbidden. (2)
+
+Because there is no version of bar in 3 and foo 3 depends on bar 3, foo 3 is forbidden.
+And because foo <3 | >3, <4 | >4, <5 | >5 is forbidden (2), foo <4 | >4, <5 | >5 is forbidden. (3)
+
+Because there is no version of bar in 4 and foo 4 depends on bar 4, foo 4 is forbidden.
+And because foo <4 | >4, <5 | >5 is forbidden (3), foo <5 | >5 is forbidden. (4)
+
+Because there is no version of bar in 5 and foo 5 depends on bar 5, foo 5 is forbidden.
+And because foo <5 | >5 is forbidden (4), foo * is forbidden.
+And because root 1 depends on foo, root 1 is forbidden."#
+    );
+    derivation_tree.collapse_no_versions();
+    assert_eq!(
+        &DefaultStringReporter::report(&derivation_tree),
+        r#"Because foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 depends on bar 1 and foo 2 depends on bar 2, foo <3 | >3, <4 | >4, <5 | >5 is forbidden.
+And because foo 3 depends on bar 3 and foo 4 depends on bar 4, foo <5 | >5 is forbidden.
+And because foo 5 depends on bar 5 and root 1 depends on foo, root 1 is forbidden."#
+    );
+}
