@@ -237,8 +237,8 @@ fn confusing_with_lots_of_holes() {
     };
     assert_eq!(
         &DefaultStringReporter::report(&derivation_tree),
-        r#"Because there is no available version for bar and foo 1 | 2 | 3 | 4 | 5 depends on bar, foo 1 | 2 | 3 | 4 | 5 is forbidden.
-And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5 | >5 and root 1 depends on foo, root 1 is forbidden."#
+        r#"Because foo 1 | 2 | 3 | 4 | 5 depends on bar and there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5 | >5, foo depends on bar.
+And because there is no available version for bar and root 1 depends on foo, root 1 is forbidden."#
     );
     derivation_tree.collapse_no_versions();
     assert_eq!(
@@ -275,27 +275,18 @@ fn confusing_with_lots_of_holes_from_eq() {
     };
     assert_eq!(
         &DefaultStringReporter::report(&derivation_tree),
-        r#"Because there is no version of bar in 1 | 2 | 3 | 4 | 5 and foo 1 depends on bar 1, foo 1 is forbidden.
-And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5 | >5, foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 is forbidden. (1)
-
-Because there is no version of bar in 2 | 3 | 4 | 5 and foo 2 depends on bar 2, foo 2 is forbidden.
-And because foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 is forbidden (1), foo <3 | >3, <4 | >4, <5 | >5 is forbidden. (2)
-
-Because there is no version of bar in 3 | 4 | 5 and foo 3 depends on bar 3, foo 3 is forbidden.
-And because foo <3 | >3, <4 | >4, <5 | >5 is forbidden (2), foo <4 | >4, <5 | >5 is forbidden. (3)
-
-Because there is no version of bar in 4 | 5 and foo 4 depends on bar 4, foo 4 is forbidden.
-And because foo <4 | >4, <5 | >5 is forbidden (3), foo <5 | >5 is forbidden. (4)
-
-Because there is no version of bar in 5 and foo 5 depends on bar 5, foo 5 is forbidden.
-And because foo <5 | >5 is forbidden (4), foo * is forbidden.
-And because root 1 depends on foo, root 1 is forbidden."#
+        r#"Because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5 | >5 and foo 1 depends on bar 1, foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 depends on bar 1.
+And because there is no version of bar in 1 | 2 | 3 | 4 | 5 and foo 2 depends on bar 2, foo <3 | >3, <4 | >4, <5 | >5 depends on bar 2.
+And because there is no version of bar in 2 | 3 | 4 | 5 and foo 3 depends on bar 3, foo <4 | >4, <5 | >5 depends on bar 3.
+And because there is no version of bar in 3 | 4 | 5 and foo 4 depends on bar 4, foo <5 | >5 depends on bar 4.
+And because there is no version of bar in 4 | 5 and foo 5 depends on bar 5, foo depends on bar 5.
+And because there is no version of bar in 5 and root 1 depends on foo, root 1 is forbidden."#
     );
     derivation_tree.collapse_no_versions();
     assert_eq!(
         &DefaultStringReporter::report(&derivation_tree),
-        r#"Because foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 depends on bar 1 | 2 | 3 | 4 | 5 and foo 2 depends on bar 2 | 3 | 4 | 5, foo <3 | >3, <4 | >4, <5 | >5 is forbidden.
-And because foo 3 depends on bar 3 | 4 | 5 and foo 4 depends on bar 4 | 5, foo <5 | >5 is forbidden.
+        r#"Because foo <2 | >2, <3 | >3, <4 | >4, <5 | >5 depends on bar 1 | 2 | 3 | 4 | 5 and foo 2 depends on bar 2, foo <3 | >3, <4 | >4, <5 | >5 depends on bar 2.
+And because foo 3 depends on bar 3 and foo 4 depends on bar 4, foo <5 | >5 depends on bar 4.
 And because foo 5 depends on bar 5 and root 1 depends on foo, root 1 is forbidden."#
     );
 }

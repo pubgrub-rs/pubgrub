@@ -142,7 +142,8 @@ pub(crate) enum SatisfierSearch<P: Package, VS: VersionSet, M: Eq + Clone + Debu
     },
 }
 
-type SatisfiedMap<'i, P, VS, M> = SmallMap<&'i P, (Option<IncompId<P, VS, M>>, u32, DecisionLevel)>;
+type SatisfiedMap<'i, P, VS, M> =
+    SmallMap<&'i P, (usize, Option<IncompId<P, VS, M>>, u32, DecisionLevel)>;
 
 impl<DP: DependencyProvider> PartialSolution<DP> {
     /// Initialize an empty PartialSolution.
@@ -412,10 +413,11 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         store: &Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
     ) -> (&'i DP::P, SatisfierSearch<DP::P, DP::VS, DP::M>) {
         let satisfied_map = Self::find_satisfier(incompat, &self.package_assignments);
-        let (&satisfier_package, &(satisfier_cause, _, satisfier_decision_level)) = satisfied_map
-            .iter()
-            .max_by_key(|(_p, (_, global_index, _))| global_index)
-            .unwrap();
+        let (&satisfier_package, &(_, satisfier_cause, _, satisfier_decision_level)) =
+            satisfied_map
+                .iter()
+                .max_by_key(|(_p, (_, _, global_index, _))| global_index)
+                .unwrap();
         let previous_satisfier_level = Self::find_previous_satisfier(
             incompat,
             satisfier_package,
@@ -470,7 +472,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     ) -> DecisionLevel {
         // First, let's retrieve the previous derivations and the initial accum_term.
         let satisfier_pa = package_assignments.get(satisfier_package).unwrap();
-        let (satisfier_cause, _gidx, _dl) = satisfied_map.get(&satisfier_package).unwrap();
+        let (_, satisfier_cause, _gidx, _dl) = satisfied_map.get(&satisfier_package).unwrap();
 
         let accum_term = if let &Some(cause) = satisfier_cause {
             store[cause].get(satisfier_package).unwrap().negate()
@@ -484,19 +486,22 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         let incompat_term = incompat
             .get(satisfier_package)
             .expect("satisfier package not in incompat");
-
+        let start_term = accum_term.intersection(&incompat_term.negate());
+        let new_entry = satisfier_pa.satisfier(satisfier_package, &start_term);
         satisfied_map.insert(
             satisfier_package,
-            satisfier_pa.satisfier(
-                satisfier_package,
-                &accum_term.intersection(&incompat_term.negate()),
-            ),
+            if accum_term.subset_of(incompat_term) {
+                assert_eq!(new_entry.0, 0);
+                (0, None, 0, DecisionLevel(1))
+            } else {
+                new_entry
+            },
         );
 
         // Finally, let's identify the decision level of that previous satisfier.
-        let (_, &(_, _, decision_level)) = satisfied_map
+        let (_, &(_, _, _, decision_level)) = satisfied_map
             .iter()
-            .max_by_key(|(_p, (_, global_index, _))| global_index)
+            .max_by_key(|(_p, (_, _, global_index, _))| global_index)
             .unwrap();
         decision_level.max(DecisionLevel(1))
     }
@@ -511,7 +516,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> PackageAssignm
         &self,
         package: &P,
         start_term: &Term<VS>,
-    ) -> (Option<IncompId<P, VS, M>>, u32, DecisionLevel) {
+    ) -> (usize, Option<IncompId<P, VS, M>>, u32, DecisionLevel) {
         let empty = Term::empty();
         // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
         let idx = self
@@ -520,14 +525,17 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> PackageAssignm
             .partition_point(|dd| !dd.accumulated_intersection.is_disjoint(start_term));
         if let Some(dd) = self.dated_derivations.get(idx) {
             debug_assert_eq!(dd.accumulated_intersection.intersection(start_term), empty);
-            return (Some(dd.cause), dd.global_index, dd.decision_level);
+            return (idx, Some(dd.cause), dd.global_index, dd.decision_level);
         }
         // If it wasn't found in the derivations,
         // it must be the decision which is last (if called in the right context).
         match &self.assignments_intersection {
-            AssignmentsIntersection::Decision((global_index, _, _)) => {
-                (None, *global_index, self.highest_decision_level)
-            }
+            AssignmentsIntersection::Decision((global_index, _, _)) => (
+                self.dated_derivations.len(),
+                None,
+                *global_index,
+                self.highest_decision_level,
+            ),
             AssignmentsIntersection::Derivations(accumulated_intersection) => {
                 unreachable!(
                     concat!(
