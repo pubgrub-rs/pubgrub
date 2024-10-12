@@ -16,8 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo build --verbose
-      - run: cargo test --features=serde --verbose
+      - run: cargo build --verbose --workspace
+      - run: cargo test --all-features --workspace --verbose
 
   clippy:
     name: No warnings from Clippy
@@ -30,7 +30,7 @@ jobs:
       - name: Check Clippy lints
         env:
           RUSTFLAGS: -D warnings
-        run: cargo clippy
+        run: cargo clippy --workspace
 
   check_formatting:
     name: Source code is formatted
@@ -51,4 +51,4 @@ jobs:
       - name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo doc --no-deps --document-private-items
+        run: cargo doc --workspace --no-deps --document-private-items

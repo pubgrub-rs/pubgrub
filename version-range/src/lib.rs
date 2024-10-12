@@ -1,54 +1,38 @@
 // SPDX-License-Identifier: MPL-2.0
 
-//! Ranges are constraints defining sets of versions.
+//! This crate contains a performance-optimized type for version ranges and operations on them.
 //!
-//! Concretely, those constraints correspond to any set of versions
-//! representable as the concatenation, union, and complement
-//! of the ranges building blocks.
+//! A [`Range`] can represent version selectors such as `(>=1, <2) OR (==3) OR (>4)`. Internally,
+//! it is an ordered list of contiguous intervals (segments) with inclusive, exclusive or open-ended
+//! ends, similar to a `Vec<(Bound<T>, Bound<T>)>`.
 //!
-//! Those building blocks are:
-//!  - [empty()](Range::empty): the empty set
-//!  - [full()](Range::full): the set of all possible versions
-//!  - [singleton(v)](Range::singleton): the set containing only the version v
-//!  - [higher_than(v)](Range::higher_than): the set defined by `v <= versions`
-//!  - [strictly_higher_than(v)](Range::strictly_higher_than): the set defined by `v < versions`
-//!  - [lower_than(v)](Range::lower_than): the set defined by `versions <= v`
-//!  - [strictly_lower_than(v)](Range::strictly_lower_than): the set defined by `versions < v`
-//!  - [between(v1, v2)](Range::between): the set defined by `v1 <= versions < v2`
+//! [`Range`] is generic over any type that implements [`Ord`] + [`Clone`] and can represent all
+//! kinds of slices with ordered coordinates, not just version ranges. While built as a
+//! performance-critical piece of [pubgrub](https://github.com/pubgrub-rs/pubgrub), it can be
+//! adopted for other domains, too.
 //!
-//! Ranges can be created from any type that implements [`Ord`] + [`Clone`].
+//! You can construct a basic range from one of the following build blocks. All other ranges are
+//! concatenation, union, and complement of these basic range.
+//!  - [empty()](Range::empty): No version
+//!  - [full()](Range::full): All versions
+//!  - [singleton(v)](Range::singleton): Only the version v exactly
+//!  - [higher_than(v)](Range::higher_than): All versions `v <= versions`
+//!  - [strictly_higher_than(v)](Range::strictly_higher_than): All versions `v < versions`
+//!  - [lower_than(v)](Range::lower_than): All versions `versions <= v`
+//!  - [strictly_lower_than(v)](Range::strictly_lower_than): All versions `versions < v`
+//!  - [between(v1, v2)](Range::between): All versions `v1 <= versions < v2`
 //!
-//! In order to advance the solver front, comparisons of versions sets are necessary in the algorithm.
-//! To do those comparisons between two sets S1 and S2 we use the mathematical property that S1 ⊂ S2 if and only if S1 ∩ S2 == S1.
-//! We can thus compute an intersection and evaluate an equality to answer if S1 is a subset of S2.
-//! But this means that the implementation of equality must be correct semantically.
-//! In practice, if equality is derived automatically, this means sets must have unique representations.
+//! Note that there are limitations to the equality implementation: Given a `Range<u32>`,
+//! the segments `(Unbounded, Included(42u32))` and `(Included(0), Included(42u32))` as well as
+//! `(Included(1), Included(5))` and  `(Included(1), Included(3)) + (Included(4), Included(5))`
+//! are reported as unequal, even though the match the same versions: We can't tell that there isn't
+//! a version between `0` and `-inf` or `3` and `4` respectively.
 //!
-//! By migrating from a custom representation for discrete sets in v0.2
-//! to a generic bounded representation for continuous sets in v0.3
-//! we are potentially breaking that assumption in two ways:
+//! ## Optional features
 //!
-//!  1. Minimal and maximal `Unbounded` values can be replaced by their equivalent if it exists.
-//!  2. Simplifying adjacent bounds of discrete sets cannot be detected and automated in the generic intersection code.
-//!
-//! An example for each can be given when `T` is `u32`.
-//! First, we can have both segments `S1 = (Unbounded, Included(42u32))` and `S2 = (Included(0), Included(42u32))`
-//! that represent the same segment but are structurally different.
-//! Thus, a derived equality check would answer `false` to `S1 == S2` while it's true.
-//!
-//! Second both segments `S1 = (Included(1), Included(5))` and `S2 = (Included(1), Included(3)) + (Included(4), Included(5))` are equal.
-//! But without asking the user to provide a `bump` function for discrete sets,
-//! the algorithm is not able to tell that the space between the right `Included(3)` bound and the left `Included(4)` bound is empty.
-//! Thus the algorithm is not able to reduce S2 to its canonical S1 form while computing sets operations like intersections in the generic code.
-//!
-//! This is likely to lead to user facing theoretically correct but practically nonsensical ranges,
-//! like (Unbounded, Excluded(0)) or (Excluded(6), Excluded(7)).
-//! In general nonsensical inputs often lead to hard to track bugs.
-//! But as far as we can tell this should work in practice.
-//! So for now this crate only provides an implementation for continuous ranges.
-//! With the v0.3 api the user could choose to bring back the discrete implementation from v0.2, as documented in the guide.
-//! If doing so regularly fixes bugs seen by users, we will bring it back into the core library.
-//! If we do not see practical bugs, or we get a formal proof that the code cannot lead to error states, then we may remove this warning.
+//! * `serde`: serialization and deserialization for the version range, given that the version type
+//!   also supports it.
+//! * `proptest`: Exports are proptest strategy for [`Range<u32>`].
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;
@@ -56,8 +40,9 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::Bound::{self, Excluded, Included, Unbounded};
 use std::ops::RangeBounds;
 
-use crate::internal::SmallVec;
-use crate::VersionSet;
+#[cfg(any(feature = "proptest", test))]
+use proptest::prelude::*;
+use smallvec::{smallvec, SmallVec};
 
 /// A Range represents multiple intervals of a continuous range of monotone increasing
 /// values.
@@ -65,7 +50,7 @@ use crate::VersionSet;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Range<V> {
-    segments: SmallVec<Interval<V>>,
+    segments: SmallVec<[Interval<V>; 2]>,
 }
 
 type Interval<V> = (Bound<V>, Bound<V>);
@@ -74,49 +59,49 @@ impl<V> Range<V> {
     /// Empty set of versions.
     pub fn empty() -> Self {
         Self {
-            segments: SmallVec::empty(),
+            segments: SmallVec::new(),
         }
     }
 
     /// Set of all possible versions
     pub fn full() -> Self {
         Self {
-            segments: SmallVec::one((Unbounded, Unbounded)),
+            segments: smallvec![(Unbounded, Unbounded)],
         }
     }
 
     /// Set of all versions higher or equal to some version
     pub fn higher_than(v: impl Into<V>) -> Self {
         Self {
-            segments: SmallVec::one((Included(v.into()), Unbounded)),
+            segments: smallvec![(Included(v.into()), Unbounded)],
         }
     }
 
     /// Set of all versions higher to some version
     pub fn strictly_higher_than(v: impl Into<V>) -> Self {
         Self {
-            segments: SmallVec::one((Excluded(v.into()), Unbounded)),
+            segments: smallvec![(Excluded(v.into()), Unbounded)],
         }
     }
 
     /// Set of all versions lower to some version
     pub fn strictly_lower_than(v: impl Into<V>) -> Self {
         Self {
-            segments: SmallVec::one((Unbounded, Excluded(v.into()))),
+            segments: smallvec![(Unbounded, Excluded(v.into()))],
         }
     }
 
     /// Set of all versions lower or equal to some version
     pub fn lower_than(v: impl Into<V>) -> Self {
         Self {
-            segments: SmallVec::one((Unbounded, Included(v.into()))),
+            segments: smallvec![(Unbounded, Included(v.into()))],
         }
     }
 
     /// Set of versions greater or equal to `v1` but less than `v2`.
     pub fn between(v1: impl Into<V>, v2: impl Into<V>) -> Self {
         Self {
-            segments: SmallVec::one((Included(v1.into()), Excluded(v2.into()))),
+            segments: smallvec![(Included(v1.into()), Excluded(v2.into()))],
         }
     }
 
@@ -131,7 +116,7 @@ impl<V: Clone> Range<V> {
     pub fn singleton(v: impl Into<V>) -> Self {
         let v = v.into();
         Self {
-            segments: SmallVec::one((Included(v.clone()), Included(v))),
+            segments: smallvec![(Included(v.clone()), Included(v))],
         }
     }
 
@@ -163,7 +148,7 @@ impl<V: Clone> Range<V> {
 
     /// Helper function performing the negation of intervals in segments.
     fn negate_segments(start: Bound<V>, segments: &[Interval<V>]) -> Self {
-        let mut complement_segments: SmallVec<Interval<V>> = SmallVec::empty();
+        let mut complement_segments = SmallVec::new();
         let mut start = start;
         for (v1, v2) in segments {
             complement_segments.push((
@@ -288,7 +273,7 @@ impl<V: Ord> Range<V> {
         };
         if valid_segment(&start, &end) {
             Self {
-                segments: SmallVec::one((start, end)),
+                segments: smallvec![(start, end)],
             }
         } else {
             Self::empty()
@@ -577,7 +562,7 @@ fn group_adjacent_locations(
 impl<V: Ord + Clone> Range<V> {
     /// Computes the union of this `Range` and another.
     pub fn union(&self, other: &Self) -> Self {
-        let mut output: SmallVec<Interval<V>> = SmallVec::empty();
+        let mut output = SmallVec::new();
         let mut accumulator: Option<(&Bound<_>, &Bound<_>)> = None;
         let mut left_iter = self.segments.iter().peekable();
         let mut right_iter = other.segments.iter().peekable();
@@ -635,7 +620,7 @@ impl<V: Ord + Clone> Range<V> {
 
     /// Computes the intersection of two sets of versions.
     pub fn intersection(&self, other: &Self) -> Self {
-        let mut output: SmallVec<Interval<V>> = SmallVec::empty();
+        let mut output = SmallVec::new();
         let mut left_iter = self.segments.iter().peekable();
         let mut right_iter = other.segments.iter().peekable();
         // By the definition of intersection any point that is matched by the output
@@ -822,7 +807,7 @@ impl<V: Ord + Clone> Range<V> {
         &self,
         kept_segments: impl Iterator<Item = (Option<usize>, Option<usize>)>,
     ) -> Range<V> {
-        let mut segments = SmallVec::Empty;
+        let mut segments = SmallVec::new();
         for (s, e) in kept_segments {
             segments.push((
                 s.map_or(Unbounded, |s| self.segments[s].0.clone()),
@@ -835,46 +820,6 @@ impl<V: Ord + Clone> Range<V> {
     /// Iterate over the parts of the range.
     pub fn iter(&self) -> impl Iterator<Item = (&Bound<V>, &Bound<V>)> {
         self.segments.iter().map(|(start, end)| (start, end))
-    }
-}
-
-impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
-    type V = T;
-
-    fn empty() -> Self {
-        Range::empty()
-    }
-
-    fn singleton(v: Self::V) -> Self {
-        Range::singleton(v)
-    }
-
-    fn complement(&self) -> Self {
-        Range::complement(self)
-    }
-
-    fn intersection(&self, other: &Self) -> Self {
-        Range::intersection(self, other)
-    }
-
-    fn contains(&self, v: &Self::V) -> bool {
-        Range::contains(self, v)
-    }
-
-    fn full() -> Self {
-        Range::full()
-    }
-
-    fn union(&self, other: &Self) -> Self {
-        Range::union(self, other)
-    }
-
-    fn is_disjoint(&self, other: &Self) -> bool {
-        Range::is_disjoint(self, other)
-    }
-
-    fn subset_of(&self, other: &Self) -> bool {
-        Range::subset_of(self, other)
     }
 }
 
@@ -928,9 +873,10 @@ impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Range<V> {
             D(V, Option<V>),
         }
 
-        let bounds: SmallVec<EitherInterval<V>> = serde::Deserialize::deserialize(deserializer)?;
+        let bounds: SmallVec<[EitherInterval<V>; 2]> =
+            serde::Deserialize::deserialize(deserializer)?;
 
-        let mut segments = SmallVec::Empty;
+        let mut segments = SmallVec::new();
         for i in bounds {
             match i {
                 EitherInterval::B(l, r) => segments.push((l, r)),
@@ -943,77 +889,76 @@ impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Range<V> {
     }
 }
 
-// TESTS #######################################################################
+/// Generate version sets from a random vector of deltas between randomly inclusive or exclusive
+/// bounds.
+#[cfg(any(feature = "proptest", test))]
+pub fn proptest_strategy() -> impl Strategy<Value = Range<u32>> {
+    (
+        any::<bool>(),
+        prop::collection::vec(any::<(u32, bool)>(), 1..10),
+    )
+        .prop_map(|(start_unbounded, deltas)| {
+            let mut start = if start_unbounded {
+                Some(Unbounded)
+            } else {
+                None
+            };
+            let mut largest: u32 = 0;
+            let mut last_bound_was_inclusive = false;
+            let mut segments = SmallVec::new();
+            for (delta, inclusive) in deltas {
+                // Add the offset to the current bound
+                largest = match largest.checked_add(delta) {
+                    Some(s) => s,
+                    None => {
+                        // Skip this offset, if it would result in a too large bound.
+                        continue;
+                    }
+                };
+
+                let current_bound = if inclusive {
+                    Included(largest)
+                } else {
+                    Excluded(largest)
+                };
+
+                // If we already have a start bound, the next offset defines the complete range.
+                // If we don't have a start bound, we have to generate one.
+                if let Some(start_bound) = start.take() {
+                    // If the delta from the start bound is 0, the only authorized configuration is
+                    // Included(x), Included(x)
+                    if delta == 0 && !(matches!(start_bound, Included(_)) && inclusive) {
+                        start = Some(start_bound);
+                        continue;
+                    }
+                    last_bound_was_inclusive = inclusive;
+                    segments.push((start_bound, current_bound));
+                } else {
+                    // If the delta from the end bound of the last range is 0 and
+                    // any of the last ending or current starting bound is inclusive,
+                    // we skip the delta because they basically overlap.
+                    if delta == 0 && (last_bound_was_inclusive || inclusive) {
+                        continue;
+                    }
+                    start = Some(current_bound);
+                }
+            }
+
+            // If we still have a start bound, but didn't have enough deltas to complete another
+            // segment, we add an unbounded upperbound.
+            if let Some(start_bound) = start {
+                segments.push((start_bound, Unbounded));
+            }
+
+            Range { segments }.check_invariants()
+        })
+}
 
 #[cfg(test)]
 pub mod tests {
     use proptest::prelude::*;
 
     use super::*;
-
-    /// Generate version sets from a random vector of deltas between bounds.
-    /// Each bound is randomly inclusive or exclusive.
-    pub fn strategy() -> impl Strategy<Value = Range<u32>> {
-        (
-            any::<bool>(),
-            prop::collection::vec(any::<(u32, bool)>(), 1..10),
-        )
-            .prop_map(|(start_unbounded, deltas)| {
-                let mut start = if start_unbounded {
-                    Some(Unbounded)
-                } else {
-                    None
-                };
-                let mut largest: u32 = 0;
-                let mut last_bound_was_inclusive = false;
-                let mut segments = SmallVec::Empty;
-                for (delta, inclusive) in deltas {
-                    // Add the offset to the current bound
-                    largest = match largest.checked_add(delta) {
-                        Some(s) => s,
-                        None => {
-                            // Skip this offset, if it would result in a too large bound.
-                            continue;
-                        }
-                    };
-
-                    let current_bound = if inclusive {
-                        Included(largest)
-                    } else {
-                        Excluded(largest)
-                    };
-
-                    // If we already have a start bound, the next offset defines the complete range.
-                    // If we don't have a start bound, we have to generate one.
-                    if let Some(start_bound) = start.take() {
-                        // If the delta from the start bound is 0, the only authorized configuration is
-                        // Included(x), Included(x)
-                        if delta == 0 && !(matches!(start_bound, Included(_)) && inclusive) {
-                            start = Some(start_bound);
-                            continue;
-                        }
-                        last_bound_was_inclusive = inclusive;
-                        segments.push((start_bound, current_bound));
-                    } else {
-                        // If the delta from the end bound of the last range is 0 and
-                        // any of the last ending or current starting bound is inclusive,
-                        // we skip the delta because they basically overlap.
-                        if delta == 0 && (last_bound_was_inclusive || inclusive) {
-                            continue;
-                        }
-                        start = Some(current_bound);
-                    }
-                }
-
-                // If we still have a start bound, but didn't have enough deltas to complete another
-                // segment, we add an unbounded upperbound.
-                if let Some(start_bound) = start {
-                    segments.push((start_bound, Unbounded));
-                }
-
-                Range { segments }.check_invariants()
-            })
-    }
 
     fn version_strat() -> impl Strategy<Value = u32> {
         any::<u32>()
@@ -1025,7 +970,7 @@ pub mod tests {
 
         #[cfg(feature = "serde")]
         #[test]
-        fn serde_round_trip(range in strategy()) {
+        fn serde_round_trip(range in proptest_strategy()) {
             let s = ron::ser::to_string(&range).unwrap();
             let r = ron::de::from_str(&s).unwrap();
             assert_eq!(range, r);
@@ -1034,83 +979,83 @@ pub mod tests {
         // Testing negate ----------------------------------
 
         #[test]
-        fn negate_is_different(range in strategy()) {
+        fn negate_is_different(range in proptest_strategy()) {
             assert_ne!(range.complement(), range);
         }
 
         #[test]
-        fn double_negate_is_identity(range in strategy()) {
+        fn double_negate_is_identity(range in proptest_strategy()) {
             assert_eq!(range.complement().complement(), range);
         }
 
         #[test]
-        fn negate_contains_opposite(range in strategy(), version in version_strat()) {
+        fn negate_contains_opposite(range in proptest_strategy(), version in version_strat()) {
             assert_ne!(range.contains(&version), range.complement().contains(&version));
         }
 
         // Testing intersection ----------------------------
 
         #[test]
-        fn intersection_is_symmetric(r1 in strategy(), r2 in strategy()) {
+        fn intersection_is_symmetric(r1 in proptest_strategy(), r2 in proptest_strategy()) {
             assert_eq!(r1.intersection(&r2), r2.intersection(&r1));
         }
 
         #[test]
-        fn intersection_with_any_is_identity(range in strategy()) {
+        fn intersection_with_any_is_identity(range in proptest_strategy()) {
             assert_eq!(Range::full().intersection(&range), range);
         }
 
         #[test]
-        fn intersection_with_none_is_none(range in strategy()) {
+        fn intersection_with_none_is_none(range in proptest_strategy()) {
             assert_eq!(Range::empty().intersection(&range), Range::empty());
         }
 
         #[test]
-        fn intersection_is_idempotent(r1 in strategy(), r2 in strategy()) {
+        fn intersection_is_idempotent(r1 in proptest_strategy(), r2 in proptest_strategy()) {
             assert_eq!(r1.intersection(&r2).intersection(&r2), r1.intersection(&r2));
         }
 
         #[test]
-        fn intersection_is_associative(r1 in strategy(), r2 in strategy(), r3 in strategy()) {
+        fn intersection_is_associative(r1 in proptest_strategy(), r2 in proptest_strategy(), r3 in proptest_strategy()) {
             assert_eq!(r1.intersection(&r2).intersection(&r3), r1.intersection(&r2.intersection(&r3)));
         }
 
         #[test]
-        fn intesection_of_complements_is_none(range in strategy()) {
+        fn intesection_of_complements_is_none(range in proptest_strategy()) {
             assert_eq!(range.complement().intersection(&range), Range::empty());
         }
 
         #[test]
-        fn intesection_contains_both(r1 in strategy(), r2 in strategy(), version in version_strat()) {
+        fn intesection_contains_both(r1 in proptest_strategy(), r2 in proptest_strategy(), version in version_strat()) {
             assert_eq!(r1.intersection(&r2).contains(&version), r1.contains(&version) && r2.contains(&version));
         }
 
         // Testing union -----------------------------------
 
         #[test]
-        fn union_of_complements_is_any(range in strategy()) {
+        fn union_of_complements_is_any(range in proptest_strategy()) {
             assert_eq!(range.complement().union(&range), Range::full());
         }
 
         #[test]
-        fn union_contains_either(r1 in strategy(), r2 in strategy(), version in version_strat()) {
+        fn union_contains_either(r1 in proptest_strategy(), r2 in proptest_strategy(), version in version_strat()) {
             assert_eq!(r1.union(&r2).contains(&version), r1.contains(&version) || r2.contains(&version));
         }
 
         #[test]
-        fn is_disjoint_through_intersection(r1 in strategy(), r2 in strategy()) {
+        fn is_disjoint_through_intersection(r1 in proptest_strategy(), r2 in proptest_strategy()) {
             let disjoint_def = r1.intersection(&r2) == Range::empty();
             assert_eq!(r1.is_disjoint(&r2), disjoint_def);
         }
 
         #[test]
-        fn subset_of_through_intersection(r1 in strategy(), r2 in strategy()) {
+        fn subset_of_through_intersection(r1 in proptest_strategy(), r2 in proptest_strategy()) {
             let disjoint_def = r1.intersection(&r2) == r1;
             assert_eq!(r1.subset_of(&r2), disjoint_def);
         }
 
         #[test]
-        fn union_through_intersection(r1 in strategy(), r2 in strategy()) {
+        fn union_through_intersection(r1 in proptest_strategy(), r2 in proptest_strategy()) {
             let union_def = r1
                 .complement()
                 .intersection(&r2.complement())
@@ -1127,17 +1072,17 @@ pub mod tests {
         }
 
         #[test]
-        fn contains_negation(range in strategy(), version in version_strat()) {
+        fn contains_negation(range in proptest_strategy(), version in version_strat()) {
             assert_ne!(range.contains(&version), range.complement().contains(&version));
         }
 
         #[test]
-        fn contains_intersection(range in strategy(), version in version_strat()) {
+        fn contains_intersection(range in proptest_strategy(), version in version_strat()) {
             assert_eq!(range.contains(&version), range.intersection(&Range::singleton(version)) != Range::empty());
         }
 
         #[test]
-        fn contains_bounding_range(range in strategy(), version in version_strat()) {
+        fn contains_bounding_range(range in proptest_strategy(), version in version_strat()) {
             if range.contains(&version) {
                 assert!(range.bounding_range().map(|b| b.contains(&version)).unwrap_or(false));
             }
@@ -1157,14 +1102,14 @@ pub mod tests {
         }
 
         #[test]
-        fn contains(range in strategy(), versions in proptest::collection::vec(version_strat(), ..30)) {
+        fn contains(range in proptest_strategy(), versions in proptest::collection::vec(version_strat(), ..30)) {
             for v in versions {
                 assert_eq!(range.contains(&v), range.segments.iter().any(|s| RangeBounds::contains(s, &v)));
             }
         }
 
         #[test]
-        fn contains_many(range in strategy(), mut versions in proptest::collection::vec(version_strat(), ..30)) {
+        fn contains_many(range in proptest_strategy(), mut versions in proptest::collection::vec(version_strat(), ..30)) {
             versions.sort();
             assert_eq!(versions.len(), range.contains_many(versions.iter()).count());
             for (a, b) in versions.iter().zip(range.contains_many(versions.iter())) {
@@ -1173,7 +1118,7 @@ pub mod tests {
         }
 
         #[test]
-        fn simplify(range in strategy(), mut versions in proptest::collection::vec(version_strat(), ..30)) {
+        fn simplify(range in proptest_strategy(), mut versions in proptest::collection::vec(version_strat(), ..30)) {
             versions.sort();
             let simp = range.simplify(versions.iter());
 
