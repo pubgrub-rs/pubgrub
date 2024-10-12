@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: MPL-2.0
 
-//! This crate contains a performance-optimized type for version ranges and operations on them.
+//! This crate contains a performance-optimized type for generic version ranges and operations on
+//! them.
 //!
 //! A [`Range`] can represent version selectors such as `(>=1, <2) OR (==3) OR (>4)`. Internally,
 //! it is an ordered list of contiguous intervals (segments) with inclusive, exclusive or open-ended
 //! ends, similar to a `Vec<(Bound<T>, Bound<T>)>`.
 //!
-//! [`Range`] is generic over any type that implements [`Ord`] + [`Clone`] and can represent all
-//! kinds of slices with ordered coordinates, not just version ranges. While built as a
-//! performance-critical piece of [pubgrub](https://github.com/pubgrub-rs/pubgrub), it can be
-//! adopted for other domains, too.
-//!
 //! You can construct a basic range from one of the following build blocks. All other ranges are
-//! concatenation, union, and complement of these basic range.
+//! concatenation, union, and complement of these basic ranges.
 //!  - [empty()](Range::empty): No version
 //!  - [full()](Range::full): All versions
 //!  - [singleton(v)](Range::singleton): Only the version v exactly
@@ -21,6 +17,11 @@
 //!  - [lower_than(v)](Range::lower_than): All versions `versions <= v`
 //!  - [strictly_lower_than(v)](Range::strictly_lower_than): All versions `versions < v`
 //!  - [between(v1, v2)](Range::between): All versions `v1 <= versions < v2`
+//!
+//! [`Range`] is generic over any type that implements [`Ord`] + [`Clone`] and can represent all
+//! kinds of slices with ordered coordinates, not just version ranges. While built as a
+//! performance-critical piece of [pubgrub](https://github.com/pubgrub-rs/pubgrub), it can be
+//! adopted for other domains, too.
 //!
 //! Note that there are limitations to the equality implementation: Given a `Range<u32>`,
 //! the segments `(Unbounded, Included(42u32))` and `(Included(0), Included(42u32))` as well as

@@ -2,6 +2,8 @@
 name = "version-range"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/pubgrub-rs/pubgrub"
+license = "MPL-2.0"
 keywords = ["version", "pubgrub", "selector", "ranges"]
 
 [dependencies]
