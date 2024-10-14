@@ -199,7 +199,7 @@ pub trait DependencyProvider {
     /// How this provider stores the version requirements for the packages.
     /// The requirements must be able to process the same kind of version as this dependency provider.
     ///
-    /// A common choice is [`Range`][version_range::Range].
+    /// A common choice is [`Ranges`][version_ranges::Ranges].
     type VS: VersionSet<V = Self::V>;
 
     /// Type for custom incompatibilities.
