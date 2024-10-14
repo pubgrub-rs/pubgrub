@@ -20,7 +20,7 @@
 
 use std::fmt::{Debug, Display};
 
-use crate::Range;
+use crate::Ranges;
 
 /// Trait describing sets of versions.
 pub trait VersionSet: Debug + Display + Clone + Eq {
@@ -71,42 +71,42 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
     }
 }
 
-impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Range<T> {
+impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Ranges<T> {
     type V = T;
 
     fn empty() -> Self {
-        Range::empty()
+        Ranges::empty()
     }
 
     fn singleton(v: Self::V) -> Self {
-        Range::singleton(v)
+        Ranges::singleton(v)
     }
 
     fn complement(&self) -> Self {
-        Range::complement(self)
+        Ranges::complement(self)
     }
 
     fn intersection(&self, other: &Self) -> Self {
-        Range::intersection(self, other)
+        Ranges::intersection(self, other)
     }
 
     fn contains(&self, v: &Self::V) -> bool {
-        Range::contains(self, v)
+        Ranges::contains(self, v)
     }
 
     fn full() -> Self {
-        Range::full()
+        Ranges::full()
     }
 
     fn union(&self, other: &Self) -> Self {
-        Range::union(self, other)
+        Ranges::union(self, other)
     }
 
     fn is_disjoint(&self, other: &Self) -> bool {
-        Range::is_disjoint(self, other)
+        Ranges::is_disjoint(self, other)
     }
 
     fn subset_of(&self, other: &Self) -> bool {
-        Range::subset_of(self, other)
+        Ranges::subset_of(self, other)
     }
 }

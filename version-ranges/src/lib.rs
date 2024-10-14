@@ -3,27 +3,27 @@
 //! This crate contains a performance-optimized type for generic version ranges and operations on
 //! them.
 //!
-//! A [`Range`] can represent version selectors such as `(>=1, <2) OR (==3) OR (>4)`. Internally,
+//! [`Ranges`] can represent version selectors such as `(>=1, <2) OR (==3) OR (>4)`. Internally,
 //! it is an ordered list of contiguous intervals (segments) with inclusive, exclusive or open-ended
 //! ends, similar to a `Vec<(Bound<T>, Bound<T>)>`.
 //!
 //! You can construct a basic range from one of the following build blocks. All other ranges are
 //! concatenation, union, and complement of these basic ranges.
-//!  - [empty()](Range::empty): No version
-//!  - [full()](Range::full): All versions
-//!  - [singleton(v)](Range::singleton): Only the version v exactly
-//!  - [higher_than(v)](Range::higher_than): All versions `v <= versions`
-//!  - [strictly_higher_than(v)](Range::strictly_higher_than): All versions `v < versions`
-//!  - [lower_than(v)](Range::lower_than): All versions `versions <= v`
-//!  - [strictly_lower_than(v)](Range::strictly_lower_than): All versions `versions < v`
-//!  - [between(v1, v2)](Range::between): All versions `v1 <= versions < v2`
+//!  - [empty()](Ranges::empty): No version
+//!  - [full()](Ranges::full): All versions
+//!  - [singleton(v)](Ranges::singleton): Only the version v exactly
+//!  - [higher_than(v)](Ranges::higher_than): All versions `v <= versions`
+//!  - [strictly_higher_than(v)](Ranges::strictly_higher_than): All versions `v < versions`
+//!  - [lower_than(v)](Ranges::lower_than): All versions `versions <= v`
+//!  - [strictly_lower_than(v)](Ranges::strictly_lower_than): All versions `versions < v`
+//!  - [between(v1, v2)](Ranges::between): All versions `v1 <= versions < v2`
 //!
-//! [`Range`] is generic over any type that implements [`Ord`] + [`Clone`] and can represent all
+//! [`Ranges`] is generic over any type that implements [`Ord`] + [`Clone`] and can represent all
 //! kinds of slices with ordered coordinates, not just version ranges. While built as a
 //! performance-critical piece of [pubgrub](https://github.com/pubgrub-rs/pubgrub), it can be
 //! adopted for other domains, too.
 //!
-//! Note that there are limitations to the equality implementation: Given a `Range<u32>`,
+//! Note that there are limitations to the equality implementation: Given a `Ranges<u32>`,
 //! the segments `(Unbounded, Included(42u32))` and `(Included(0), Included(42u32))` as well as
 //! `(Included(1), Included(5))` and  `(Included(1), Included(3)) + (Included(4), Included(5))`
 //! are reported as unequal, even though the match the same versions: We can't tell that there isn't
@@ -33,7 +33,7 @@
 //!
 //! * `serde`: serialization and deserialization for the version range, given that the version type
 //!   also supports it.
-//! * `proptest`: Exports are proptest strategy for [`Range<u32>`].
+//! * `proptest`: Exports are proptest strategy for [`Ranges<u32>`].
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;
@@ -45,18 +45,17 @@ use std::ops::RangeBounds;
 use proptest::prelude::*;
 use smallvec::{smallvec, SmallVec};
 
-/// A Range represents multiple intervals of a continuous range of monotone increasing
-/// values.
+/// Ranges represents multiple intervals of a continuous range of monotone increasing values.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct Range<V> {
+pub struct Ranges<V> {
     segments: SmallVec<[Interval<V>; 2]>,
 }
 
 type Interval<V> = (Bound<V>, Bound<V>);
 
-impl<V> Range<V> {
+impl<V> Ranges<V> {
     /// Empty set of versions.
     pub fn empty() -> Self {
         Self {
@@ -112,7 +111,7 @@ impl<V> Range<V> {
     }
 }
 
-impl<V: Clone> Range<V> {
+impl<V: Clone> Ranges<V> {
     /// Set containing exactly one version
     pub fn singleton(v: impl Into<V>) -> Self {
         let v = v.into();
@@ -121,7 +120,7 @@ impl<V: Clone> Range<V> {
         }
     }
 
-    /// Returns the complement of this Range.
+    /// Returns the complement, which contains everything not included in `self`.
     pub fn complement(&self) -> Self {
         match self.segments.first() {
             // Complement of ∅ is ∞
@@ -176,9 +175,8 @@ impl<V: Clone> Range<V> {
     }
 }
 
-impl<V: Ord> Range<V> {
-    /// If the range includes a single version, return it.
-    /// Otherwise, returns [None].
+impl<V: Ord> Ranges<V> {
+    /// If self contains exactly a single version, return it, otherwise, return [None].
     pub fn as_singleton(&self) -> Option<&V> {
         match self.segments.as_slice() {
             [(Included(v1), Included(v2))] => {
@@ -207,7 +205,7 @@ impl<V: Ord> Range<V> {
         })
     }
 
-    /// Returns true if this Range contains the specified value.
+    /// Returns true if self contains the specified value.
     pub fn contains(&self, version: &V) -> bool {
         self.segments
             .binary_search_by(|segment| {
@@ -219,7 +217,7 @@ impl<V: Ord> Range<V> {
             .is_ok()
     }
 
-    /// Returns true if this Range contains the specified values.
+    /// Returns true if self contains the specified values.
     ///
     /// The `versions` iterator must be sorted.
     /// Functionally equivalent to `versions.map(|v| self.contains(v))`.
@@ -416,7 +414,7 @@ fn cmp_bounds_end<V: PartialOrd>(left: Bound<&V>, right: Bound<&V>) -> Option<Or
     })
 }
 
-impl<V: PartialOrd> PartialOrd for Range<V> {
+impl<V: PartialOrd> PartialOrd for Ranges<V> {
     /// A simple ordering scheme where we zip the segments and compare all bounds in order. If all
     /// bounds are equal, the longer range is considered greater. (And if all zipped bounds are
     /// equal and we have the same number of segments, the ranges are equal).
@@ -435,7 +433,7 @@ impl<V: PartialOrd> PartialOrd for Range<V> {
     }
 }
 
-impl<V: Ord> Ord for Range<V> {
+impl<V: Ord> Ord for Ranges<V> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other)
             .expect("PartialOrd must be `Some(Ordering)` for types that implement `Ord`")
@@ -560,8 +558,8 @@ fn group_adjacent_locations(
     })
 }
 
-impl<V: Ord + Clone> Range<V> {
-    /// Computes the union of this `Range` and another.
+impl<V: Ord + Clone> Ranges<V> {
+    /// Computes the union of this `Ranges` and another.
     pub fn union(&self, other: &Self) -> Self {
         let mut output = SmallVec::new();
         let mut accumulator: Option<(&Bound<_>, &Bound<_>)> = None;
@@ -744,7 +742,7 @@ impl<V: Ord + Clone> Range<V> {
         true
     }
 
-    /// Returns a simpler Range that contains the same versions.
+    /// Returns a simpler representation that contains the same versions.
     ///
     /// For every one of the Versions provided in versions the existing range and the simplified range will agree on whether it is contained.
     /// The simplified version may include or exclude versions that are not in versions as the implementation wishes.
@@ -807,7 +805,7 @@ impl<V: Ord + Clone> Range<V> {
     fn keep_segments(
         &self,
         kept_segments: impl Iterator<Item = (Option<usize>, Option<usize>)>,
-    ) -> Range<V> {
+    ) -> Ranges<V> {
         let mut segments = SmallVec::new();
         for (s, e) in kept_segments {
             segments.push((
@@ -826,7 +824,7 @@ impl<V: Ord + Clone> Range<V> {
 
 // REPORT ######################################################################
 
-impl<V: Display + Eq> Display for Range<V> {
+impl<V: Display + Eq> Display for Ranges<V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.segments.is_empty() {
             write!(f, "∅")?;
@@ -861,9 +859,9 @@ impl<V: Display + Eq> Display for Range<V> {
 // SERIALIZATION ###############################################################
 
 #[cfg(feature = "serde")]
-impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Range<V> {
+impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Ranges<V> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        // This enables conversion from the "old" discrete implementation of `Range` to the new
+        // This enables conversion from the "old" discrete implementation of `Ranges` to the new
         // bounded one.
         //
         // Serialization is always performed in the new format.
@@ -886,14 +884,14 @@ impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Range<V> {
             }
         }
 
-        Ok(Range { segments })
+        Ok(Ranges { segments })
     }
 }
 
 /// Generate version sets from a random vector of deltas between randomly inclusive or exclusive
 /// bounds.
 #[cfg(any(feature = "proptest", test))]
-pub fn proptest_strategy() -> impl Strategy<Value = Range<u32>> {
+pub fn proptest_strategy() -> impl Strategy<Value = Ranges<u32>> {
     (
         any::<bool>(),
         prop::collection::vec(any::<(u32, bool)>(), 1..10),
@@ -951,7 +949,7 @@ pub fn proptest_strategy() -> impl Strategy<Value = Range<u32>> {
                 segments.push((start_bound, Unbounded));
             }
 
-            Range { segments }.check_invariants()
+            Ranges { segments }.check_invariants()
         })
 }
 
@@ -1003,12 +1001,12 @@ pub mod tests {
 
         #[test]
         fn intersection_with_any_is_identity(range in proptest_strategy()) {
-            assert_eq!(Range::full().intersection(&range), range);
+            assert_eq!(Ranges::full().intersection(&range), range);
         }
 
         #[test]
         fn intersection_with_none_is_none(range in proptest_strategy()) {
-            assert_eq!(Range::empty().intersection(&range), Range::empty());
+            assert_eq!(Ranges::empty().intersection(&range), Ranges::empty());
         }
 
         #[test]
@@ -1023,7 +1021,7 @@ pub mod tests {
 
         #[test]
         fn intesection_of_complements_is_none(range in proptest_strategy()) {
-            assert_eq!(range.complement().intersection(&range), Range::empty());
+            assert_eq!(range.complement().intersection(&range), Ranges::empty());
         }
 
         #[test]
@@ -1035,7 +1033,7 @@ pub mod tests {
 
         #[test]
         fn union_of_complements_is_any(range in proptest_strategy()) {
-            assert_eq!(range.complement().union(&range), Range::full());
+            assert_eq!(range.complement().union(&range), Ranges::full());
         }
 
         #[test]
@@ -1045,7 +1043,7 @@ pub mod tests {
 
         #[test]
         fn is_disjoint_through_intersection(r1 in proptest_strategy(), r2 in proptest_strategy()) {
-            let disjoint_def = r1.intersection(&r2) == Range::empty();
+            let disjoint_def = r1.intersection(&r2) == Ranges::empty();
             assert_eq!(r1.is_disjoint(&r2), disjoint_def);
         }
 
@@ -1069,7 +1067,7 @@ pub mod tests {
 
         #[test]
         fn always_contains_exact(version in version_strat()) {
-            assert!(Range::singleton(version).contains(&version));
+            assert!(Ranges::singleton(version).contains(&version));
         }
 
         #[test]
@@ -1079,7 +1077,7 @@ pub mod tests {
 
         #[test]
         fn contains_intersection(range in proptest_strategy(), version in version_strat()) {
-            assert_eq!(range.contains(&version), range.intersection(&Range::singleton(version)) != Range::empty());
+            assert_eq!(range.contains(&version), range.intersection(&Ranges::singleton(version)) != Ranges::empty());
         }
 
         #[test]
@@ -1091,14 +1089,14 @@ pub mod tests {
 
         #[test]
         fn from_range_bounds(range in any::<(Bound<u32>, Bound<u32>)>(), version in version_strat()) {
-            let rv: Range<_> = Range::from_range_bounds(range);
+            let rv: Ranges<_> = Ranges::from_range_bounds(range);
             assert_eq!(range.contains(&version), rv.contains(&version));
         }
 
         #[test]
         fn from_range_bounds_round_trip(range in any::<(Bound<u32>, Bound<u32>)>()) {
-            let rv: Range<u32> = Range::from_range_bounds(range);
-            let rv2: Range<u32> = rv.bounding_range().map(Range::from_range_bounds::<_, u32>).unwrap_or_else(Range::empty);
+            let rv: Ranges<u32> = Ranges::from_range_bounds(range);
+            let rv2: Ranges<u32> = rv.bounding_range().map(Ranges::from_range_bounds::<_, u32>).unwrap_or_else(Ranges::empty);
             assert_eq!(rv, rv2);
         }
 
@@ -1132,7 +1130,7 @@ pub mod tests {
 
     #[test]
     fn contains_many_can_take_owned() {
-        let range: Range<u8> = Range::singleton(1);
+        let range: Ranges<u8> = Ranges::singleton(1);
         let versions = vec![1, 2, 3];
         // Check that iter can be a Cow
         assert_eq!(
@@ -1150,7 +1148,7 @@ pub mod tests {
 
     #[test]
     fn simplify_can_take_owned() {
-        let range: Range<u8> = Range::singleton(1);
+        let range: Ranges<u8> = Ranges::singleton(1);
         let versions = vec![1, 2, 3];
         // Check that iter can be a Cow
         assert_eq!(
@@ -1166,20 +1164,20 @@ pub mod tests {
 
     #[test]
     fn version_ord() {
-        let versions: &[Range<u32>] = &[
-            Range::strictly_lower_than(1u32),
-            Range::lower_than(1u32),
-            Range::singleton(1u32),
-            Range::between(1u32, 3u32),
-            Range::higher_than(1u32),
-            Range::strictly_higher_than(1u32),
-            Range::singleton(2u32),
-            Range::singleton(2u32).union(&Range::singleton(3u32)),
-            Range::singleton(2u32)
-                .union(&Range::singleton(3u32))
-                .union(&Range::singleton(4u32)),
-            Range::singleton(2u32).union(&Range::singleton(4u32)),
-            Range::singleton(3u32),
+        let versions: &[Ranges<u32>] = &[
+            Ranges::strictly_lower_than(1u32),
+            Ranges::lower_than(1u32),
+            Ranges::singleton(1u32),
+            Ranges::between(1u32, 3u32),
+            Ranges::higher_than(1u32),
+            Ranges::strictly_higher_than(1u32),
+            Ranges::singleton(2u32),
+            Ranges::singleton(2u32).union(&Ranges::singleton(3u32)),
+            Ranges::singleton(2u32)
+                .union(&Ranges::singleton(3u32))
+                .union(&Ranges::singleton(4u32)),
+            Ranges::singleton(2u32).union(&Ranges::singleton(4u32)),
+            Ranges::singleton(3u32),
         ];
 
         let mut versions_sorted = versions.to_vec();

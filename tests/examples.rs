@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::{
-    resolve, DefaultStringReporter, Map, OfflineDependencyProvider, PubGrubError, Range,
+    resolve, DefaultStringReporter, Map, OfflineDependencyProvider, PubGrubError, Ranges,
     Reporter as _, SemanticVersion, Set,
 };
 
-type NumVS = Range<u32>;
-type SemVS = Range<SemanticVersion>;
+type NumVS = Ranges<u32>;
+type SemVS = Ranges<SemanticVersion>;
 
 use std::io::Write;
 
@@ -28,12 +28,12 @@ fn no_conflict() {
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
-        [("foo", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("foo", Ranges::between((1, 0, 0), (2, 0, 0)))],
     );
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "foo", (1, 0, 0),
-        [("bar", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("bar", Ranges::between((1, 0, 0), (2, 0, 0)))],
     );
     dependency_provider.add_dependencies("bar", (1, 0, 0), []);
     dependency_provider.add_dependencies("bar", (2, 0, 0), []);
@@ -60,14 +60,14 @@ fn avoiding_conflict_during_decision_making() {
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
         [
-            ("foo", Range::between((1, 0, 0), (2, 0, 0))),
-            ("bar", Range::between((1, 0, 0), (2, 0, 0))),
+            ("foo", Ranges::between((1, 0, 0), (2, 0, 0))),
+            ("bar", Ranges::between((1, 0, 0), (2, 0, 0))),
         ],
     );
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "foo", (1, 1, 0),
-        [("bar", Range::between((2, 0, 0), (3, 0, 0)))],
+        [("bar", Ranges::between((2, 0, 0), (3, 0, 0)))],
     );
     dependency_provider.add_dependencies("foo", (1, 0, 0), []);
     dependency_provider.add_dependencies("bar", (1, 0, 0), []);
@@ -95,18 +95,18 @@ fn conflict_resolution() {
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
-        [("foo", Range::higher_than((1, 0, 0)))],
+        [("foo", Ranges::higher_than((1, 0, 0)))],
     );
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "foo", (2, 0, 0),
-        [("bar", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("bar", Ranges::between((1, 0, 0), (2, 0, 0)))],
     );
     dependency_provider.add_dependencies("foo", (1, 0, 0), []);
     #[rustfmt::skip]
         dependency_provider.add_dependencies(
         "bar", (1, 0, 0),
-        [("foo", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("foo", Ranges::between((1, 0, 0), (2, 0, 0)))],
     );
 
     // Run the algorithm.
@@ -131,8 +131,8 @@ fn conflict_with_partial_satisfier() {
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
         [
-            ("foo", Range::between((1, 0, 0), (2, 0, 0))),
-            ("target", Range::between((2, 0, 0), (3, 0, 0))),
+            ("foo", Ranges::between((1, 0, 0), (2, 0, 0))),
+            ("target", Ranges::between((2, 0, 0), (3, 0, 0))),
         ],
     );
     #[rustfmt::skip]
@@ -140,8 +140,8 @@ fn conflict_with_partial_satisfier() {
         dependency_provider.add_dependencies(
         "foo", (1, 1, 0),
         [
-            ("left", Range::between((1, 0, 0), (2, 0, 0))),
-            ("right", Range::between((1, 0, 0), (2, 0, 0))),
+            ("left", Ranges::between((1, 0, 0), (2, 0, 0))),
+            ("right", Ranges::between((1, 0, 0), (2, 0, 0))),
         ],
     );
     dependency_provider.add_dependencies("foo", (1, 0, 0), []);
@@ -149,20 +149,20 @@ fn conflict_with_partial_satisfier() {
     // left 1.0.0 depends on shared >=1.0.0
         dependency_provider.add_dependencies(
         "left", (1, 0, 0),
-        [("shared", Range::higher_than((1, 0, 0)))],
+        [("shared", Ranges::higher_than((1, 0, 0)))],
     );
     #[rustfmt::skip]
     // right 1.0.0 depends on shared <2.0.0
         dependency_provider.add_dependencies(
         "right", (1, 0, 0),
-        [("shared", Range::strictly_lower_than((2, 0, 0)))],
+        [("shared", Ranges::strictly_lower_than((2, 0, 0)))],
     );
     dependency_provider.add_dependencies("shared", (2, 0, 0), []);
     #[rustfmt::skip]
     // shared 1.0.0 depends on target ^1.0.0
         dependency_provider.add_dependencies(
         "shared", (1, 0, 0),
-        [("target", Range::between((1, 0, 0), (2, 0, 0)))],
+        [("target", Ranges::between((1, 0, 0), (2, 0, 0)))],
     );
     dependency_provider.add_dependencies("target", (2, 0, 0), []);
     dependency_provider.add_dependencies("target", (1, 0, 0), []);
@@ -192,11 +192,11 @@ fn conflict_with_partial_satisfier() {
 fn double_choices() {
     init_log();
     let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
-    dependency_provider.add_dependencies("a", 0u32, [("b", Range::full()), ("c", Range::full())]);
-    dependency_provider.add_dependencies("b", 0u32, [("d", Range::singleton(0u32))]);
-    dependency_provider.add_dependencies("b", 1u32, [("d", Range::singleton(1u32))]);
+    dependency_provider.add_dependencies("a", 0u32, [("b", Ranges::full()), ("c", Ranges::full())]);
+    dependency_provider.add_dependencies("b", 0u32, [("d", Ranges::singleton(0u32))]);
+    dependency_provider.add_dependencies("b", 1u32, [("d", Ranges::singleton(1u32))]);
     dependency_provider.add_dependencies("c", 0u32, []);
-    dependency_provider.add_dependencies("c", 1u32, [("d", Range::singleton(2u32))]);
+    dependency_provider.add_dependencies("c", 1u32, [("d", Ranges::singleton(2u32))]);
     dependency_provider.add_dependencies("d", 0u32, []);
 
     // Solution.
@@ -219,12 +219,12 @@ fn confusing_with_lots_of_holes() {
     dependency_provider.add_dependencies(
         "root",
         1u32,
-        vec![("foo", Range::full()), ("baz", Range::full())],
+        vec![("foo", Ranges::full()), ("baz", Ranges::full())],
     );
 
     for i in 1..6 {
         // foo depends on bar...
-        dependency_provider.add_dependencies("foo", i as u32, vec![("bar", Range::full())]);
+        dependency_provider.add_dependencies("foo", i as u32, vec![("bar", Ranges::full())]);
     }
 
     // This package is part of the dependency tree, but it's not part of the conflict

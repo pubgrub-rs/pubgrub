@@ -222,12 +222,12 @@ impl<VS: VersionSet + Display> Display for Term<VS> {
 pub mod tests {
     use super::*;
     use proptest::prelude::*;
-    use version_range::Range;
+    use version_ranges::Ranges;
 
-    pub fn strategy() -> impl Strategy<Value = Term<Range<u32>>> {
+    pub fn strategy() -> impl Strategy<Value = Term<Ranges<u32>>> {
         prop_oneof![
-            version_range::proptest_strategy().prop_map(Term::Negative),
-            version_range::proptest_strategy().prop_map(Term::Positive),
+            version_ranges::proptest_strategy().prop_map(Term::Negative),
+            version_ranges::proptest_strategy().prop_map(Term::Positive),
         ]
     }
     proptest! {

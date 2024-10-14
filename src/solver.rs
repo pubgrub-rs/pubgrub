@@ -35,9 +35,9 @@
 //!
 //! ```
 //! # use std::convert::Infallible;
-//! # use pubgrub::{resolve, OfflineDependencyProvider, PubGrubError, Range};
+//! # use pubgrub::{resolve, OfflineDependencyProvider, PubGrubError, Ranges};
 //! #
-//! # type NumVS = Range<u32>;
+//! # type NumVS = Ranges<u32>;
 //! #
 //! # fn try_main() -> Result<(), PubGrubError<OfflineDependencyProvider<&'static str, NumVS>>> {
 //! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();

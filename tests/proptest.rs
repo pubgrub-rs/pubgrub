@@ -13,7 +13,7 @@ use proptest::string::string_regex;
 
 use pubgrub::{
     resolve, DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, External,
-    OfflineDependencyProvider, Package, PubGrubError, Range, Reporter, SelectedDependencies,
+    OfflineDependencyProvider, Package, PubGrubError, Ranges, Reporter, SelectedDependencies,
     VersionSet,
 };
 
@@ -131,13 +131,13 @@ fn timeout_resolve<DP: DependencyProvider>(
     )
 }
 
-type NumVS = Range<u32>;
+type NumVS = Ranges<u32>;
 
 #[test]
 #[should_panic]
 fn should_cancel_can_panic() {
     let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
-    dependency_provider.add_dependencies(0, 0u32, [(666, Range::full())]);
+    dependency_provider.add_dependencies(0, 0u32, [(666, Ranges::full())]);
 
     // Run the algorithm.
     let _ = resolve(
@@ -223,17 +223,17 @@ pub fn registry_strategy<N: Package + Ord>(
                     list_of_pkgid[b].1.push((
                         dep_name,
                         if c > s_last_index {
-                            Range::empty()
+                            Ranges::empty()
                         } else if c == 0 && d >= s_last_index {
-                            Range::full()
+                            Ranges::full()
                         } else if c == 0 {
-                            Range::strictly_lower_than(s[d] + 1)
+                            Ranges::strictly_lower_than(s[d] + 1)
                         } else if d >= s_last_index {
-                            Range::higher_than(s[c])
+                            Ranges::higher_than(s[c])
                         } else if c == d {
-                            Range::singleton(s[c])
+                            Ranges::singleton(s[c])
                         } else {
-                            Range::between(s[c], s[d] + 1)
+                            Ranges::between(s[c], s[d] + 1)
                         },
                     ));
                 }
@@ -607,7 +607,7 @@ fn large_case() {
         } else if name.ends_with("str_SemanticVersion.ron") {
             let dependency_provider: OfflineDependencyProvider<
                 &str,
-                Range<pubgrub::SemanticVersion>,
+                Ranges<pubgrub::SemanticVersion>,
             > = ron::de::from_str(&data).unwrap();
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {

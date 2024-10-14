@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::{
-    resolve, DefaultStringReporter, OfflineDependencyProvider, PubGrubError, Range, Reporter,
+    resolve, DefaultStringReporter, OfflineDependencyProvider, PubGrubError, Ranges, Reporter,
     SemanticVersion,
 };
 
-type SemVS = Range<SemanticVersion>;
+type SemVS = Ranges<SemanticVersion>;
 
 // `root` depends on `menu` and `icons 1.0.0`
 // `menu 1.0.0` depends on `dropdown < 2.0.0`
@@ -18,43 +18,43 @@ fn main() {
     let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     // Direct dependencies: menu and icons.
     dependency_provider.add_dependencies("root", (1, 0, 0), [
-        ("menu", Range::full()),
-        ("icons", Range::singleton((1, 0, 0))),
+        ("menu", Ranges::full()),
+        ("icons", Ranges::singleton((1, 0, 0))),
     ]);
 
     // Dependencies of the menu lib.
     dependency_provider.add_dependencies("menu", (1, 0, 0), [
-        ("dropdown", Range::from_range_bounds(..(2, 0, 0))),
+        ("dropdown", Ranges::from_range_bounds(..(2, 0, 0))),
     ]);
     dependency_provider.add_dependencies("menu", (1, 1, 0), [
-        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
+        ("dropdown", Ranges::from_range_bounds((2, 0, 0)..)),
     ]);
     dependency_provider.add_dependencies("menu", (1, 2, 0), [
-        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
+        ("dropdown", Ranges::from_range_bounds((2, 0, 0)..)),
     ]);
     dependency_provider.add_dependencies("menu", (1, 3, 0), [
-        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
+        ("dropdown", Ranges::from_range_bounds((2, 0, 0)..)),
     ]);
     dependency_provider.add_dependencies("menu", (1, 4, 0), [
-        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
+        ("dropdown", Ranges::from_range_bounds((2, 0, 0)..)),
     ]);
     dependency_provider.add_dependencies("menu", (1, 5, 0), [
-        ("dropdown", Range::from_range_bounds((2, 0, 0)..)),
+        ("dropdown", Ranges::from_range_bounds((2, 0, 0)..)),
     ]);
 
     // Dependencies of the dropdown lib.
     dependency_provider.add_dependencies("dropdown", (1, 8, 0), []);
     dependency_provider.add_dependencies("dropdown", (2, 0, 0), [
-        ("icons", Range::singleton((2, 0, 0))),
+        ("icons", Ranges::singleton((2, 0, 0))),
     ]);
     dependency_provider.add_dependencies("dropdown", (2, 1, 0), [
-        ("icons", Range::singleton((2, 0, 0))),
+        ("icons", Ranges::singleton((2, 0, 0))),
     ]);
     dependency_provider.add_dependencies("dropdown", (2, 2, 0), [
-        ("icons", Range::singleton((2, 0, 0))),
+        ("icons", Ranges::singleton((2, 0, 0))),
     ]);
     dependency_provider.add_dependencies("dropdown", (2, 3, 0), [
-        ("icons", Range::singleton((2, 0, 0))),
+        ("icons", Ranges::singleton((2, 0, 0))),
     ]);
 
     // Icons has no dependency.

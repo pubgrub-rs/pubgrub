@@ -1,5 +1,5 @@
 [package]
-name = "version-range"
+name = "version-ranges"
 version = "0.1.0"
 edition = "2021"
 repository = "https://github.com/pubgrub-rs/pubgrub"
