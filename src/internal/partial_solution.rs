@@ -487,10 +487,14 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
 
         satisfied_map.insert(
             satisfier_package,
-            satisfier_pa.satisfier(
-                satisfier_package,
-                &accum_term.intersection(&incompat_term.negate()),
-            ),
+            if accum_term.subset_of(incompat_term) {
+                (None, 0, DecisionLevel(1))
+            } else {
+                satisfier_pa.satisfier(
+                    satisfier_package,
+                    &accum_term.intersection(&incompat_term.negate()),
+                )
+            },
         );
 
         // Finally, let's identify the decision level of that previous satisfier.
@@ -512,14 +516,16 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> PackageAssignm
         package: &P,
         start_term: &Term<VS>,
     ) -> (Option<IncompId<P, VS, M>>, u32, DecisionLevel) {
-        let empty = Term::empty();
         // Indicate if we found a satisfier in the list of derivations, otherwise it will be the decision.
         let idx = self
             .dated_derivations
             .as_slice()
             .partition_point(|dd| !dd.accumulated_intersection.is_disjoint(start_term));
         if let Some(dd) = self.dated_derivations.get(idx) {
-            debug_assert_eq!(dd.accumulated_intersection.intersection(start_term), empty);
+            debug_assert_eq!(
+                dd.accumulated_intersection.intersection(start_term),
+                Term::empty()
+            );
             return (Some(dd.cause), dd.global_index, dd.decision_level);
         }
         // If it wasn't found in the derivations,
