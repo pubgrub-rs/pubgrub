@@ -50,9 +50,13 @@ use smallvec::{smallvec, SmallVec};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Ranges<V> {
+    /// Profiling in <https://github.com/pubgrub-rs/pubgrub/pull/262#discussion_r1804276278> showed
+    /// that a single stack entry is the most efficient. This is most likely due to `Interval<V>`
+    /// being large.
     segments: SmallVec<[Interval<V>; 1]>,
 }
 
+// TODO: Replace the tuple type with a custom enum inlining the bounds to reduce the type's size.
 type Interval<V> = (Bound<V>, Bound<V>);
 
 impl<V> Ranges<V> {
