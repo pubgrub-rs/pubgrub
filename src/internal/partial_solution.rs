@@ -650,6 +650,18 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     pub(crate) fn current_decision_level(&self) -> DecisionLevel {
         self.current_decision_level
     }
+
+    /// Retrieve the constraints on a package that will not change.
+    pub fn unchanging_term_for_package(&self, package: Id<DP::P>) -> Option<&Term<DP::VS>> {
+        let pa = self.package_assignments.get(&package)?;
+
+        let idx_newer = pa
+            .dated_derivations
+            .as_slice()
+            .partition_point(|dd| dd.decision_level <= DecisionLevel::new(1));
+        let idx = idx_newer.checked_sub(1)?;
+        Some(&pa.dated_derivations[idx].accumulated_intersection)
+    }
 }
 
 impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> PackageAssignments<P, VS, M> {
