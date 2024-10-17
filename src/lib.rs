@@ -230,6 +230,8 @@ pub use term::Term;
 pub use type_aliases::{DependencyConstraints, Map, SelectedDependencies, Set};
 pub use version::{SemanticVersion, VersionParseError};
 pub use version_ranges::Ranges;
+#[deprecated(note = "Use `Ranges` instead")]
+pub use version_ranges::Ranges as Range;
 pub use version_set::VersionSet;
 
 mod internal;
