@@ -50,7 +50,7 @@ use smallvec::{smallvec, SmallVec};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Ranges<V> {
-    segments: SmallVec<[Interval<V>; 2]>,
+    segments: SmallVec<[Interval<V>; 1]>,
 }
 
 type Interval<V> = (Bound<V>, Bound<V>);
