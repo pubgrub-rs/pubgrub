@@ -2,9 +2,9 @@
 
 use std::cell::RefCell;
 
-use pubgrub::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider, Range};
+use pubgrub::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider, Ranges};
 
-type NumVS = Range<u32>;
+type NumVS = Ranges<u32>;
 
 // An example implementing caching dependency provider that will
 // store queried dependencies in memory and check them before querying more from remote.
@@ -51,14 +51,14 @@ impl<DP: DependencyProvider<M = String>> DependencyProvider for CachingDependenc
         }
     }
 
-    fn choose_version(&self, package: &DP::P, range: &DP::VS) -> Result<Option<DP::V>, DP::Err> {
-        self.remote_dependencies.choose_version(package, range)
+    fn choose_version(&self, package: &DP::P, ranges: &DP::VS) -> Result<Option<DP::V>, DP::Err> {
+        self.remote_dependencies.choose_version(package, ranges)
     }
 
     type Priority = DP::Priority;
 
-    fn prioritize(&self, package: &DP::P, range: &DP::VS) -> Self::Priority {
-        self.remote_dependencies.prioritize(package, range)
+    fn prioritize(&self, package: &DP::P, ranges: &DP::VS) -> Self::Priority {
+        self.remote_dependencies.prioritize(package, ranges)
     }
 
     type Err = DP::Err;

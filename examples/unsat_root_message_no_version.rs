@@ -4,7 +4,7 @@ use std::fmt::{self, Display};
 
 use pubgrub::{
     resolve, DefaultStringReporter, Derived, External, Map, OfflineDependencyProvider,
-    PubGrubError, Range, ReportFormatter, Reporter, SemanticVersion, Term,
+    PubGrubError, Ranges, ReportFormatter, Reporter, SemanticVersion, Term,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -25,10 +25,10 @@ impl Display for Package {
 #[derive(Debug, Default)]
 struct CustomReportFormatter;
 
-impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFormatter {
+impl ReportFormatter<Package, Ranges<SemanticVersion>, String> for CustomReportFormatter {
     type Output = String;
 
-    fn format_terms(&self, terms: &Map<Package, Term<Range<SemanticVersion>>>) -> String {
+    fn format_terms(&self, terms: &Map<Package, Term<Ranges<SemanticVersion>>>) -> String {
         let terms_vec: Vec<_> = terms.iter().collect();
         match terms_vec.as_slice() {
             [] => "version solving failed".into(),
@@ -38,11 +38,11 @@ impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFo
             [(package @ Package::Root, Term::Negative(_))] => {
                 format!("{package} is mandatory")
             }
-            [(package @ Package::Package(_), Term::Positive(range))] => {
-                format!("{package} {range} is forbidden")
+            [(package @ Package::Package(_), Term::Positive(ranges))] => {
+                format!("{package} {ranges} is forbidden")
             }
-            [(package @ Package::Package(_), Term::Negative(range))] => {
-                format!("{package} {range} is mandatory")
+            [(package @ Package::Package(_), Term::Negative(ranges))] => {
+                format!("{package} {ranges} is mandatory")
             }
             [(p1, Term::Positive(r1)), (p2, Term::Negative(r2))] => {
                 External::<_, _, String>::FromDependencyOf(p1, r1.clone(), p2, r2.clone())
@@ -61,32 +61,32 @@ impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFo
 
     fn format_external(
         &self,
-        external: &External<Package, Range<SemanticVersion>, String>,
+        external: &External<Package, Ranges<SemanticVersion>, String>,
     ) -> String {
         match external {
             External::NotRoot(package, version) => {
                 format!("we are solving dependencies of {package} {version}")
             }
             External::NoVersions(package, set) => {
-                if set == &Range::full() {
+                if set == &Ranges::full() {
                     format!("there is no available version for {package}")
                 } else {
                     format!("there is no version of {package} in {set}")
                 }
             }
             External::Custom(package, set, reason) => {
-                if set == &Range::full() {
+                if set == &Ranges::full() {
                     format!("dependencies of {package} are unavailable because {reason}")
                 } else {
                     format!("dependencies of {package} at version {set} are unavailable because {reason}")
                 }
             }
             External::FromDependencyOf(package, package_set, dependency, dependency_set) => {
-                if package_set == &Range::full() && dependency_set == &Range::full() {
+                if package_set == &Ranges::full() && dependency_set == &Ranges::full() {
                     format!("{package} depends on {dependency}")
-                } else if package_set == &Range::full() {
+                } else if package_set == &Ranges::full() {
                     format!("{package} depends on {dependency} {dependency_set}")
-                } else if dependency_set == &Range::full() {
+                } else if dependency_set == &Ranges::full() {
                     if matches!(package, Package::Root) {
                         // Exclude the dummy version for root packages
                         format!("{package} depends on {dependency}")
@@ -106,9 +106,9 @@ impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFo
     /// Simplest case, we just combine two external incompatibilities.
     fn explain_both_external(
         &self,
-        external1: &External<Package, Range<SemanticVersion>, String>,
-        external2: &External<Package, Range<SemanticVersion>, String>,
-        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+        external1: &External<Package, Ranges<SemanticVersion>, String>,
+        external2: &External<Package, Ranges<SemanticVersion>, String>,
+        current_terms: &Map<Package, Term<Ranges<SemanticVersion>>>,
     ) -> String {
         // TODO: order should be chosen to make it more logical.
         format!(
@@ -123,10 +123,10 @@ impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFo
     fn explain_both_ref(
         &self,
         ref_id1: usize,
-        derived1: &Derived<Package, Range<SemanticVersion>, String>,
+        derived1: &Derived<Package, Ranges<SemanticVersion>, String>,
         ref_id2: usize,
-        derived2: &Derived<Package, Range<SemanticVersion>, String>,
-        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+        derived2: &Derived<Package, Ranges<SemanticVersion>, String>,
+        current_terms: &Map<Package, Term<Ranges<SemanticVersion>>>,
     ) -> String {
         // TODO: order should be chosen to make it more logical.
         format!(
@@ -145,9 +145,9 @@ impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFo
     fn explain_ref_and_external(
         &self,
         ref_id: usize,
-        derived: &Derived<Package, Range<SemanticVersion>, String>,
-        external: &External<Package, Range<SemanticVersion>, String>,
-        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+        derived: &Derived<Package, Ranges<SemanticVersion>, String>,
+        external: &External<Package, Ranges<SemanticVersion>, String>,
+        current_terms: &Map<Package, Term<Ranges<SemanticVersion>>>,
     ) -> String {
         // TODO: order should be chosen to make it more logical.
         format!(
@@ -162,8 +162,8 @@ impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFo
     /// Add an external cause to the chain of explanations.
     fn and_explain_external(
         &self,
-        external: &External<Package, Range<SemanticVersion>, String>,
-        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+        external: &External<Package, Ranges<SemanticVersion>, String>,
+        current_terms: &Map<Package, Term<Ranges<SemanticVersion>>>,
     ) -> String {
         format!(
             "And because {}, {}.",
@@ -176,8 +176,8 @@ impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFo
     fn and_explain_ref(
         &self,
         ref_id: usize,
-        derived: &Derived<Package, Range<SemanticVersion>, String>,
-        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+        derived: &Derived<Package, Ranges<SemanticVersion>, String>,
+        current_terms: &Map<Package, Term<Ranges<SemanticVersion>>>,
     ) -> String {
         format!(
             "And because {} ({}), {}.",
@@ -190,9 +190,9 @@ impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFo
     /// Add an already explained incompat to the chain of explanations.
     fn and_explain_prior_and_external(
         &self,
-        prior_external: &External<Package, Range<SemanticVersion>, String>,
-        external: &External<Package, Range<SemanticVersion>, String>,
-        current_terms: &Map<Package, Term<Range<SemanticVersion>>>,
+        prior_external: &External<Package, Ranges<SemanticVersion>, String>,
+        external: &External<Package, Ranges<SemanticVersion>, String>,
+        current_terms: &Map<Package, Term<Ranges<SemanticVersion>>>,
     ) -> String {
         format!(
             "And because {} and {}, {}.",
@@ -205,14 +205,14 @@ impl ReportFormatter<Package, Range<SemanticVersion>, String> for CustomReportFo
 
 fn main() {
     let mut dependency_provider =
-        OfflineDependencyProvider::<Package, Range<SemanticVersion>>::new();
+        OfflineDependencyProvider::<Package, Ranges<SemanticVersion>>::new();
     // Define the root package with a dependency on a package we do not provide
     dependency_provider.add_dependencies(
         Package::Root,
         (0, 0, 0),
         vec![(
             Package::Package("foo".to_string()),
-            Range::singleton((1, 0, 0)),
+            Ranges::singleton((1, 0, 0)),
         )],
     );
 

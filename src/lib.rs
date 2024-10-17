@@ -40,19 +40,19 @@
 //!
 //! We can model that scenario with this library as follows
 //! ```
-//! # use pubgrub::{OfflineDependencyProvider, resolve, Range};
+//! # use pubgrub::{OfflineDependencyProvider, resolve, Ranges};
 //!
-//! type NumVS = Range<u32>;
+//! type NumVS = Ranges<u32>;
 //!
 //! let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //!
 //! dependency_provider.add_dependencies(
 //!     "root",
 //!     1u32,
-//!     [("menu", Range::full()), ("icons", Range::full())],
+//!     [("menu", Ranges::full()), ("icons", Ranges::full())],
 //! );
-//! dependency_provider.add_dependencies("menu", 1u32, [("dropdown", Range::full())]);
-//! dependency_provider.add_dependencies("dropdown", 1u32, [("icons", Range::full())]);
+//! dependency_provider.add_dependencies("menu", 1u32, [("dropdown", Ranges::full())]);
+//! dependency_provider.add_dependencies("dropdown", 1u32, [("icons", Ranges::full())]);
 //! dependency_provider.add_dependencies("icons", 1u32, []);
 //!
 //! // Run the algorithm.
@@ -71,14 +71,14 @@
 //! and [SemanticVersion] for versions.
 //! This may be done quite easily by implementing the three following functions.
 //! ```
-//! # use pubgrub::{DependencyProvider, Dependencies, SemanticVersion,Range, DependencyConstraints, Map};
+//! # use pubgrub::{DependencyProvider, Dependencies, SemanticVersion, Ranges, DependencyConstraints, Map};
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
 //! # use std::convert::Infallible;
 //! #
 //! # struct MyDependencyProvider;
 //! #
-//! type SemVS = Range<SemanticVersion>;
+//! type SemVS = Ranges<SemanticVersion>;
 //!
 //! impl DependencyProvider for MyDependencyProvider {
 //!     fn choose_version(&self, package: &String, range: &SemVS) -> Result<Option<SemanticVersion>, Infallible> {
@@ -172,9 +172,9 @@
 //! [DefaultStringReporter] that outputs the report as a [String].
 //! You may use it as follows:
 //! ```
-//! # use pubgrub::{resolve, OfflineDependencyProvider, DefaultStringReporter, Reporter, PubGrubError, Range};
+//! # use pubgrub::{resolve, OfflineDependencyProvider, DefaultStringReporter, Reporter, PubGrubError, Ranges};
 //! #
-//! # type NumVS = Range<u32>;
+//! # type NumVS = Ranges<u32>;
 //! #
 //! # let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! # let root_package = "root";
@@ -212,7 +212,6 @@
 
 mod error;
 mod package;
-mod range;
 mod report;
 mod solver;
 mod term;
@@ -222,7 +221,6 @@ mod version_set;
 
 pub use error::{NoSolutionError, PubGrubError};
 pub use package::Package;
-pub use range::Range;
 pub use report::{
     DefaultStringReportFormatter, DefaultStringReporter, DerivationTree, Derived, External,
     ReportFormatter, Reporter,
@@ -231,6 +229,9 @@ pub use solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyPro
 pub use term::Term;
 pub use type_aliases::{DependencyConstraints, Map, SelectedDependencies, Set};
 pub use version::{SemanticVersion, VersionParseError};
+pub use version_ranges::Ranges;
+#[deprecated(note = "Use `Ranges` instead")]
+pub use version_ranges::Ranges as Range;
 pub use version_set::VersionSet;
 
 mod internal;

@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
+[workspace]
+members = ["version-ranges"]
+
 [package]
 name = "pubgrub"
 version = "0.2.1"
@@ -21,18 +24,23 @@ include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples
 
 [dependencies]
 indexmap = "2.5.0"
+log = "0.4.22" # for debug logs in tests
 priority-queue = "2.1.1"
-thiserror = "1.0"
 rustc-hash = ">=1.0.0, <3.0.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
-log = "0.4.22" # for debug logs in tests
+thiserror = "1.0"
+version-ranges = { version = "0.1.0", path = "version-ranges" }
 
 [dev-dependencies]
+criterion = "0.5"
+env_logger = "0.11.5"
 proptest = "1.5.0"
 ron = "=0.9.0-alpha.0"
 varisat = "0.2.2"
-criterion = "0.5"
-env_logger = "0.11.5"
+version-ranges = { version = "0.1.0", path = "version-ranges", features = ["proptest"] }
+
+[features]
+serde = ["dep:serde", "version-ranges/serde"]
 
 [[bench]]
 name = "large_case"

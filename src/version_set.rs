@@ -20,6 +20,8 @@
 
 use std::fmt::{Debug, Display};
 
+use crate::Ranges;
+
 /// Trait describing sets of versions.
 pub trait VersionSet: Debug + Display + Clone + Eq {
     /// Version type associated with the sets manipulated.
@@ -66,5 +68,45 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
     /// Whether all range of `self` are contained in `other`.
     fn subset_of(&self, other: &Self) -> bool {
         self == &self.intersection(other)
+    }
+}
+
+impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Ranges<T> {
+    type V = T;
+
+    fn empty() -> Self {
+        Ranges::empty()
+    }
+
+    fn singleton(v: Self::V) -> Self {
+        Ranges::singleton(v)
+    }
+
+    fn complement(&self) -> Self {
+        Ranges::complement(self)
+    }
+
+    fn intersection(&self, other: &Self) -> Self {
+        Ranges::intersection(self, other)
+    }
+
+    fn contains(&self, v: &Self::V) -> bool {
+        Ranges::contains(self, v)
+    }
+
+    fn full() -> Self {
+        Ranges::full()
+    }
+
+    fn union(&self, other: &Self) -> Self {
+        Ranges::union(self, other)
+    }
+
+    fn is_disjoint(&self, other: &Self) -> bool {
+        Ranges::is_disjoint(self, other)
+    }
+
+    fn subset_of(&self, other: &Self) -> bool {
+        Ranges::subset_of(self, other)
     }
 }

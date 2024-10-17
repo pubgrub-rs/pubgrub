@@ -579,6 +579,7 @@ dependencies = [
  "serde",
  "thiserror",
  "varisat",
+ "version-ranges",
 ]
 
 [[package]]
@@ -785,6 +786,9 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "syn"
@@ -972,6 +976,16 @@ name = "vec_mut_scan"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68ed610a8d5e63d9c0e31300e8fdb55104c5f21e422743a9dc74848fa8317fd2"
+
+[[package]]
+name = "version-ranges"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "ron",
+ "serde",
+ "smallvec",
+]
 
 [[package]]
 name = "wait-timeout"

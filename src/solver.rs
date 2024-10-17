@@ -35,9 +35,9 @@
 //!
 //! ```
 //! # use std::convert::Infallible;
-//! # use pubgrub::{resolve, OfflineDependencyProvider, PubGrubError, Range};
+//! # use pubgrub::{resolve, OfflineDependencyProvider, PubGrubError, Ranges};
 //! #
-//! # type NumVS = Range<u32>;
+//! # type NumVS = Ranges<u32>;
 //! #
 //! # fn try_main() -> Result<(), PubGrubError<OfflineDependencyProvider<&'static str, NumVS>>> {
 //! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
@@ -199,7 +199,7 @@ pub trait DependencyProvider {
     /// How this provider stores the version requirements for the packages.
     /// The requirements must be able to process the same kind of version as this dependency provider.
     ///
-    /// A common choice is [`Range`][crate::range::Range].
+    /// A common choice is [`Ranges`][version_ranges::Ranges].
     type VS: VersionSet<V = Self::V>;
 
     /// Type for custom incompatibilities.
