@@ -898,7 +898,7 @@ impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Ranges<V> {
 pub fn proptest_strategy() -> impl Strategy<Value = Ranges<u32>> {
     (
         any::<bool>(),
-        prop::collection::vec(any::<(u32, bool)>(), 1..10),
+        prop::collection::vec(any::<(u32, bool)>(), 0..10),
     )
         .prop_map(|(start_unbounded, deltas)| {
             let mut start = if start_unbounded {

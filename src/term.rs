@@ -9,20 +9,22 @@ use crate::VersionSet;
 
 /// A positive or negative expression regarding a set of versions.
 ///
-/// If a version is selected then `Positive(r)` and `Negative(r.complement())` are equivalent, but
-/// they have different semantics when no version is selected. A `Positive` term in the partial
-/// solution requires a version to be selected. But a `Negative` term allows for a solution that
-/// does not have that package selected. Specifically, `Positive(VS::empty())` means that there was
-/// a conflict, we need to select a version for the package but can't pick any, while
-/// `Negative(VS::full())` would mean it is fine as long as we don't select the package.
+/// `Positive(r)` and `Negative(r.complement())` are not equivalent:
+/// * the term `Positive(r)` is satisfied if the package is selected AND the selected version is in `r`.
+/// * the term `Negative(r.complement())` is satisfied if the package is not selected OR the selected version is in `r`.
+///
+/// A `Positive` term in the partial solution requires a version to be selected, but a `Negative` term
+/// allows for a solution that does not have that package selected.
+/// Specifically, `Positive(VS::empty())` means that there was a conflict (we need to select a version for the package
+/// but can't pick any), while `Negative(VS::full())` would mean it is fine as long as we don't select the package.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Term<VS: VersionSet> {
-    /// For example, "1.0.0 <= v < 2.0.0" is a positive expression
+    /// For example, `1.0.0 <= v < 2.0.0` is a positive expression
     /// that is evaluated true if a version is selected
     /// and comprised between version 1.0.0 and version 2.0.0.
     Positive(VS),
-    /// The term "not v < 3.0.0" is a negative expression
-    /// that is evaluated true if a version is selected >= 3.0.0
+    /// The term `not (v < 3.0.0)` is a negative expression
+    /// that is evaluated true if a version >= 3.0.0 is selected
     /// or if no version is selected at all.
     Negative(VS),
 }
@@ -93,7 +95,8 @@ impl<VS: VersionSet> Term<VS> {
 impl<VS: VersionSet> Term<VS> {
     /// Compute the intersection of two terms.
     ///
-    /// The intersection is positive if at least one of the two terms is positive.
+    /// The intersection is negative (unselected package is allowed)
+    /// if all terms are negative.
     pub(crate) fn intersection(&self, other: &Self) -> Self {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => Self::Positive(r1.intersection(r2)),
@@ -110,7 +113,8 @@ impl<VS: VersionSet> Term<VS> {
     pub(crate) fn is_disjoint(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => r1.is_disjoint(r2),
-            (Self::Negative(r1), Self::Negative(r2)) => r1 == &VS::empty() && r2 == &VS::empty(),
+            // Unselected package is allowed in both terms, so they are never disjoint.
+            (Self::Negative(_), Self::Negative(_)) => false,
             // If the positive term is a subset of the negative term, it lies fully in the region that the negative
             // term excludes.
             (Self::Positive(p), Self::Negative(n)) | (Self::Negative(n), Self::Positive(p)) => {
@@ -120,7 +124,7 @@ impl<VS: VersionSet> Term<VS> {
     }
 
     /// Compute the union of two terms.
-    /// If at least one term is negative, the union is also negative.
+    /// If at least one term is negative, the union is also negative (unselected package is allowed).
     pub(crate) fn union(&self, other: &Self) -> Self {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => Self::Positive(r1.union(r2)),
@@ -138,6 +142,8 @@ impl<VS: VersionSet> Term<VS> {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => r1.subset_of(r2),
             (Self::Positive(r1), Self::Negative(r2)) => r1.is_disjoint(r2),
+            // Only a negative term allows the unselected package,
+            // so it can never be a subset of a positive term.
             (Self::Negative(_), Self::Positive(_)) => false,
             (Self::Negative(r1), Self::Negative(r2)) => r2.subset_of(r1),
         }
