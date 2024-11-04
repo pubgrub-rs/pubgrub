@@ -50,6 +50,13 @@ use smallvec::{smallvec, SmallVec};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Ranges<V> {
+    /// Internally, [`Ranges`] are an ordered list of segments, where segment is a bounds pair.
+    ///
+    /// Invariants:
+    /// 1. The segments are sorted, from lowest to highest (through `Ord`).
+    /// 2. Each segment contains at least one version (start < end).
+    /// 3. There is at least one version between two segments.
+    ///
     /// Profiling in <https://github.com/pubgrub-rs/pubgrub/pull/262#discussion_r1804276278> showed
     /// that a single stack entry is the most efficient. This is most likely due to `Interval<V>`
     /// being large.
@@ -283,6 +290,37 @@ impl<V: Ord> Ranges<V> {
         }
     }
 
+    /// We want to use `iterator_try_collect`, but since it's unstable at the time of writing,
+    /// we expose a public `FromIterator<(Bound<V>, Bound<V>)>` method and use this for internal
+    /// testing.
+    fn try_from(
+        into_iter: impl IntoIterator<Item = (Bound<V>, Bound<V>)>,
+    ) -> Result<Self, FromIterError> {
+        let mut iter = into_iter.into_iter();
+        let Some(mut previous) = iter.next() else {
+            return Ok(Self {
+                segments: SmallVec::new(),
+            });
+        };
+        let mut segments = SmallVec::with_capacity(iter.size_hint().0);
+        for current in iter {
+            if !valid_segment(&previous.start_bound(), &previous.end_bound()) {
+                return Err(FromIterError::InvalidSegment);
+            }
+            if !end_before_start_with_gap(&previous.end_bound(), &current.start_bound()) {
+                return Err(FromIterError::OverlappingSegments);
+            }
+            segments.push(previous);
+            previous = current;
+        }
+        if !valid_segment(&previous.start_bound(), &previous.end_bound()) {
+            return Err(FromIterError::InvalidSegment);
+        }
+        segments.push(previous);
+        Ok(Self { segments })
+    }
+
+    /// See `Range.segments` docstring.
     fn check_invariants(self) -> Self {
         if cfg!(debug_assertions) {
             for p in self.segments.as_slice().windows(2) {
@@ -820,9 +858,78 @@ impl<V: Ord + Clone> Ranges<V> {
         Self { segments }.check_invariants()
     }
 
+    /// Constructor from arbitrary, unsorted and potentially overlapping ranges.
+    // TODO(konsti): If we handroll this, we don't need the clone bound
+    pub fn from_unsorted(segments: impl IntoIterator<Item = (Bound<V>, Bound<V>)>) -> Self {
+        // We have three constraints we need to fulfil:
+        // 1. The segments are sorted, from lowest to highest (through `Ord`): By sorting.
+        // 2. Each segment contains at least one version (start < end): By `union`.
+        // 3. There is at least one version between two segments: By `union`.
+        let mut segments: SmallVec<_> = segments.into_iter().collect();
+        segments.sort_by(|a: &Interval<V>, b: &Interval<V>| {
+            if a.start_bound() == b.start_bound() {
+                // The ends don't matter, we merge them anyway.
+                Ordering::Equal
+            } else if left_start_is_smaller(a.start_bound(), b.start_bound()) {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        });
+        // TODO(konsti): Handroll this. We're relying on the union implementation treating each
+        // segment as potentially coming from the other ranges and merging overlapping bounds.
+        Self { segments }.union(&Self {
+            segments: SmallVec::new(),
+        })
+    }
+
     /// Iterate over the parts of the range.
     pub fn iter(&self) -> impl Iterator<Item = (&Bound<V>, &Bound<V>)> {
         self.segments.iter().map(|(start, end)| (start, end))
+    }
+}
+
+impl<V> IntoIterator for Ranges<V> {
+    type Item = (Bound<V>, Bound<V>);
+    // TODO(konsti): We must not leak the type here!
+    type IntoIter = smallvec::IntoIter<[Interval<V>; 1]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.segments.into_iter()
+    }
+}
+
+/// User provided segment iterator breaks [`Ranges`] invariants.
+///
+/// Not user accessible since `FromIterator<(Bound<V>, Bound<V>)>` panics and `iterator_try_collect`
+/// is unstable.
+#[derive(Debug, PartialEq, Eq)]
+enum FromIterError {
+    /// The start of a segment must be before its end, and a segment must contain at least one
+    /// version.
+    InvalidSegment,
+    /// The end of a segment is not before the start of the next segment, leaving at least one
+    /// version space.
+    OverlappingSegments,
+}
+
+impl Display for FromIterError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FromIterError::InvalidSegment => f.write_str("segment must be valid"),
+            FromIterError::OverlappingSegments => {
+                f.write_str("end of a segment and start of the next segment must not overlap")
+            }
+        }
+    }
+}
+
+impl<V: Ord> FromIterator<(Bound<V>, Bound<V>)> for Ranges<V> {
+    /// Construct a [`Ranges`] from an ordered list of bounds.
+    ///
+    /// Panics if the bounds aren't sorted, are empty or have no space to the next bound.
+    fn from_iter<T: IntoIterator<Item = (Bound<V>, Bound<V>)>>(iter: T) -> Self {
+        Self::try_from(iter).unwrap()
     }
 }
 
@@ -1130,6 +1237,29 @@ pub mod tests {
             }
             assert!(simp.segments.len() <= range.segments.len())
         }
+
+        #[test]
+        fn from_iter_valid(segments in proptest::collection::vec(any::<(Bound<u32>, Bound<u32>)>(), ..30)) {
+            match Ranges::try_from(segments.clone()) {
+                Ok(ranges) => {
+                    ranges.check_invariants();
+                }
+                Err(_) => {
+                    assert!(
+                        segments
+                            .as_slice()
+                            .windows(2)
+                            .any(|p| !end_before_start_with_gap(&p[0].1, &p[1].0))
+                            || segments.iter().any(|(start, end)| !valid_segment(start, end))
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn from_unsorted_valid(segments in proptest::collection::vec(any::<(Bound<u32>, Bound<u32>)>(), ..30)) {
+            Ranges::from_unsorted(segments.clone()).check_invariants();
+        }
     }
 
     #[test]
@@ -1193,5 +1323,38 @@ pub mod tests {
         version_reverse_sorted.reverse();
         version_reverse_sorted.sort();
         assert_eq!(version_reverse_sorted, versions);
+    }
+
+    /// Test all error conditions in [`Ranges::try_from`].
+    #[test]
+    fn from_iter_errors() {
+        // Unbounded in not at an end
+        let result = Ranges::try_from([
+            (Bound::Included(1), Bound::Unbounded),
+            (Bound::Included(2), Bound::Unbounded),
+        ]);
+        assert_eq!(result, Err(FromIterError::OverlappingSegments));
+        // Not a version in between
+        let result = Ranges::try_from([
+            (Bound::Included(1), Bound::Excluded(2)),
+            (Bound::Included(2), Bound::Unbounded),
+        ]);
+        assert_eq!(result, Err(FromIterError::OverlappingSegments));
+        // First segment
+        let result = Ranges::try_from([(Bound::Excluded(2), Bound::Included(2))]);
+        assert_eq!(result, Err(FromIterError::InvalidSegment));
+        // Middle segment
+        let result = Ranges::try_from([
+            (Bound::Included(1), Bound::Included(2)),
+            (Bound::Included(3), Bound::Included(2)),
+            (Bound::Included(4), Bound::Included(5)),
+        ]);
+        assert_eq!(result, Err(FromIterError::InvalidSegment));
+        // Last segment
+        let result = Ranges::try_from([
+            (Bound::Included(1), Bound::Included(2)),
+            (Bound::Included(3), Bound::Included(2)),
+        ]);
+        assert_eq!(result, Err(FromIterError::InvalidSegment));
     }
 }
