@@ -865,7 +865,10 @@ impl<V: Ord + Clone> Ranges<V> {
         // 1. The segments are sorted, from lowest to highest (through `Ord`): By sorting.
         // 2. Each segment contains at least one version (start < end): By `union`.
         // 3. There is at least one version between two segments: By `union`.
-        let mut segments: SmallVec<_> = segments.into_iter().collect();
+        let mut segments: SmallVec<_> = segments
+            .into_iter()
+            .filter(|segment| valid_segment(&segment.start_bound(), &segment.end_bound()))
+            .collect();
         segments.sort_by(|a: &Interval<V>, b: &Interval<V>| {
             if a.start_bound() == b.start_bound() {
                 // The ends don't matter, we merge them anyway.
