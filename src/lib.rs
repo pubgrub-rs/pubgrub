@@ -212,6 +212,7 @@
 
 mod error;
 mod package;
+mod provider;
 mod report;
 mod solver;
 mod term;
@@ -221,11 +222,12 @@ mod version_set;
 
 pub use error::{NoSolutionError, PubGrubError};
 pub use package::Package;
+pub use provider::OfflineDependencyProvider;
 pub use report::{
     DefaultStringReportFormatter, DefaultStringReporter, DerivationTree, Derived, External,
     ReportFormatter, Reporter,
 };
-pub use solver::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider};
+pub use solver::{resolve, Dependencies, DependencyProvider};
 pub use term::Term;
 pub use type_aliases::{DependencyConstraints, Map, SelectedDependencies, Set};
 pub use version::{SemanticVersion, VersionParseError};
