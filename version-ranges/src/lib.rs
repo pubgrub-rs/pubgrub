@@ -283,6 +283,39 @@ impl<V: Ord> Ranges<V> {
         }
     }
 
+    /// Construct from segments already fulfilling the [`Ranges`] invariants.
+    ///
+    /// 1. The segments are sorted, from lowest to highest (through `Ord`).
+    /// 2. Each segment contains at least one version (start < end).
+    /// 3. There is at least one version between two segments.
+    pub fn from_normalized(
+        into_iter: impl IntoIterator<Item = (Bound<V>, Bound<V>)>,
+    ) -> Result<Self, FromIterError> {
+        let mut iter = into_iter.into_iter();
+        let Some(mut previous) = iter.next() else {
+            return Ok(Self {
+                segments: SmallVec::new(),
+            });
+        };
+        let mut segments = SmallVec::with_capacity(iter.size_hint().0);
+        for current in iter {
+            if !valid_segment(&previous.start_bound(), &previous.end_bound()) {
+                return Err(FromIterError::InvalidSegment);
+            }
+            if !end_before_start_with_gap(&previous.end_bound(), &current.start_bound()) {
+                return Err(FromIterError::OverlappingSegments);
+            }
+            segments.push(previous);
+            previous = current;
+        }
+        if !valid_segment(&previous.start_bound(), &previous.end_bound()) {
+            return Err(FromIterError::InvalidSegment);
+        }
+        segments.push(previous);
+        Ok(Self { segments })
+    }
+
+    /// See `Ranges` docstring for the invariants.
     fn check_invariants(self) -> Self {
         if cfg!(debug_assertions) {
             for p in self.segments.as_slice().windows(2) {
@@ -416,6 +449,31 @@ fn cmp_bounds_end<V: PartialOrd>(left: Bound<&V>, right: Bound<&V>) -> Option<Or
         // right:  ---[   OR -----[ OR -----[
         (Excluded(left), Excluded(right)) => left.partial_cmp(right)?,
     })
+}
+
+/// User provided segment iterator breaks [`Ranges`] invariants.
+///
+/// Not user accessible since `FromIterator<(Bound<V>, Bound<V>)>` panics and `iterator_try_collect`
+/// is unstable.
+#[derive(Debug, PartialEq, Eq)]
+pub enum FromIterError {
+    /// The start of a segment must be before its end, and a segment must contain at least one
+    /// version.
+    InvalidSegment,
+    /// The end of a segment is not before the start of the next segment, leaving at least one
+    /// version space.
+    OverlappingSegments,
+}
+
+impl Display for FromIterError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FromIterError::InvalidSegment => f.write_str("segment must be valid"),
+            FromIterError::OverlappingSegments => {
+                f.write_str("end of a segment and start of the next segment must not overlap")
+            }
+        }
+    }
 }
 
 impl<V: PartialOrd> PartialOrd for Ranges<V> {
@@ -1130,6 +1188,24 @@ pub mod tests {
             }
             assert!(simp.segments.len() <= range.segments.len())
         }
+
+        #[test]
+        fn from_normalized_valid(segments in proptest::collection::vec(any::<(Bound<u32>, Bound<u32>)>(), ..30)) {
+            match Ranges::from_normalized(segments.clone()) {
+                Ok(ranges) => {
+                    ranges.check_invariants();
+                }
+                Err(_) => {
+                    assert!(
+                        segments
+                            .as_slice()
+                            .windows(2)
+                            .any(|p| !end_before_start_with_gap(&p[0].1, &p[1].0))
+                            || segments.iter().any(|(start, end)| !valid_segment(start, end))
+                    );
+                }
+            }
+        }
     }
 
     #[test]
@@ -1193,5 +1269,38 @@ pub mod tests {
         version_reverse_sorted.reverse();
         version_reverse_sorted.sort();
         assert_eq!(version_reverse_sorted, versions);
+    }
+
+    /// Test all error conditions in [`Ranges::from_normalized`].
+    #[test]
+    fn from_iter_errors() {
+        // Unbounded in not at an end
+        let result = Ranges::from_normalized([
+            (Bound::Included(1), Bound::Unbounded),
+            (Bound::Included(2), Bound::Unbounded),
+        ]);
+        assert_eq!(result, Err(FromIterError::OverlappingSegments));
+        // Not a version in between
+        let result = Ranges::from_normalized([
+            (Bound::Included(1), Bound::Excluded(2)),
+            (Bound::Included(2), Bound::Unbounded),
+        ]);
+        assert_eq!(result, Err(FromIterError::OverlappingSegments));
+        // First segment
+        let result = Ranges::from_normalized([(Bound::Excluded(2), Bound::Included(2))]);
+        assert_eq!(result, Err(FromIterError::InvalidSegment));
+        // Middle segment
+        let result = Ranges::from_normalized([
+            (Bound::Included(1), Bound::Included(2)),
+            (Bound::Included(3), Bound::Included(2)),
+            (Bound::Included(4), Bound::Included(5)),
+        ]);
+        assert_eq!(result, Err(FromIterError::InvalidSegment));
+        // Last segment
+        let result = Ranges::from_normalized([
+            (Bound::Included(1), Bound::Included(2)),
+            (Bound::Included(3), Bound::Included(2)),
+        ]);
+        assert_eq!(result, Err(FromIterError::InvalidSegment));
     }
 }
