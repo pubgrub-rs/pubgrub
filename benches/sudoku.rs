@@ -56,8 +56,8 @@ fn from_board(b: &str) -> Vec<(SudokuPackage, Range<Arc<usize>>)> {
             if let Some(val) = val.chars().next().unwrap().to_digit(10) {
                 out.push((
                     SudokuPackage::Cell {
-                        row: (row + 1).try_into().unwrap(),
-                        col: (col + 1).try_into().unwrap(),
+                        row: row + 1,
+                        col: col + 1,
                     },
                     Range::singleton(val as usize),
                 ));

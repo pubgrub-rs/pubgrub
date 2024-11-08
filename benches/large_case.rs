@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
+
 use std::time::Duration;
 
 use criterion::*;
