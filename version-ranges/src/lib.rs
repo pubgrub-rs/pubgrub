@@ -879,6 +879,87 @@ impl<V> IntoIterator for Ranges<V> {
     }
 }
 
+impl<V: Ord + Debug> FromIterator<(Bound<V>, Bound<V>)> for Ranges<V> {
+    /// Constructor from arbitrary, unsorted and potentially overlapping ranges.
+    ///
+    /// This is equivalent, but faster, to computing the [`Ranges::union`] of the
+    /// [`Ranges::from_range_bounds`] of each segment.
+    fn from_iter<T: IntoIterator<Item = (Bound<V>, Bound<V>)>>(iter: T) -> Self {
+        // We have three constraints we need to fulfil:
+        // 1. The segments are sorted, from lowest to highest (through `Ord`): By sorting.
+        // 2. Each segment contains at least one version (start < end): By `union`.
+        // 3. There is at least one version between two segments: By `union`.
+        let mut segments: SmallVec<[Interval<V>; 1]> = SmallVec::new();
+
+        for segment in iter {
+            if !valid_segment(&segment.start_bound(), &segment.end_bound()) {
+                continue;
+            }
+            // Find where to insert the new segment
+            let insertion_point = segments.partition_point(|elem: &Interval<V>| {
+                cmp_bounds_start(elem.start_bound(), segment.start_bound())
+                    .unwrap()
+                    .is_lt()
+            });
+            // Is it overlapping with the previous segment?
+            let previous_overlapping = insertion_point > 0
+                && !end_before_start_with_gap(
+                    &segments[insertion_point - 1].end_bound(),
+                    &segment.start_bound(),
+                );
+
+            // Is it overlapping with the following segment?
+            let next_overlapping = insertion_point < segments.len()
+                && !end_before_start_with_gap(
+                    &segment.end_bound(),
+                    &segments[insertion_point].start_bound(),
+                );
+
+            match (previous_overlapping, next_overlapping) {
+                (true, true) => {
+                    // previous:  |-------|
+                    // segment:         |-------|
+                    // following:             |-----|
+                    //
+                    // final:    |--------------------|
+                    // We merge all three segments into one, which is effectively removing one of
+                    // two previously inserted and changing the bounds on the other.
+                    let following = segments.remove(insertion_point);
+                    segments[insertion_point - 1].1 = following.1;
+                }
+                (true, false) => {
+                    // previous:  |-----|
+                    // segment:      |-----|
+                    // following:              |-----|
+                    //
+                    // final:    |---------|   |-----|
+                    // We can reuse the existing element by extending it.
+                    segments[insertion_point - 1].1 = segment.1;
+                }
+                (false, true) => {
+                    // previous:  |-----|
+                    // segment:            |-----|
+                    // following:              |-----|
+                    //
+                    // final:    |-----|   |---------|
+                    // We can reuse the existing element by extending it.
+                    segments[insertion_point].0 = segment.0;
+                }
+                (false, false) => {
+                    // previous:  |-----|
+                    // segment:            |-----|
+                    // following:                    |-----|
+                    //
+                    // final:    |-----|   |-----|   |-----|
+                    segments.insert(insertion_point, segment);
+                }
+            }
+        }
+
+        Self { segments }.check_invariants()
+    }
+}
+
 // REPORT ######################################################################
 
 impl<V: Display + Eq> Display for Ranges<V> {
@@ -1183,6 +1264,12 @@ pub mod tests {
             }
             assert!(simp.segments.len() <= range.segments.len())
         }
+
+        #[test]
+        fn from_iter_valid(segments in proptest::collection::vec(any::<(Bound<u32>, Bound<u32>)>(), ..30)) {
+            // We check invariants in the method.
+            Ranges::from_iter(segments.clone());
+        }
     }
 
     #[test]
@@ -1217,6 +1304,15 @@ pub mod tests {
             range.simplify(versions.iter()),
             range.simplify(versions.into_iter())
         );
+    }
+
+    #[test]
+    fn from_iter_regression() {
+        Ranges::from_iter([
+            (Included(0), Included(0)),
+            (Excluded(1u32), Unbounded),
+            (Included(0), Included(0)),
+        ]);
     }
 
     #[test]
