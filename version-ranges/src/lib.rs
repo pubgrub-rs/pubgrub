@@ -917,40 +917,40 @@ impl<V: Ord + Debug> FromIterator<(Bound<V>, Bound<V>)> for Ranges<V> {
 
             match (previous_overlapping, next_overlapping) {
                 (true, true) => {
-                    // previous:  |-------|
-                    // segment:         |-------|
-                    // following:             |-----|
+                    // previous:  |------|
+                    // segment:       |------|
+                    // following:          |------|
                     //
-                    // final:    |--------------------|
+                    // final:     |---------------|
                     // We merge all three segments into one, which is effectively removing one of
                     // two previously inserted and changing the bounds on the other.
                     let following = segments.remove(insertion_point);
                     segments[insertion_point - 1].1 = following.1;
                 }
                 (true, false) => {
-                    // previous:  |-----|
-                    // segment:      |-----|
-                    // following:              |-----|
+                    // previous:  |------|
+                    // segment:       |------|
+                    // following:                |------|
                     //
-                    // final:    |---------|   |-----|
+                    // final:     |----------|   |------|
                     // We can reuse the existing element by extending it.
                     segments[insertion_point - 1].1 = segment.1;
                 }
                 (false, true) => {
-                    // previous:  |-----|
-                    // segment:            |-----|
-                    // following:              |-----|
+                    // previous:  |------|
+                    // segment:             |------|
+                    // following:               |------|
                     //
-                    // final:    |-----|   |---------|
+                    // final:    |------|   |---------|
                     // We can reuse the existing element by extending it.
                     segments[insertion_point].0 = segment.0;
                 }
                 (false, false) => {
-                    // previous:  |-----|
-                    // segment:            |-----|
-                    // following:                    |-----|
+                    // previous:  |------|
+                    // segment:             |------|
+                    // following:                      |------|
                     //
-                    // final:    |-----|   |-----|   |-----|
+                    // final:    |------|   |------|   |------|
                     segments.insert(insertion_point, segment);
                 }
             }
