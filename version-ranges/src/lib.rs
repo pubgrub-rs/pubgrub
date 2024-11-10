@@ -891,7 +891,7 @@ impl<V: Ord> FromIterator<(Bound<V>, Bound<V>)> for Ranges<V> {
         // 3. There is at least one version between two segments: By `union`.
 
         // For this implementation, we choose to only build a single smallvec and insert or remove
-        // in it, instead of e.g. collecting the segments into one smallvec, sorting that and then
+        // in it, instead of e.g. collecting the segments into a sorted datastructure first and then
         // construction the second smallvec without shifting.
         let mut segments: SmallVec<[Interval<V>; 1]> = SmallVec::new();
 
