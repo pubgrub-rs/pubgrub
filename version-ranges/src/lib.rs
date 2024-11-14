@@ -887,8 +887,16 @@ impl<V: Ord> FromIterator<(Bound<V>, Bound<V>)> for Ranges<V> {
     fn from_iter<T: IntoIterator<Item = (Bound<V>, Bound<V>)>>(iter: T) -> Self {
         // We have three constraints we need to fulfil:
         // 1. The segments are sorted, from lowest to highest (through `Ord`): By sorting.
-        // 2. Each segment contains at least one version (start < end): By `union`.
-        // 3. There is at least one version between two segments: By `union`.
+        // 2. Each segment contains at least one version (start < end): By skipping invalid
+        //    segments.
+        // 3. There is at least one version between two segments: By merging overlapping elements.
+        //
+        // Technically, the implementation has a O(n²) worst case complexity since we're inserting
+        // and removing. This has two motivations: One is that we don't have any performance
+        // critical usages of this method as of this writing, so we have no real world benchmark.
+        // The other is that we get the elements from an iterator, so to avoid moving elements
+        // around we would first need to build a different, sorted collection with extra
+        // allocation(s), before we could build our real segments. --Konsti
 
         // For this implementation, we choose to only build a single smallvec and insert or remove
         // in it, instead of e.g. collecting the segments into a sorted datastructure first and then
@@ -1039,6 +1047,9 @@ impl<V: Ord> FromIterator<(Bound<V>, Bound<V>)> for Ranges<V> {
                     // following:                      |------|
                     //
                     // final:    |------|   |------|   |------|
+
+                    // This line is O(n), which makes the algorithm O(n²), but it should be good
+                    // enough for now.
                     segments.insert(insertion_point, segment);
                 }
             }
