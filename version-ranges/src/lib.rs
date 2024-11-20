@@ -305,7 +305,7 @@ impl<V: Ord> Ranges<V> {
     /// See [`Ranges`] for the invariants checked.
     fn check_invariants(self) -> Self {
         if cfg!(debug_assertions) {
-            for p in self.segments.as_slice().windows(2) {
+            for p in self.segments.windows(2) {
                 assert!(end_before_start_with_gap(&p[0].1, &p[1].0));
             }
             for (s, e) in self.segments.iter() {

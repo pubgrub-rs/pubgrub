@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use std::io::Write;
+
+use log::LevelFilter;
 use pubgrub::{
-    resolve, DefaultStringReporter, Map, OfflineDependencyProvider, PubGrubError, Ranges,
-    Reporter as _, SemanticVersion, Set,
+    DefaultStringReporter, Map, OfflineDependencyProvider, PubGrubError, Ranges, Reporter as _,
+    SemanticVersion, Set,
 };
 
 type NumVS = Ranges<u32>;
 type SemVS = Ranges<SemanticVersion>;
-
-use std::io::Write;
-
-use log::LevelFilter;
 
 fn init_log() {
     let _ = env_logger::builder()
@@ -39,7 +38,7 @@ fn no_conflict() {
     dependency_provider.add_dependencies("bar", (2, 0, 0), []);
 
     // Run the algorithm.
-    let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
+    let computed_solution = dependency_provider.resolve("root", (1, 0, 0)).unwrap();
 
     // Solution.
     let mut expected_solution = Map::default();
@@ -75,7 +74,7 @@ fn avoiding_conflict_during_decision_making() {
     dependency_provider.add_dependencies("bar", (2, 0, 0), []);
 
     // Run the algorithm.
-    let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
+    let computed_solution = dependency_provider.resolve("root", (1, 0, 0)).unwrap();
 
     // Solution.
     let mut expected_solution = Map::default();
@@ -110,7 +109,7 @@ fn conflict_resolution() {
     );
 
     // Run the algorithm.
-    let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
+    let computed_solution = dependency_provider.resolve("root", (1, 0, 0)).unwrap();
 
     // Solution.
     let mut expected_solution = Map::default();
@@ -168,7 +167,7 @@ fn conflict_with_partial_satisfier() {
     dependency_provider.add_dependencies("target", (1, 0, 0), []);
 
     // Run the algorithm.
-    let computed_solution = resolve(&dependency_provider, "root", (1, 0, 0)).unwrap();
+    let computed_solution = dependency_provider.resolve("root", (1, 0, 0)).unwrap();
 
     // Solution.
     let mut expected_solution = Map::default();
@@ -207,7 +206,7 @@ fn double_choices() {
     expected_solution.insert("d", 0u32);
 
     // Run the algorithm.
-    let computed_solution = resolve(&dependency_provider, "a", 0u32).unwrap();
+    let computed_solution = dependency_provider.resolve("a", 0u32).unwrap();
     assert_eq!(expected_solution, computed_solution);
 }
 
@@ -230,24 +229,28 @@ fn confusing_with_lots_of_holes() {
     // This package is part of the dependency tree, but it's not part of the conflict
     dependency_provider.add_dependencies("baz", 1u32, vec![]);
 
-    let Err(PubGrubError::NoSolution(mut derivation_tree)) =
-        resolve(&dependency_provider, "root", 1u32)
-    else {
+    let Err(PubGrubError::NoSolution(mut error)) = dependency_provider.resolve("root", 1u32) else {
         unreachable!()
     };
     assert_eq!(
-        &DefaultStringReporter::report(&derivation_tree),
-        r#"Because there is no available version for bar and foo 1 | 2 | 3 | 4 | 5 depends on bar, foo 1 | 2 | 3 | 4 | 5 is forbidden.
-And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5 | >5 and root 1 depends on foo, root 1 is forbidden."#
+        &DefaultStringReporter::report(&error, &dependency_provider),
+        r#"Because foo @ * depends on bar @ ∅ and root @ 1 depends on foo @ *, root @ 1 is forbidden."#
     );
-    derivation_tree.collapse_no_versions();
+
+    error.derivation_tree.collapse_no_versions();
     assert_eq!(
-        &DefaultStringReporter::report(&derivation_tree),
-        "Because foo depends on bar and root 1 depends on foo, root 1 is forbidden."
+        &DefaultStringReporter::report(&error, &dependency_provider),
+        r#"Because foo @ * depends on bar @ ∅ and root @ 1 depends on foo @ *, root @ 1 is forbidden."#
     );
+
     assert_eq!(
-        derivation_tree.packages(),
+        error
+            .derivation_tree
+            .packages()
+            .into_iter()
+            .filter_map(|p| error.package_store.pkg(p).unwrap().inner_pkg().copied())
+            .collect::<Set<_>>(),
         // baz isn't shown.
-        Set::from_iter(&["root", "foo", "bar"])
+        Set::from_iter(["root", "foo", "bar"]),
     );
 }

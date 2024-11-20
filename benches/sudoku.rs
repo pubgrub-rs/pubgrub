@@ -3,12 +3,12 @@
 //! Uses `Arc<usize>` for being closer to real versions.
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::{resolve, OfflineDependencyProvider, Range};
 use std::fmt;
 use std::sync::Arc;
-use version_ranges::Ranges;
 
 use criterion::*;
+use pubgrub::{OfflineDependencyProvider, Range};
+use version_ranges::Ranges;
 
 /// The size of a box in the board.
 const BOARD_BASE: usize = 3;
@@ -122,7 +122,7 @@ fn solve(c: &mut Criterion, board: Vec<(SudokuPackage, Ranges<Arc<usize>>)>, cas
     dependency_provider.add_dependencies(SudokuPackage::Root, Arc::new(1usize), board);
     c.bench_function(case, |b| {
         b.iter(|| {
-            let _ = resolve(&dependency_provider, SudokuPackage::Root, Arc::new(1usize));
+            let _ = dependency_provider.resolve(SudokuPackage::Root, Arc::new(1usize));
         })
     });
 }

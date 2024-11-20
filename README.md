@@ -29,10 +29,6 @@ So, because root depends on both menu >=1.0.0 and intl >=5.0.0,
 ```
 
 This pubgrub crate provides a Rust implementation of PubGrub.
-It is generic and works for any type of dependency system
-as long as packages (P) and versions (V) implement
-the provided `Package` and `Version` traits.
-
 
 ## Using the pubgrub crate
 

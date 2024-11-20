@@ -26,7 +26,7 @@ fn backtracking_singletons(c: &mut Criterion, package_count: u32, version_count:
 
     c.bench_function("backtracking_singletons", |b| {
         b.iter(|| {
-            let _ = pubgrub::resolve(&dependency_provider, 0u32, 0u32);
+            let _ = dependency_provider.resolve(0u32, 0u32);
         })
     });
 }
@@ -59,7 +59,7 @@ fn backtracking_disjoint_versions(c: &mut Criterion, package_count: u32, version
 
     c.bench_function("backtracking_disjoint_versions", |b| {
         b.iter(|| {
-            let _ = pubgrub::resolve(&dependency_provider, 0u32, 0u32);
+            let _ = dependency_provider.resolve(0u32, 0u32);
         })
     });
 }
@@ -83,7 +83,7 @@ fn backtracking_ranges(c: &mut Criterion, package_count: u32, version_count: u32
 
     c.bench_function("backtracking_ranges", |b| {
         b.iter(|| {
-            let _ = pubgrub::resolve(&dependency_provider, 0u32, 0u32);
+            let _ = dependency_provider.resolve(0u32, 0u32);
         })
     });
 }

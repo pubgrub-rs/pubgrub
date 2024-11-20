@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use std::collections::BTreeMap;
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
+
 use pubgrub::{
-    Dependencies, DependencyProvider, Map, OfflineDependencyProvider, Package, PubGrubError,
-    SelectedDependencies, VersionSet,
+    helpers::PackageVersionWrapper, DependencyProvider, Map, OfflineDependencyProvider,
+    PubGrubError, SelectedDependencies, VersionRanges,
 };
 use varisat::ExtendFormula;
 
@@ -35,17 +39,17 @@ fn sat_at_most_one(solver: &mut impl ExtendFormula, vars: &[varisat::Var]) {
 ///
 /// The SAT library does not optimize for the newer version,
 /// so the selected packages may not match the real resolver.
-pub struct SatResolve<P: Package, VS: VersionSet> {
+pub struct SatResolve<P: Debug + Display + Clone + Eq + Hash, V: Debug + Display + Clone + Ord> {
     solver: varisat::Solver<'static>,
-    all_versions_by_p: Map<P, Vec<(VS::V, varisat::Var)>>,
+    all_versions_by_p: Map<P, BTreeMap<V, varisat::Var>>,
 }
 
-impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
-    pub fn new(dp: &OfflineDependencyProvider<P, VS>) -> Self {
+impl<P: Debug + Display + Clone + Eq + Hash, V: Debug + Display + Clone + Ord> SatResolve<P, V> {
+    pub fn new<R: VersionRanges<V = V>>(dp: &OfflineDependencyProvider<P, R>) -> Self {
         let mut cnf = varisat::CnfFormula::new();
 
         let mut all_versions = vec![];
-        let mut all_versions_by_p: Map<P, Vec<(VS::V, varisat::Var)>> = Map::default();
+        let mut all_versions_by_p: Map<P, BTreeMap<R::V, varisat::Var>> = Map::default();
 
         for p in dp.packages() {
             let mut versions_for_p = vec![];
@@ -56,7 +60,7 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
                 all_versions_by_p
                     .entry(p.clone())
                     .or_default()
-                    .push((v.clone(), new_var));
+                    .insert(v.clone(), new_var);
             }
             // no two versions of the same package
             sat_at_most_one(&mut cnf, &versions_for_p);
@@ -64,17 +68,13 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
 
         // active packages need each of there `deps` to be satisfied
         for (p, v, var) in &all_versions {
-            let deps = match dp.get_dependencies(p, v).unwrap() {
-                Dependencies::Unavailable(_) => panic!(),
-                Dependencies::Available(d) => d,
-            };
-            for (p1, range) in &deps {
-                let empty_vec = vec![];
+            let deps = dp.dependencies(p, v).unwrap();
+            for (p1, range) in deps {
                 let mut matches: Vec<varisat::Lit> = all_versions_by_p
                     .get(p1)
-                    .unwrap_or(&empty_vec)
+                    .unwrap_or(&BTreeMap::new())
                     .iter()
-                    .filter(|(v1, _)| range.contains(v1))
+                    .filter(|&(v1, _)| range.contains(v1))
                     .map(|(_, var1)| var1.positive())
                     .collect();
                 // ^ the `dep` is satisfied or
@@ -99,32 +99,35 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
         }
     }
 
-    pub fn resolve(&mut self, name: &P, ver: &VS::V) -> bool {
+    pub fn resolve(&mut self, name: &P, ver: &V) -> bool {
         if let Some(vers) = self.all_versions_by_p.get(name) {
-            if let Some((_, var)) = vers.iter().find(|(v, _)| v == ver) {
+            if let Some((_, var)) = vers.iter().find(|&(v, _)| v == ver) {
                 self.solver.assume(&[var.positive()]);
 
-                self.solver
+                return self
+                    .solver
                     .solve()
-                    .expect("docs say it can't error in default config")
-            } else {
-                false
+                    .expect("docs say it can't error in default config");
             }
-        } else {
-            false
         }
+        false
     }
 
-    pub fn is_valid_solution<DP: DependencyProvider<P = P, VS = VS, V = VS::V>>(
+    pub fn is_valid_solution<DP: DependencyProvider<P = PackageVersionWrapper<P>>>(
         &mut self,
         pids: &SelectedDependencies<DP>,
     ) -> bool {
+        let pids = pids
+            .iter()
+            .filter_map(|(wrapper, &version_index)| wrapper.inner(version_index))
+            .collect::<Map<_, _>>();
+
         let mut assumption = vec![];
 
         for (p, vs) in &self.all_versions_by_p {
-            let pid_for_p = pids.get(p);
-            for (v, var) in vs {
-                assumption.push(var.lit(pid_for_p == Some(v)))
+            let pid_for_p = pids.get(p).map(|&v| v as usize);
+            for (i, var) in vs.values().enumerate() {
+                assumption.push(var.lit(pid_for_p == Some(i)))
             }
         }
 
@@ -135,19 +138,15 @@ impl<P: Package, VS: VersionSet> SatResolve<P, VS> {
             .expect("docs say it can't error in default config")
     }
 
-    pub fn check_resolve<DP: DependencyProvider<P = P, VS = VS, V = VS::V>>(
+    pub fn check_resolve<DP: DependencyProvider<P = PackageVersionWrapper<P>>>(
         &mut self,
         res: &Result<SelectedDependencies<DP>, PubGrubError<DP>>,
         p: &P,
-        v: &VS::V,
+        v: &V,
     ) {
         match res {
-            Ok(s) => {
-                assert!(self.is_valid_solution::<DP>(s));
-            }
-            Err(_) => {
-                assert!(!self.resolve(p, v));
-            }
+            Ok(s) => assert!(self.is_valid_solution::<DP>(s)),
+            Err(_) => assert!(!self.resolve(p, v)),
         }
     }
 }

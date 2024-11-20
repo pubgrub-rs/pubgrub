@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::{
-    resolve, DefaultStringReporter, OfflineDependencyProvider, PubGrubError, Ranges, Reporter,
+    DefaultStringReporter, OfflineDependencyProvider, PubGrubError, Ranges, Reporter,
     SemanticVersion,
 };
 
@@ -36,11 +36,14 @@ fn main() {
     dependency_provider.add_dependencies("baz", (3, 0, 0), []);
 
     // Run the algorithm.
-    match resolve(&dependency_provider, "root", (1, 0, 0)) {
-        Ok(sol) => println!("{:?}", sol),
-        Err(PubGrubError::NoSolution(mut derivation_tree)) => {
-            derivation_tree.collapse_no_versions();
-            eprintln!("{}", DefaultStringReporter::report(&derivation_tree));
+    match dependency_provider.resolve("root", (1, 0, 0)) {
+        Ok(sol) => println!("Solution: {sol:?}"),
+        Err(PubGrubError::NoSolution(mut error)) => {
+            error.derivation_tree.collapse_no_versions();
+            eprintln!(
+                "{}",
+                DefaultStringReporter::report(&error, &dependency_provider)
+            );
             std::process::exit(1);
         }
         Err(err) => panic!("{:?}", err),
