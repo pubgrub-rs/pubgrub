@@ -190,27 +190,6 @@ impl<K, V> SmallMap<K, V> {
     }
 }
 
-impl<K: Eq + Hash + Clone, V: Clone> SmallMap<K, V> {
-    pub(crate) fn as_map(&self) -> Map<K, V> {
-        match self {
-            Self::Empty => Map::default(),
-            Self::One([(k, v)]) => {
-                let mut map = Map::with_capacity_and_hasher(1, Default::default());
-                map.insert(k.clone(), v.clone());
-                map
-            }
-            Self::Two(data) => {
-                let mut map = Map::with_capacity_and_hasher(2, Default::default());
-                for (k, v) in data {
-                    map.insert(k.clone(), v.clone());
-                }
-                map
-            }
-            Self::Flexible(data) => data.clone(),
-        }
-    }
-}
-
 enum IterSmallMap<'a, K, V> {
     Inline(std::slice::Iter<'a, (K, V)>),
     Map(std::collections::hash_map::Iter<'a, K, V>),

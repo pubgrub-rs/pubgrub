@@ -65,7 +65,7 @@ use std::fmt::{Debug, Display};
 
 use log::{debug, info};
 
-use crate::internal::{Incompatibility, State};
+use crate::internal::{Id, Incompatibility, State};
 use crate::{DependencyConstraints, Map, Package, PubGrubError, SelectedDependencies, VersionSet};
 
 /// Main function of the library.
@@ -76,44 +76,59 @@ pub fn resolve<DP: DependencyProvider>(
     version: impl Into<DP::V>,
 ) -> Result<SelectedDependencies<DP>, PubGrubError<DP>> {
     let mut state: State<DP> = State::init(package.clone(), version.into());
-    let mut added_dependencies: Map<DP::P, Set<DP::V>> = Map::default();
-    let mut next = package;
+    let mut added_dependencies: Map<Id<DP::P>, Set<DP::V>> = Map::default();
+    let mut next = state.root_package;
     loop {
         dependency_provider
             .should_cancel()
-            .map_err(PubGrubError::ErrorInShouldCancel)?;
+            .map_err(|err| PubGrubError::ErrorInShouldCancel(err))?;
 
-        info!("unit_propagation: {}", &next);
+        info!(
+            "unit_propagation: {:?} = '{}'",
+            &next, state.package_store[next]
+        );
         state.unit_propagation(next)?;
 
         debug!(
             "Partial solution after unit propagation: {}",
-            state.partial_solution
+            state.partial_solution.display(&state.package_store)
         );
 
-        let Some(highest_priority_pkg) = state
-            .partial_solution
-            .pick_highest_priority_pkg(|p, r| dependency_provider.prioritize(p, r))
+        let Some(highest_priority_pkg) =
+            state.partial_solution.pick_highest_priority_pkg(|p, r| {
+                dependency_provider.prioritize(&state.package_store[p], r)
+            })
         else {
-            return Ok(state.partial_solution.extract_solution());
+            return Ok(state
+                .partial_solution
+                .extract_solution()
+                .map(|(p, v)| (state.package_store[p].clone(), v))
+                .collect());
         };
         next = highest_priority_pkg;
 
         let term_intersection = state
             .partial_solution
-            .term_intersection_for_package(&next)
+            .term_intersection_for_package(next)
             .ok_or_else(|| {
                 PubGrubError::Failure("a package was chosen but we don't have a term.".into())
             })?;
         let decision = dependency_provider
-            .choose_version(&next, term_intersection.unwrap_positive())
+            .choose_version(
+                &state.package_store[next],
+                term_intersection.unwrap_positive(),
+            )
             .map_err(PubGrubError::ErrorChoosingPackageVersion)?;
-        info!("DP chose: {} @ {:?}", next, decision);
+
+        info!(
+            "DP chose: {:?} = '{}' @ {:?}",
+            &next, state.package_store[next], decision
+        );
 
         // Pick the next compatible version.
         let v = match decision {
             None => {
-                let inc = Incompatibility::no_versions(next.clone(), term_intersection.clone());
+                let inc = Incompatibility::no_versions(next, term_intersection.clone());
                 state.add_incompatibility(inc);
                 continue;
             }
@@ -127,25 +142,25 @@ pub fn resolve<DP: DependencyProvider>(
         }
 
         let is_new_dependency = added_dependencies
-            .entry(next.clone())
+            .entry(next)
             .or_default()
             .insert(v.clone());
 
         if is_new_dependency {
             // Retrieve that package dependencies.
-            let p = &next;
-            let dependencies = dependency_provider.get_dependencies(p, &v).map_err(|err| {
-                PubGrubError::ErrorRetrievingDependencies {
-                    package: p.clone(),
+            let p = next;
+            let dependencies = dependency_provider
+                .get_dependencies(&state.package_store[p], &v)
+                .map_err(|err| PubGrubError::ErrorRetrievingDependencies {
+                    package: state.package_store[p].clone(),
                     version: v.clone(),
                     source: err,
-                }
-            })?;
+                })?;
 
             let dependencies = match dependencies {
                 Dependencies::Unavailable(reason) => {
                     state.add_incompatibility(Incompatibility::custom_version(
-                        p.clone(),
+                        p,
                         v.clone(),
                         reason,
                     ));
@@ -156,19 +171,19 @@ pub fn resolve<DP: DependencyProvider>(
 
             // Add that package and version if the dependencies are not problematic.
             let dep_incompats =
-                state.add_incompatibility_from_dependencies(p.clone(), v.clone(), dependencies);
+                state.add_incompatibility_from_dependencies(p, v.clone(), dependencies);
 
-            state.partial_solution.add_version(
-                p.clone(),
-                v.clone(),
-                dep_incompats,
-                &state.incompatibility_store,
-            );
+            state
+                .partial_solution
+                .add_version(p, v, dep_incompats, &state.incompatibility_store);
         } else {
             // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
             // terms and can add the decision directly.
-            info!("add_decision (not first time): {} @ {}", &next, v);
-            state.partial_solution.add_decision(next.clone(), v);
+            info!(
+                "add_decision (not first time): {:?} = '{}' @ {}",
+                &next, state.package_store[next], v
+            );
+            state.partial_solution.add_decision(next, v);
         }
     }
 }
