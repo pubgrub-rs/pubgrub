@@ -3,10 +3,7 @@
 //! Uses `Arc<usize>` for being closer to real versions.
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::{
-    resolve, DefaultStringReporter, OfflineDependencyProvider, PubGrubError, Range, Reporter,
-    SelectedDependencies,
-};
+use pubgrub::{resolve, OfflineDependencyProvider, Range};
 use std::fmt;
 use std::sync::Arc;
 use version_ranges::Ranges;
@@ -119,19 +116,15 @@ fn encode_constraints(
     }
 }
 
-fn solve(board: Vec<(SudokuPackage, Ranges<Arc<usize>>)>) -> SelectedDependencies<DP> {
+fn solve(c: &mut Criterion, board: Vec<(SudokuPackage, Ranges<Arc<usize>>)>, case: &str) {
     let mut dependency_provider = DP::new();
     encode_constraints(&mut dependency_provider);
     dependency_provider.add_dependencies(SudokuPackage::Root, Arc::new(1usize), board);
-    match resolve(&dependency_provider, SudokuPackage::Root, Arc::new(1usize)) {
-        Ok(sol) => sol,
-        Err(PubGrubError::NoSolution(mut derivation_tree)) => {
-            derivation_tree.collapse_no_versions();
-            eprintln!("{}", DefaultStringReporter::report(&derivation_tree));
-            std::process::exit(1);
-        }
-        Err(err) => panic!("{:?}", err),
-    }
+    c.bench_function(case, |b| {
+        b.iter(|| {
+            let _ = resolve(&dependency_provider, SudokuPackage::Root, Arc::new(1usize));
+        })
+    });
 }
 
 fn bench_solve(c: &mut Criterion) {
@@ -149,30 +142,22 @@ fn bench_solve(c: &mut Criterion) {
         _ _ _ | 4 1 9 | _ _ 5
         _ _ _ | _ 8 6 | 1 7 9"#,
     );
-    c.bench_function("sudoku-easy", |b| {
-        b.iter(|| {
-            solve(black_box(easy.clone()));
-        })
-    });
     let hard = from_board(
         r#"
         5 3 _ | _ 7 _ | _ _ _
         6 _ _ | 1 9 5 | _ _ _
         _ 9 8 | _ _ _ | _ 6 _
-       -------+-------+-------
+        -------+-------+-------
         8 _ _ | _ 6 _ | _ _ 3
         4 _ _ | 8 _ 3 | _ _ 1
         7 _ _ | _ 2 _ | _ _ 6
-       -------+-------+-------
+        -------+-------+-------
         _ 6 _ | _ _ _ | 2 8 _
         _ _ _ | 4 1 9 | _ _ 5
         _ _ _ | _ 8 _ | _ 7 9"#,
     );
-    c.bench_function("sudoku-hard", |b| {
-        b.iter(|| {
-            solve(black_box(hard.clone()));
-        })
-    });
+    solve(c, easy, "sudoku-easy");
+    solve(c, hard, "sudoku-hard");
 }
 
 criterion_group!(benches, bench_solve);
