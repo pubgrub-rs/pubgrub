@@ -70,6 +70,7 @@ use crate::{DependencyConstraints, Map, Package, PubGrubError, SelectedDependenc
 
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
+#[cold]
 pub fn resolve<DP: DependencyProvider>(
     dependency_provider: &DP,
     package: DP::P,

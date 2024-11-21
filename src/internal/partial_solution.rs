@@ -267,6 +267,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         }
     }
 
+    #[cold]
     pub(crate) fn pick_highest_priority_pkg(
         &mut self,
         prioritizer: impl Fn(Id<DP::P>, &DP::VS) -> DP::Priority,

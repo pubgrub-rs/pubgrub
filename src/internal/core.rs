@@ -79,6 +79,7 @@ impl<DP: DependencyProvider> State<DP> {
     }
 
     /// Add an incompatibility to the state.
+    #[cold]
     pub(crate) fn add_incompatibility_from_dependencies(
         &mut self,
         package: Id<DP::P>,
@@ -105,6 +106,7 @@ impl<DP: DependencyProvider> State<DP> {
 
     /// Unit propagation is the core mechanism of the solving algorithm.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
+    #[cold]
     pub(crate) fn unit_propagation(
         &mut self,
         package: Id<DP::P>,
@@ -187,6 +189,7 @@ impl<DP: DependencyProvider> State<DP> {
     /// Return the root cause or the terminal incompatibility.
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     #[allow(clippy::type_complexity)]
+    #[cold]
     fn conflict_resolution(
         &mut self,
         incompatibility: IncompDpId<DP>,
