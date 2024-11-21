@@ -211,6 +211,8 @@
 #![warn(missing_docs)]
 
 mod error;
+#[allow(unused)]
+mod experimental;
 mod package;
 mod provider;
 mod report;
