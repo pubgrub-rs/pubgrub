@@ -23,7 +23,7 @@ include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-indexmap = "2.6.0"
+indexmap = "2.7.0"
 # for debug logs in tests
 log = "0.4.22"
 priority-queue = "2.1.1"
