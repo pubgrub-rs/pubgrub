@@ -229,7 +229,11 @@ impl<V: Ord> Ranges<V> {
     }
 
     /// Returns true if self contains the specified value.
-    pub fn contains(&self, version: &V) -> bool {
+    pub fn contains<Q>(&self, version: &Q) -> bool
+    where
+        V: Borrow<Q>,
+        Q: ?Sized + PartialOrd,
+    {
         self.segments
             .binary_search_by(|segment| {
                 // We have to reverse because we need the segment wrt to the version, while
@@ -470,10 +474,14 @@ impl<V: Ord> Ord for Ranges<V> {
 ///   ^      ^      ^
 ///   less   equal  greater
 /// ```
-fn within_bounds<V: PartialOrd>(version: &V, segment: &Interval<V>) -> Ordering {
+fn within_bounds<Q, V>(version: &Q, segment: &Interval<V>) -> Ordering
+where
+    V: Borrow<Q>,
+    Q: ?Sized + PartialOrd,
+{
     let below_lower_bound = match segment {
-        (Excluded(start), _) => version <= start,
-        (Included(start), _) => version < start,
+        (Excluded(start), _) => version <= start.borrow(),
+        (Included(start), _) => version < start.borrow(),
         (Unbounded, _) => false,
     };
     if below_lower_bound {
@@ -481,8 +489,8 @@ fn within_bounds<V: PartialOrd>(version: &V, segment: &Interval<V>) -> Ordering 
     }
     let below_upper_bound = match segment {
         (_, Unbounded) => true,
-        (_, Included(end)) => version <= end,
-        (_, Excluded(end)) => version < end,
+        (_, Included(end)) => version <= end.borrow(),
+        (_, Excluded(end)) => version < end.borrow(),
     };
     if below_upper_bound {
         return Ordering::Equal;
@@ -1304,7 +1312,7 @@ pub mod tests {
 
         #[test]
         fn always_contains_exact(version in version_strat()) {
-            assert!(Ranges::singleton(version).contains(&version));
+            assert!(Ranges::<u32>::singleton(version).contains(&version));
         }
 
         #[test]
@@ -1326,7 +1334,7 @@ pub mod tests {
 
         #[test]
         fn from_range_bounds(range in any::<(Bound<u32>, Bound<u32>)>(), version in version_strat()) {
-            let rv: Ranges<_> = Ranges::from_range_bounds(range);
+            let rv: Ranges<_> = Ranges::<u32>::from_range_bounds(range);
             assert_eq!(range.contains(&version), rv.contains(&version));
         }
 
