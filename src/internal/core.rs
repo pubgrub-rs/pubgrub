@@ -275,7 +275,7 @@ impl<DP: DependencyProvider> State<DP> {
                     .map(|m| (past, m))
             }) {
                 let new = self.incompatibility_store.alloc(merged);
-                for (&pkg, _) in self.incompatibility_store[new].iter() {
+                for (pkg, _) in self.incompatibility_store[new].iter() {
                     self.incompatibilities
                         .entry(pkg)
                         .or_default()
@@ -287,7 +287,7 @@ impl<DP: DependencyProvider> State<DP> {
                 deps_lookup.push(id);
             }
         }
-        for (&pkg, term) in self.incompatibility_store[id].iter() {
+        for (pkg, term) in self.incompatibility_store[id].iter() {
             if cfg!(debug_assertions) {
                 assert_ne!(term, &crate::term::Term::any());
             }

@@ -459,7 +459,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         package_assignments: &FnvIndexMap<Id<DP::P>, PackageAssignments<DP::P, DP::VS, DP::M>>,
     ) -> SatisfiedMap<DP::P, DP::VS, DP::M> {
         let mut satisfied = SmallMap::Empty;
-        for (&package, incompat_term) in incompat.iter() {
+        for (package, incompat_term) in incompat.iter() {
             let pa = package_assignments.get(&package).expect("Must exist");
             satisfied.insert(package, pa.satisfier(package, &incompat_term.negate()));
         }

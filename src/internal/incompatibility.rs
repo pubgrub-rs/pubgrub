@@ -246,8 +246,10 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
     }
 
     /// Iterate over packages.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&Id<P>, &Term<VS>)> {
-        self.package_terms.iter()
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (Id<P>, &Term<VS>)> {
+        self.package_terms
+            .iter()
+            .map(|(package, term)| (*package, term))
     }
 
     // Reporting ###############################################################
@@ -348,17 +350,17 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
             [] => "version solving failed".into(),
             // TODO: special case when that unique package is root.
             [(package, Term::Positive(range))] => {
-                format!("{} {} is forbidden", package_store[**package], range)
+                format!("{} {} is forbidden", package_store[*package], range)
             }
             [(package, Term::Negative(range))] => {
-                format!("{} {} is mandatory", package_store[**package], range)
+                format!("{} {} is mandatory", package_store[*package], range)
             }
             [(p_pos, Term::Positive(r_pos)), (p_neg, Term::Negative(r_neg))]
             | [(p_neg, Term::Negative(r_neg)), (p_pos, Term::Positive(r_pos))] => {
                 External::<_, _, M>::FromDependencyOf(
-                    &package_store[**p_pos],
+                    &package_store[*p_pos],
                     r_pos.clone(),
-                    &package_store[**p_neg],
+                    &package_store[*p_neg],
                     r_neg.clone(),
                 )
                 .to_string()
@@ -366,7 +368,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
             slice => {
                 let str_terms: Vec<_> = slice
                     .iter()
-                    .map(|(p, t)| format!("{} {}", package_store[**p], t))
+                    .map(|(p, t)| format!("{} {}", package_store[*p], t))
                     .collect();
                 str_terms.join(", ") + " are incompatible"
             }
