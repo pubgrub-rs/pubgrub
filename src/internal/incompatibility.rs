@@ -328,7 +328,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
     }
 
     /// Iterate over packages.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (Id<P>, &Term<VS>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (Id<P>, &Term<VS>)> {
         self.package_terms
             .iter()
             .map(|(package, term)| (*package, term))
