@@ -323,6 +323,11 @@ pub trait DependencyProvider {
     /// > since these packages will run out of versions to try more quickly.
     /// > But there's likely room for improvement in these heuristics.
     ///
+    /// The `package_conflicts_counts` argument provides access to some other heuristics that
+    /// are production users have found useful. Although the exact meaning/efficacy of those arguments may change.
+    /// 
+    /// If two packages have the same priority, PubGrub will biased toward a breadth first search.
+    /// 
     /// Note: the resolver may call this even when the range has not changed,
     /// if it is more efficient for the resolvers internal data structures.
     fn prioritize(
