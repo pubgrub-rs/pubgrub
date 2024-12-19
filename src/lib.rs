@@ -71,7 +71,8 @@
 //! and [SemanticVersion] for versions.
 //! This may be done quite easily by implementing the three following functions.
 //! ```
-//! # use pubgrub::{DependencyProvider, Dependencies, SemanticVersion, Ranges, DependencyConstraints, Map, PackageResolutionStatistics};
+//! # use pubgrub::{DependencyProvider, Dependencies, SemanticVersion, Ranges,
+//! #               DependencyConstraints, Map, PackageResolutionStatistics};
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
 //! # use std::convert::Infallible;

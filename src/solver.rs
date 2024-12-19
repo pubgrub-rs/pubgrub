@@ -126,8 +126,8 @@ pub fn resolve<DP: DependencyProvider>(
             "unit_propagation: {:?} = '{}'",
             &next, state.package_store[next]
         );
-        let root_causes = state.unit_propagation(next)?;
-        for (affected, incompat) in root_causes {
+        let satisfier_causes = state.unit_propagation(next)?;
+        for (affected, incompat) in satisfier_causes {
             conflict_tracker
                 .entry(affected)
                 .or_default()

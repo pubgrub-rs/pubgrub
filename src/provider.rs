@@ -2,8 +2,10 @@ use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 
-use crate::solver::PackageResolutionStatistics;
-use crate::{Dependencies, DependencyConstraints, DependencyProvider, Map, Package, VersionSet};
+use crate::{
+    Dependencies, DependencyConstraints, DependencyProvider, Map, Package,
+    PackageResolutionStatistics, VersionSet,
+};
 
 /// A basic implementation of [DependencyProvider].
 #[derive(Debug, Clone, Default)]
@@ -102,15 +104,15 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
         range: &Self::VS,
         package_statistics: &PackageResolutionStatistics,
     ) -> Self::Priority {
-        (
-            package_statistics.conflict_count(),
-            Reverse(
-                self.dependencies
-                    .get(package)
-                    .map(|versions| versions.keys().filter(|v| range.contains(v)).count())
-                    .unwrap_or(0),
-            ),
-        )
+        let version_count = self
+            .dependencies
+            .get(package)
+            .map(|versions| versions.keys().filter(|v| range.contains(v)).count())
+            .unwrap_or(0);
+        if version_count == 0 {
+            return (u32::MAX, Reverse(0));
+        }
+        (package_statistics.conflict_count(), Reverse(version_count))
     }
 
     #[inline]
