@@ -67,6 +67,10 @@ pub(crate) struct PartialSolution<DP: DependencyProvider> {
     /// The undecided packages order by their `Priority`.
     ///
     /// The max heap allows quickly `pop`ing the highest priority package.
+    ///
+    /// The `Reverse<u32>` is the discovery order of packages used as tiebreaker. Its order is that
+    /// of a breadth-first search.
+    #[allow(clippy::type_complexity)]
     prioritized_potential_packages:
         PriorityQueue<Id<DP::P>, (DP::Priority, Reverse<u32>), BuildHasherDefault<FxHasher>>,
     /// Whether we have never backtracked, to enable fast path optimizations.
