@@ -168,9 +168,7 @@ impl<T: Hash + Eq + fmt::Debug> fmt::Debug for HashArena<T> {
 
 impl<T: Hash + Eq> HashArena<T> {
     pub fn new() -> Self {
-        HashArena {
-            data: FnvIndexSet::default(),
-        }
+        Self::default()
     }
 
     pub fn alloc(&mut self, value: T) -> Id<T> {
@@ -180,6 +178,14 @@ impl<T: Hash + Eq> HashArena<T> {
         );
         let (raw, _) = self.data.insert_full(value);
         Id::from_usize(raw)
+    }
+}
+
+impl<T: Hash + Eq> Default for HashArena<T> {
+    fn default() -> Self {
+        Self {
+            data: FnvIndexSet::default(),
+        }
     }
 }
 
