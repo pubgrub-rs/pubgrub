@@ -228,15 +228,9 @@ pub fn resolve<DP: DependencyProvider>(
             };
 
             // Add that package and version if the dependencies are not problematic.
-            let dep_incompats =
-                state.add_incompatibility_from_dependencies(p, v.clone(), dependencies);
-
-            if let Some(conflict) = state.partial_solution.add_version(
-                p,
-                v,
-                dep_incompats,
-                &state.incompatibility_store,
-            ) {
+            if let Some(conflict) =
+                state.add_package_version_dependencies(p, v.clone(), dependencies)
+            {
                 conflict_tracker.entry(p).or_default().dependencies_affected += 1;
                 for (incompat_package, _) in state.incompatibility_store[conflict].iter() {
                     if incompat_package == p {

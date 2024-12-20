@@ -417,12 +417,15 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         self.has_ever_backtracked = true;
     }
 
-    /// We can add the version to the partial solution as a decision
-    /// if it doesn't produce any conflict with the new incompatibilities.
-    /// In practice I think it can only produce a conflict if one of the dependencies
-    /// (which are used to make the new incompatibilities)
-    /// is already in the partial solution with an incompatible version.
-    pub(crate) fn add_version(
+    /// Add a package version as decision if none of its dependencies conflicts with the partial
+    /// solution.
+    ///
+    /// If the resolution never backtracked before, a fast path adds the package version directly
+    /// without checking dependencies.
+    ///
+    /// Returns the incompatibility that caused the current version to be rejected, if a conflict
+    /// in the dependencies was found.
+    pub(crate) fn add_package_version_incompatibilities(
         &mut self,
         package: Id<DP::P>,
         version: DP::V,

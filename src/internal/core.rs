@@ -7,8 +7,8 @@ use std::collections::HashSet as Set;
 use std::sync::Arc;
 
 use crate::internal::{
-    Arena, DecisionLevel, HashArena, Id, IncompDpId, Incompatibility, PartialSolution, Relation,
-    SatisfierSearch, SmallVec,
+    Arena, DecisionLevel, HashArena, Id, IncompDpId, IncompId, Incompatibility, PartialSolution,
+    Relation, SatisfierSearch, SmallVec,
 };
 use crate::{DependencyProvider, DerivationTree, Map, NoSolutionError, VersionSet};
 
@@ -71,6 +71,23 @@ impl<DP: DependencyProvider> State<DP> {
             unit_propagation_buffer: SmallVec::Empty,
             merged_dependencies: Map::default(),
         }
+    }
+
+    /// Add the dependencies for the current version of the current package as incompatibilities.
+    pub(crate) fn add_package_version_dependencies(
+        &mut self,
+        package: Id<DP::P>,
+        version: DP::V,
+        dependencies: impl IntoIterator<Item = (DP::P, DP::VS)>,
+    ) -> Option<IncompId<DP::P, DP::VS, DP::M>> {
+        let dep_incompats =
+            self.add_incompatibility_from_dependencies(package, version.clone(), dependencies);
+        self.partial_solution.add_package_version_incompatibilities(
+            package,
+            version.clone(),
+            dep_incompats,
+            &self.incompatibility_store,
+        )
     }
 
     /// Add an incompatibility to the state.
