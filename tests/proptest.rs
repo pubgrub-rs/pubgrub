@@ -13,8 +13,8 @@ use proptest::string::string_regex;
 
 use pubgrub::{
     resolve, DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, External,
-    OfflineDependencyProvider, Package, PubGrubError, Ranges, Reporter, SelectedDependencies,
-    VersionSet,
+    OfflineDependencyProvider, Package, PackageResolutionStatistics, PubGrubError, Ranges,
+    Reporter, SelectedDependencies, VersionSet,
 };
 
 use crate::sat_dependency_provider::SatResolve;
@@ -49,8 +49,13 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OldestVersionsDependency
 
     type Priority = <OfflineDependencyProvider<P, VS> as DependencyProvider>::Priority;
 
-    fn prioritize(&self, package: &P, range: &VS) -> Self::Priority {
-        self.0.prioritize(package, range)
+    fn prioritize(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+        package_statistics: &PackageResolutionStatistics,
+    ) -> Self::Priority {
+        self.0.prioritize(package, range, package_statistics)
     }
 
     type Err = Infallible;
@@ -104,8 +109,13 @@ impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP
 
     type Priority = DP::Priority;
 
-    fn prioritize(&self, package: &DP::P, range: &DP::VS) -> Self::Priority {
-        self.dp.prioritize(package, range)
+    fn prioritize(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+        package_statistics: &PackageResolutionStatistics,
+    ) -> Self::Priority {
+        self.dp.prioritize(package, range, package_statistics)
     }
 
     type Err = DP::Err;

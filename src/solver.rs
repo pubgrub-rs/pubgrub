@@ -68,6 +68,43 @@ use log::{debug, info};
 use crate::internal::{Id, Incompatibility, State};
 use crate::{DependencyConstraints, Map, Package, PubGrubError, SelectedDependencies, VersionSet};
 
+/// Statistics on how often a package conflicted with other packages.
+#[derive(Debug, Default, Clone)]
+pub struct PackageResolutionStatistics {
+    // We track these fields separately but currently don't expose them separately to keep the
+    // stable API slim. Please be encouraged to try different combinations of them and report if
+    // you find better metrics that should be exposed.
+    //
+    // Say we have packages A and B, A having higher priority than B. We first decide A and then B,
+    // and then find B to conflict with A. We call be B "affected" and A "culprit" since the
+    // decisions for B is being rejected due to the decision we made for A earlier.
+    //
+    // If B is rejected due to its dependencies conflicting with A, we increase
+    // `dependencies_affected` for B and for `dependencies_culprit` A. If B is rejected in unit
+    // through an incompatibility with B, we increase `unit_propagation_affected` for B and for
+    // `unit_propagation_culprit` A.
+    unit_propagation_affected: u32,
+    unit_propagation_culprit: u32,
+    dependencies_affected: u32,
+    dependencies_culprit: u32,
+}
+
+impl PackageResolutionStatistics {
+    /// The number of conflicts this package was involved in.
+    ///
+    /// Processing packages with a high conflict count earlier usually speeds up resolution.
+    ///
+    /// Whenever a package is part of the root cause incompatibility of a conflict, we increase its
+    /// count by one. Since the structure of the incompatibilities may change, this count too may
+    /// change in the future.
+    pub fn conflict_count(&self) -> u32 {
+        self.unit_propagation_affected
+            + self.unit_propagation_culprit
+            + self.dependencies_affected
+            + self.dependencies_culprit
+    }
+}
+
 /// Main function of the library.
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
 #[cold]
@@ -77,6 +114,7 @@ pub fn resolve<DP: DependencyProvider>(
     version: impl Into<DP::V>,
 ) -> Result<SelectedDependencies<DP>, PubGrubError<DP>> {
     let mut state: State<DP> = State::init(package.clone(), version.into());
+    let mut conflict_tracker: Map<Id<DP::P>, PackageResolutionStatistics> = Map::default();
     let mut added_dependencies: Map<Id<DP::P>, Set<DP::V>> = Map::default();
     let mut next = state.root_package;
     loop {
@@ -88,7 +126,22 @@ pub fn resolve<DP: DependencyProvider>(
             "unit_propagation: {:?} = '{}'",
             &next, state.package_store[next]
         );
-        state.unit_propagation(next)?;
+        let root_causes = state.unit_propagation(next)?;
+        for (affected, incompat) in root_causes {
+            conflict_tracker
+                .entry(affected)
+                .or_default()
+                .unit_propagation_affected += 1;
+            for (conflict_package, _) in state.incompatibility_store[incompat].iter() {
+                if conflict_package == affected {
+                    continue;
+                }
+                conflict_tracker
+                    .entry(conflict_package)
+                    .or_default()
+                    .unit_propagation_culprit += 1;
+            }
+        }
 
         debug!(
             "Partial solution after unit propagation: {}",
@@ -97,7 +150,11 @@ pub fn resolve<DP: DependencyProvider>(
 
         let Some(highest_priority_pkg) =
             state.partial_solution.pick_highest_priority_pkg(|p, r| {
-                dependency_provider.prioritize(&state.package_store[p], r)
+                dependency_provider.prioritize(
+                    &state.package_store[p],
+                    r,
+                    conflict_tracker.entry(p).or_default(),
+                )
             })
         else {
             return Ok(state
@@ -174,9 +231,23 @@ pub fn resolve<DP: DependencyProvider>(
             let dep_incompats =
                 state.add_incompatibility_from_dependencies(p, v.clone(), dependencies);
 
-            state
-                .partial_solution
-                .add_version(p, v, dep_incompats, &state.incompatibility_store);
+            if let Some(conflict) = state.partial_solution.add_version(
+                p,
+                v,
+                dep_incompats,
+                &state.incompatibility_store,
+            ) {
+                conflict_tracker.entry(p).or_default().dependencies_affected += 1;
+                for (incompat_package, _) in state.incompatibility_store[conflict].iter() {
+                    if incompat_package == p {
+                        continue;
+                    }
+                    conflict_tracker
+                        .entry(incompat_package)
+                        .or_default()
+                        .dependencies_culprit += 1;
+                }
+            }
         } else {
             // `dep_incompats` are already in `incompatibilities` so we know there are not satisfied
             // terms and can add the decision directly.
@@ -252,9 +323,19 @@ pub trait DependencyProvider {
     /// > since these packages will run out of versions to try more quickly.
     /// > But there's likely room for improvement in these heuristics.
     ///
+    /// The `package_conflicts_counts` argument provides access to some other heuristics that
+    /// are production users have found useful. Although the exact meaning/efficacy of those arguments may change.
+    ///
+    /// If two packages have the same priority, PubGrub will biased toward a breadth first search.
+    ///
     /// Note: the resolver may call this even when the range has not changed,
     /// if it is more efficient for the resolvers internal data structures.
-    fn prioritize(&self, package: &Self::P, range: &Self::VS) -> Self::Priority;
+    fn prioritize(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+        package_conflicts_counts: &PackageResolutionStatistics,
+    ) -> Self::Priority;
     /// The type returned from `prioritize`. The resolver does not care what type this is
     /// as long as it can pick a largest one and clone it.
     ///

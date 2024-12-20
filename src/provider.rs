@@ -2,6 +2,7 @@ use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 
+use crate::solver::PackageResolutionStatistics;
 use crate::{Dependencies, DependencyConstraints, DependencyProvider, Map, Package, VersionSet};
 
 /// A basic implementation of [DependencyProvider].
@@ -92,15 +93,23 @@ impl<P: Package, VS: VersionSet> DependencyProvider for OfflineDependencyProvide
             .and_then(|versions| versions.keys().rev().find(|v| range.contains(v)).cloned()))
     }
 
-    type Priority = Reverse<usize>;
+    type Priority = (u32, Reverse<usize>);
 
     #[inline]
-    fn prioritize(&self, package: &P, range: &VS) -> Self::Priority {
-        Reverse(
-            self.dependencies
-                .get(package)
-                .map(|versions| versions.keys().filter(|v| range.contains(v)).count())
-                .unwrap_or(0),
+    fn prioritize(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+        package_statistics: &PackageResolutionStatistics,
+    ) -> Self::Priority {
+        (
+            package_statistics.conflict_count(),
+            Reverse(
+                self.dependencies
+                    .get(package)
+                    .map(|versions| versions.keys().filter(|v| range.contains(v)).count())
+                    .unwrap_or(0),
+            ),
         )
     }
 

@@ -2,7 +2,10 @@
 
 use std::cell::RefCell;
 
-use pubgrub::{resolve, Dependencies, DependencyProvider, OfflineDependencyProvider, Ranges};
+use pubgrub::{
+    resolve, Dependencies, DependencyProvider, OfflineDependencyProvider,
+    PackageResolutionStatistics, Ranges,
+};
 
 type NumVS = Ranges<u32>;
 
@@ -57,8 +60,14 @@ impl<DP: DependencyProvider<M = String>> DependencyProvider for CachingDependenc
 
     type Priority = DP::Priority;
 
-    fn prioritize(&self, package: &DP::P, ranges: &DP::VS) -> Self::Priority {
-        self.remote_dependencies.prioritize(package, ranges)
+    fn prioritize(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+        package_statistics: &PackageResolutionStatistics,
+    ) -> Self::Priority {
+        self.remote_dependencies
+            .prioritize(package, range, package_statistics)
     }
 
     type Err = DP::Err;

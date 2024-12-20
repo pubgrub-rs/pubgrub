@@ -71,7 +71,7 @@
 //! and [SemanticVersion] for versions.
 //! This may be done quite easily by implementing the three following functions.
 //! ```
-//! # use pubgrub::{DependencyProvider, Dependencies, SemanticVersion, Ranges, DependencyConstraints, Map};
+//! # use pubgrub::{DependencyProvider, Dependencies, SemanticVersion, Ranges, DependencyConstraints, Map, PackageResolutionStatistics};
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
 //! # use std::convert::Infallible;
@@ -86,7 +86,7 @@
 //!     }
 //!
 //!     type Priority = usize;
-//!     fn prioritize(&self, package: &String, range: &SemVS) -> Self::Priority {
+//!     fn prioritize(&self, package: &String, range: &SemVS, conflicts_counts: &PackageResolutionStatistics) -> Self::Priority {
 //!         unimplemented!()
 //!     }
 //!
@@ -227,7 +227,7 @@ pub use report::{
     DefaultStringReportFormatter, DefaultStringReporter, DerivationTree, Derived, External,
     ReportFormatter, Reporter,
 };
-pub use solver::{resolve, Dependencies, DependencyProvider};
+pub use solver::{resolve, Dependencies, DependencyProvider, PackageResolutionStatistics};
 pub use term::Term;
 pub use type_aliases::{DependencyConstraints, Map, SelectedDependencies, Set};
 pub use version::{SemanticVersion, VersionParseError};
