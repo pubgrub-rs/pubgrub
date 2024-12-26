@@ -1402,6 +1402,17 @@ pub mod tests {
     }
 
     #[test]
+    fn contains_can_take_owned() {
+        let range: Ranges<Box<u8>> = Ranges::singleton(1);
+        let version = 1;
+
+        assert_eq!(range.contains(&Box::new(version)), range.contains(&version));
+        let range: Ranges<String> = Ranges::singleton(1.to_string());
+        let version = 1.to_string();
+        assert_eq!(range.contains(&version), range.contains("1"));
+    }
+
+    #[test]
     fn simplify_can_take_owned() {
         let range: Ranges<u8> = Ranges::singleton(1);
         let versions = vec![1, 2, 3];
