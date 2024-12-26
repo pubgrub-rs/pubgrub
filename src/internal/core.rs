@@ -209,37 +209,36 @@ impl<DP: DependencyProvider> State<DP> {
         Ok(satisfier_causes)
     }
 
-    /// Return the root cause or the terminal incompatibility.
-    /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
+    /// Return the root cause or the terminal incompatibility. CF
+    /// <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     ///
-    /// Usually by the time we have a conflict `unit_propagation` has done a lot of work.
-    /// So the actual conflict we find is important, but not particularly actionable.
-    /// It says something like "the dependency on package X and the dependency on package Y are incompatible".
-    /// To make it actionable we want to track it back to decisions that made the dependency required.
-    /// "The decision on B is incompatible with the decision on C,
-    ///  because unit propagation from just those decisions will lead to the conflict about X and Y"
-    /// is much more actionable, backtrack until one of those decisions can be revisited.
-    /// To make a practical, we really only need one of the terms to be a decision.
-    /// We may as well leave the other terms general. Something like
-    /// "the dependency on the package X is incompatible with the decision on C" tends to work out pretty well.
-    /// Then if A turns out to also have a dependency on X the resulting root cause is still useful.
-    /// Of course, this is more heuristics than science. If the output is too general, then `unit_propagation` will
-    /// handle the confusion by calling us again with the next most specific conflict it comes across.
-    /// If the output is to specific, then the outer `solver` loop will eventually end up calling us again
-    /// until all possibilities are enumerated.
+    /// When we found a conflict, we want to learn as much as possible from it, to avoid making (or
+    /// keeping) decisions that will be rejected. Say we found that the dependency requirements on X and the
+    /// dependency requirements on Y are incompatible. We may find that the decisions on earlier packages B and C
+    /// require us to make incompatible requirements on X and Y, so we backtrack until either B or C
+    /// can be revisited. To make it practical, we really only need one of the terms to be a
+    /// decision. We may as well leave the other terms general. Something like "the dependency on
+    /// the package X is incompatible with the decision on C" tends to work out pretty well. Then if
+    /// A turns out to also have a dependency on X the resulting root cause is still useful.
+    /// (`unit_propagation` will ensure we don't try that version of C.)
+    /// Of course, this is more heuristics than science. If the output is too general, then
+    /// `unit_propagation` will handle the confusion by calling us again with the next most specific
+    /// conflict it comes across. If the output is too specific, then the outer `solver` loop will
+    /// eventually end up calling us again until all possibilities are enumerated.
     ///
-    /// This function combines incompatibilities with things that make the problem inevitable to end up with a
-    /// more useful incompatibility. For the correctness of the PubGrub algorithm only the final output is required.
-    /// By banning the final output, unit propagation will prevent the intermediate steps from occurring again,
-    /// at least prevent the exact same way. However, the statistics collected for `prioritize`may want
-    /// to analyze those intermediate steps. For example we might start with "there is no version 1 of Z",
-    /// and `conflict_resolution` may be able to determine that "that was inevitable when we picked version 1 of X"
-    /// which was inevitable when picked W and ... and version 1 of B, which was depended on by version 1 of A.
-    /// Therefore the root cause may simplify all the way down to "we cannot pick version 1 of A".
-    /// This will prevent us going down this path again. However when we start looking at version 2 of A,
-    /// and discover that it depends on version 2 of B, we will want to prioritize the chain of intermediate steps
-    /// to confirm if it has a problem with the same shape.
-    /// The `satisfier_causes` argument keeps track of these intermediate steps so that the caller can use.
+    /// To end up with a more useful incompatibility, this function combines incompatibilities into
+    /// derivations. Fulfilling this derivation implies the later conflict. By banning it, we
+    /// prevent the intermediate steps from occurring again, at least in the exact same way.
+    /// However, the statistics collected for `prioritize` may want to analyze those intermediate
+    /// steps. For example we might start with "there is no version 1 of Z", and
+    /// `conflict_resolution` may be able to determine that "that was inevitable when we picked
+    /// version 1 of X" which was inevitable when we picked W and so on, until version 1 of B, which
+    /// was depended on by version 1 of A. Therefore the root cause may simplify all the way down to
+    /// "we cannot pick version 1 of A". This will prevent us going down this path again. However
+    /// when we start looking at version 2 of A, and discover that it depends on version 2 of B, we
+    /// will want to prioritize the chain of intermediate steps to check if it has a problem with
+    /// the same shape. The `satisfier_causes` argument keeps track of these intermediate steps so
+    /// that the caller can use them for prioritization.
     #[allow(clippy::type_complexity)]
     #[cold]
     fn conflict_resolution(
