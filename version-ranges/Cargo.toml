@@ -9,7 +9,7 @@ keywords = ["version", "pubgrub", "selector", "ranges"]
 include = ["ranges.png", "src"]
 
 [dependencies]
-proptest = { version = "1.5.0", optional = true }
+proptest = { version = "1.6.0", optional = true }
 serde = { version = "1.0.217", features = ["derive"], optional = true }
 smallvec = { version = "1.13.2", features = ["union"] }
 
@@ -17,5 +17,5 @@ smallvec = { version = "1.13.2", features = ["union"] }
 serde = ["dep:serde", "smallvec/serde"]
 
 [dev-dependencies]
-proptest = "1.5.0"
+proptest = "1.6.0"
 ron = "=0.9.0-alpha.0"
