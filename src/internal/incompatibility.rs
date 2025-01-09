@@ -63,7 +63,7 @@ pub struct Incompatibility<P: Package, VS: VersionSet, M: Eq + Clone + Debug + D
 }
 
 /// Type alias of unique identifiers for incompatibilities.
-pub(crate) type IncompId<P, VS, M> = Id<Incompatibility<P, VS, M>>;
+pub type IncompId<P, VS, M> = Id<Incompatibility<P, VS, M>>;
 
 pub(crate) type IncompDpId<DP> = IncompId<
     <DP as DependencyProvider>::P,
