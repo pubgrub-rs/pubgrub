@@ -2,7 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased [(diff)][unreleased-diff]
+## [0.3.0] UNRELEASED [(diff with 0.2.1)][unreleased-diff]
+
+PubGrub 0.3 improves the interfaces and speeds resolution significantly.
+
+All public interfaces are now in the root of the crate. 
+
+In the main interface, [`DependencyProvider`](TODO), `choose_package_version` was split into two methods: `prioritize`
+for choosing which package to decide next by assigning a priority to each package, and `choose_version`. The generic
+parameters became associated types. The version set is configurable by an associated type.
+
+[`Dependencies`](TODO) gained a generic parameter for custom incompatibility type outside version conflicts, such as
+packages not available for the current platform or permission errors. This type is on `DependencyProvider` as
+`DependencyProvider::M`.
+
+`pubgrub::range::Range` now lives in its own crate as [`version_ranges::Ranges`](https://docs.rs/version-ranges/0.1/version_ranges/struct.Ranges.html).
+
+At a glance, this is the new `DependencyProvider` interface:
+
+```rust
+pub trait DependencyProvider {
+    type P: Package;
+    type V: Debug + Display + Clone + Ord;
+    type VS: VersionSet<V = Self::V>;
+    type M: Eq + Clone + Debug + Display;
+    type Priority: Ord + Clone;
+    type Err: Error + 'static;
+
+    fn prioritize(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+        package_conflicts_counts: &PackageResolutionStatistics,
+    ) -> Self::Priority;
+
+    fn choose_version(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+    ) -> Result<Option<Self::V>, Self::Err>;
+
+    fn get_dependencies(
+        &self,
+        package: &Self::P,
+        version: &Self::V,
+    ) -> Result<Dependencies<Self::P, Self::VS, Self::M>, Self::Err>;
+
+}
+```
 
 ## [0.2.1] - 2021-06-30 - [(diff with 0.2.0)][0.2.0-diff]
 
