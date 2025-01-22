@@ -5,7 +5,7 @@ members = ["version-ranges"]
 
 [package]
 name = "pubgrub"
-version = "0.2.1"
+version = "0.3.0-alpha.1"
 authors = [
     "Matthieu Pizenberg <matthieu.pizenberg@gmail.com>",
     "Alex Tokarev <aleksator@gmail.com>",
