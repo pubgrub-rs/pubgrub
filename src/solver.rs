@@ -1,64 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
 
-//! PubGrub version solving algorithm.
-//!
-//! It consists in efficiently finding a set of packages and versions
-//! that satisfy all the constraints of a given project dependencies.
-//! In addition, when that is not possible,
-//! PubGrub tries to provide a very human-readable and clear
-//! explanation as to why that failed.
-//! Below is an example of explanation present in
-//! the introductory blog post about PubGrub
-//!
-//! ```txt
-//! Because dropdown >=2.0.0 depends on icons >=2.0.0 and
-//!   root depends on icons <2.0.0, dropdown >=2.0.0 is forbidden.
-//!
-//! And because menu >=1.1.0 depends on dropdown >=2.0.0,
-//!   menu >=1.1.0 is forbidden.
-//!
-//! And because menu <1.1.0 depends on dropdown >=1.0.0 <2.0.0
-//!   which depends on intl <4.0.0, every version of menu
-//!   requires intl <4.0.0.
-//!
-//! So, because root depends on both menu >=1.0.0 and intl >=5.0.0,
-//!   version solving failed.
-//! ```
-//!
-//! The algorithm is generic and works for any type of dependency system
-//! as long as packages (P) and versions (V) implement
-//! the [Package] and Version traits.
-//! [Package] is strictly equivalent and automatically generated
-//! for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display].
-//!
-//! ## API
-//!
-//! ```
-//! # use std::convert::Infallible;
-//! # use pubgrub::{resolve, OfflineDependencyProvider, PubGrubError, Ranges};
-//! #
-//! # type NumVS = Ranges<u32>;
-//! #
-//! # fn try_main() -> Result<(), PubGrubError<OfflineDependencyProvider<&'static str, NumVS>>> {
-//! #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
-//! #     let package = "root";
-//! #     let version = 1u32;
-//! let solution = resolve(&dependency_provider, package, version)?;
-//! #     Ok(())
-//! # }
-//! # fn main() {
-//! #     assert!(matches!(try_main(), Err(PubGrubError::NoSolution(_))));
-//! # }
-//! ```
-//!
-//! Where `dependency_provider` supplies the list of available packages and versions,
-//! as well as the dependencies of every available package
-//! by implementing the [DependencyProvider] trait.
-//! The call to [resolve] for a given package at a given version
-//! will compute the set of packages and versions needed
-//! to satisfy the dependencies of that package and version pair.
-//! If there is no solution, the reason will be provided as clear as possible.
-
 use std::collections::BTreeSet as Set;
 use std::error::Error;
 use std::fmt::{Debug, Display};
@@ -108,7 +49,65 @@ impl PackageResolutionStatistics {
 }
 
 /// Main function of the library.
+/// 
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
+///
+/// It consists in efficiently finding a set of packages and versions
+/// that satisfy all the constraints of a given project dependencies.
+/// In addition, when that is not possible,
+/// PubGrub tries to provide a very human-readable and clear
+/// explanation as to why that failed.
+/// Below is an example of explanation present in
+/// the introductory blog post about PubGrub
+///
+/// ```txt
+/// Because dropdown >=2.0.0 depends on icons >=2.0.0 and
+///   root depends on icons <2.0.0, dropdown >=2.0.0 is forbidden.
+///
+/// And because menu >=1.1.0 depends on dropdown >=2.0.0,
+///   menu >=1.1.0 is forbidden.
+///
+/// And because menu <1.1.0 depends on dropdown >=1.0.0 <2.0.0
+///   which depends on intl <4.0.0, every version of menu
+///   requires intl <4.0.0.
+///
+/// So, because root depends on both menu >=1.0.0 and intl >=5.0.0,
+///   version solving failed.
+/// ```
+///
+/// The algorithm is generic and works for any type of dependency system
+/// as long as packages (P) and versions (V) implement
+/// the [Package] and Version traits.
+/// [Package] is strictly equivalent and automatically generated
+/// for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display].
+///
+/// ## API
+///
+/// ```
+/// # use std::convert::Infallible;
+/// # use pubgrub::{resolve, OfflineDependencyProvider, PubGrubError, Ranges};
+/// #
+/// # type NumVS = Ranges<u32>;
+/// #
+/// # fn try_main() -> Result<(), PubGrubError<OfflineDependencyProvider<&'static str, NumVS>>> {
+/// #     let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
+/// #     let package = "root";
+/// #     let version = 1u32;
+/// let solution = resolve(&dependency_provider, package, version)?;
+/// #     Ok(())
+/// # }
+/// # fn main() {
+/// #     assert!(matches!(try_main(), Err(PubGrubError::NoSolution(_))));
+/// # }
+/// ```
+///
+/// Where `dependency_provider` supplies the list of available packages and versions,
+/// as well as the dependencies of every available package
+/// by implementing the [DependencyProvider] trait.
+/// The call to [resolve] for a given package at a given version
+/// will compute the set of packages and versions needed
+/// to satisfy the dependencies of that package and version pair.
+/// If there is no solution, the reason will be provided as clear as possible.
 #[cold]
 pub fn resolve<DP: DependencyProvider>(
     dependency_provider: &DP,
