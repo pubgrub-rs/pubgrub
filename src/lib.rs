@@ -20,6 +20,7 @@
 //! So things like [String] will work out of the box.
 //!
 //! TODO! This is all wrong. Need to talk about VS, not Version.
+//! 
 //! Our Version trait requires
 //! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display).
 //! For convenience, this library provides [SemanticVersion]

@@ -59,6 +59,7 @@ impl PackageResolutionStatistics {
 /// explanation as to why that failed.
 /// Below is an example of explanation present in
 /// the introductory blog post about PubGrub
+/// (Although this crate is not yet capable of building formatting quite this nice.)
 ///
 /// ```txt
 /// Because dropdown >=2.0.0 depends on icons >=2.0.0 and
@@ -75,6 +76,7 @@ impl PackageResolutionStatistics {
 ///   version solving failed.
 /// ```
 ///
+/// TODO: there is not Version traits
 /// The algorithm is generic and works for any type of dependency system
 /// as long as packages (P) and versions (V) implement
 /// the [Package] and Version traits.
