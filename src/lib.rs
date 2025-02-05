@@ -8,24 +8,6 @@
 //! we should try to provide a very human-readable and clear
 //! explanation as to why that failed.
 //!
-//! # Package and Version traits
-//!
-//! All the code in this crate is manipulating packages and versions, and for this to work
-//! we defined a [Package] trait
-//! that is used as bounds on most of the exposed types and functions.
-//!
-//! Package identifiers needs to implement our [Package] trait,
-//! which is automatic if the type already implements
-//! [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
-//! So things like [String] will work out of the box.
-//!
-//! TODO! This is all wrong. Need to talk about VS, not Version.
-//! 
-//! Our Version trait requires
-//! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display).
-//! For convenience, this library provides [SemanticVersion]
-//! that implements semantic versioning rules.
-//!
 //! # Basic example
 //!
 //! Let's imagine that we are building a user interface
@@ -59,6 +41,24 @@
 //! // Run the algorithm.
 //! let solution = resolve(&dependency_provider, "root", 1u32).unwrap();
 //! ```
+//!
+//! # Package and Version flexibility
+//!
+//! The [OfflineDependencyProvider] used in that example is generic over the way package names,
+//! version requirements, and version numbers are represented.
+//!
+//! The first bound is the type of package names. It can be anything that implements our [Package] trait.
+//! The [Package] trait is automatic if the type already implements
+//! [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
+//! So things like [String] will work out of the box.
+//!
+//! The second bound is the type of package requirements. It can be anything that implements our [VersionSet] trait.
+//! This trait is used to figure out how version requirements are combined.
+//! If the normal [Ord]/[PartialEq] operations are all that is needed for requirements, our [Ranges] type will work.
+//!
+//! The chosen `VersionSet` in turn specifies what can be used for version numbers.
+//! This type needs to at least implement [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display).
+//! For convenience, this library provides [SemanticVersion] that implements the basics of semantic versioning rules.
 //!
 //! # DependencyProvider trait
 //!

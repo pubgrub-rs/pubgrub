@@ -48,8 +48,6 @@ impl PackageResolutionStatistics {
     }
 }
 
-/// Main function of the library.
-/// 
 /// Finds a set of packages satisfying dependency bounds for a given package + version pair.
 ///
 /// It consists in efficiently finding a set of packages and versions
@@ -76,12 +74,11 @@ impl PackageResolutionStatistics {
 ///   version solving failed.
 /// ```
 ///
-/// TODO: there is not Version traits
-/// The algorithm is generic and works for any type of dependency system
-/// as long as packages (P) and versions (V) implement
-/// the [Package] and Version traits.
-/// [Package] is strictly equivalent and automatically generated
-/// for any type that implement [Clone] + [Eq] + [Hash] + [Debug] + [Display].
+/// Is generic over an implementation of [DependencyProvider] which represents where the dependency constraints come from.
+/// The associated types on the DependencyProvider allow flexibility for the representation of
+/// package names, version requirements, version numbers, and other things.
+/// See its documentation for more details.
+/// For simple cases [OfflineDependencyProvider](crate::OfflineDependencyProvider) may be sufficient.
 ///
 /// ## API
 ///
@@ -103,9 +100,6 @@ impl PackageResolutionStatistics {
 /// # }
 /// ```
 ///
-/// Where `dependency_provider` supplies the list of available packages and versions,
-/// as well as the dependencies of every available package
-/// by implementing the [DependencyProvider] trait.
 /// The call to [resolve] for a given package at a given version
 /// will compute the set of packages and versions needed
 /// to satisfy the dependencies of that package and version pair.
