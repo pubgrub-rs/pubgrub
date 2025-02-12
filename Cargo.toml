@@ -1,14 +1,17 @@
 # SPDX-License-Identifier: MPL-2.0
 
+[workspace]
+members = ["version-ranges"]
+
 [package]
 name = "pubgrub"
-version = "0.2.1"
+version = "0.3.0"
 authors = [
     "Matthieu Pizenberg <matthieu.pizenberg@gmail.com>",
     "Alex Tokarev <aleksator@gmail.com>",
     "Jacob Finkelman <Eh2406@wayne.edu>",
 ]
-edition = "2018"
+edition = "2021"
 description = "PubGrub version solving algorithm"
 readme = "README.md"
 repository = "https://github.com/pubgrub-rs/pubgrub"
@@ -20,17 +23,35 @@ include = ["Cargo.toml", "LICENSE", "README.md", "src/**", "tests/**", "examples
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thiserror = "1.0"
-rustc-hash = "1.1.0"
+indexmap = "2.7.0"
+# for debug logs in tests
+log = "0.4.22"
+priority-queue = "2.1.1"
+rustc-hash = "^2.0.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
+thiserror = "2.0"
+version-ranges = { version = "0.1.0", path = "version-ranges" }
 
 [dev-dependencies]
-proptest = "0.10.1"
-ron = "0.6"
+criterion = { version = "2.7.2", package = "codspeed-criterion-compat" }
+env_logger = "0.11.6"
+proptest = "1.6.0"
+ron = "=0.9.0-alpha.1"
 varisat = "0.2.2"
-criterion = "0.3"
+version-ranges = { version = "0.1.0", path = "version-ranges", features = ["proptest"] }
+
+[features]
+serde = ["dep:serde", "version-ranges/serde"]
+
+[[bench]]
+name = "backtracking"
+harness = false
 
 [[bench]]
 name = "large_case"
 harness = false
 required-features = ["serde"]
+
+[[bench]]
+name = "sudoku"
+harness = false

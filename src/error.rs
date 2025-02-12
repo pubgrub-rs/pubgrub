@@ -4,73 +4,81 @@
 
 use thiserror::Error;
 
-use crate::package::Package;
-use crate::report::DerivationTree;
-use crate::version::Version;
+use crate::{DependencyProvider, DerivationTree};
+
+/// There is no solution for this set of dependencies.
+pub type NoSolutionError<DP> = DerivationTree<
+    <DP as DependencyProvider>::P,
+    <DP as DependencyProvider>::VS,
+    <DP as DependencyProvider>::M,
+>;
 
 /// Errors that may occur while solving dependencies.
-#[derive(Error, Debug)]
-pub enum PubGrubError<P: Package, V: Version> {
+#[derive(Error)]
+pub enum PubGrubError<DP: DependencyProvider> {
     /// There is no solution for this set of dependencies.
-    #[error("No solution")]
-    NoSolution(DerivationTree<P, V>),
+    #[error("There is no solution")]
+    NoSolution(NoSolutionError<DP>),
 
-    /// Error arising when the implementer of
-    /// [DependencyProvider](crate::solver::DependencyProvider)
-    /// returned an error in the method
-    /// [get_dependencies](crate::solver::DependencyProvider::get_dependencies).
+    /// Error arising when the implementer of [DependencyProvider] returned an error in the method
+    /// [`get_dependencies`](DependencyProvider::get_dependencies).
     #[error("Retrieving dependencies of {package} {version} failed")]
     ErrorRetrievingDependencies {
         /// Package whose dependencies we want.
-        package: P,
+        package: DP::P,
         /// Version of the package for which we want the dependencies.
-        version: V,
-        /// Error raised by the implementer of
-        /// [DependencyProvider](crate::solver::DependencyProvider).
-        source: Box<dyn std::error::Error>,
+        version: DP::V,
+        /// Error raised by the implementer of [DependencyProvider].
+        source: DP::Err,
     },
 
-    /// Error arising when the implementer of
-    /// [DependencyProvider](crate::solver::DependencyProvider)
-    /// returned a dependency on an empty range.
-    /// This technically means that the package can not be selected,
-    /// but is clearly some kind of mistake.
-    #[error("Package {dependent} required by {package} {version} depends on the empty set")]
-    DependencyOnTheEmptySet {
-        /// Package whose dependencies we want.
-        package: P,
-        /// Version of the package for which we want the dependencies.
-        version: V,
-        /// The dependent package that requires us to pick from the empty set.
-        dependent: P,
+    /// Error arising when the implementer of [DependencyProvider] returned an error in the method
+    /// [`choose_version`](DependencyProvider::choose_version).
+    #[error("Choosing a version for {package} failed")]
+    ErrorChoosingVersion {
+        /// Package to choose a version for.
+        package: DP::P,
+        /// Error raised by the implementer of [DependencyProvider].
+        source: DP::Err,
     },
 
-    /// Error arising when the implementer of
-    /// [DependencyProvider](crate::solver::DependencyProvider)
-    /// returned a dependency on the requested package.
-    /// This technically means that the package directly depends on itself,
-    /// and is clearly some kind of mistake.
-    #[error("{package} {version} depends on itself")]
-    SelfDependency {
-        /// Package whose dependencies we want.
-        package: P,
-        /// Version of the package for which we want the dependencies.
-        version: V,
-    },
+    /// Error arising when the implementer of [DependencyProvider]
+    /// returned an error in the method [`should_cancel`](DependencyProvider::should_cancel).
+    #[error("The solver was cancelled")]
+    ErrorInShouldCancel(#[source] DP::Err),
+}
 
-    /// Error arising when the implementer of
-    /// [DependencyProvider](crate::solver::DependencyProvider)
-    /// returned an error in the method
-    /// [choose_package_version](crate::solver::DependencyProvider::choose_package_version).
-    #[error("Decision making failed")]
-    ErrorChoosingPackageVersion(Box<dyn std::error::Error>),
+impl<DP: DependencyProvider> From<NoSolutionError<DP>> for PubGrubError<DP> {
+    fn from(err: NoSolutionError<DP>) -> Self {
+        Self::NoSolution(err)
+    }
+}
 
-    /// Error arising when the implementer of [DependencyProvider](crate::solver::DependencyProvider)
-    /// returned an error in the method [should_cancel](crate::solver::DependencyProvider::should_cancel).
-    #[error("We should cancel")]
-    ErrorInShouldCancel(Box<dyn std::error::Error>),
-
-    /// Something unexpected happened.
-    #[error("{0}")]
-    Failure(String),
+impl<DP> std::fmt::Debug for PubGrubError<DP>
+where
+    DP: DependencyProvider,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoSolution(err) => f.debug_tuple("NoSolution").field(&err).finish(),
+            Self::ErrorRetrievingDependencies {
+                package,
+                version,
+                source,
+            } => f
+                .debug_struct("ErrorRetrievingDependencies")
+                .field("package", package)
+                .field("version", version)
+                .field("source", source)
+                .finish(),
+            Self::ErrorChoosingVersion { package, source } => f
+                .debug_struct("ErrorChoosingVersion")
+                .field("package", package)
+                .field("source", source)
+                .finish(),
+            Self::ErrorInShouldCancel(arg0) => {
+                f.debug_tuple("ErrorInShouldCancel").field(arg0).finish()
+            }
+        }
+    }
 }

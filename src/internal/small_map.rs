@@ -1,8 +1,9 @@
-use crate::type_aliases::Map;
 use std::hash::Hash;
 
+use crate::Map;
+
 #[derive(Debug, Clone)]
-pub enum SmallMap<K, V> {
+pub(crate) enum SmallMap<K, V> {
     Empty,
     One([(K, V); 1]),
     Two([(K, V); 2]),
@@ -10,7 +11,7 @@ pub enum SmallMap<K, V> {
 }
 
 impl<K: PartialEq + Eq + Hash, V> SmallMap<K, V> {
-    pub fn get(&self, key: &K) -> Option<&V> {
+    pub(crate) fn get(&self, key: &K) -> Option<&V> {
         match self {
             Self::Empty => None,
             Self::One([(k, v)]) if k == key => Some(v),
@@ -22,7 +23,7 @@ impl<K: PartialEq + Eq + Hash, V> SmallMap<K, V> {
         }
     }
 
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+    pub(crate) fn get_mut(&mut self, key: &K) -> Option<&mut V> {
         match self {
             Self::Empty => None,
             Self::One([(k, v)]) if k == key => Some(v),
@@ -34,7 +35,7 @@ impl<K: PartialEq + Eq + Hash, V> SmallMap<K, V> {
         }
     }
 
-    pub fn remove(&mut self, key: &K) -> Option<V> {
+    pub(crate) fn remove(&mut self, key: &K) -> Option<V> {
         let out;
         *self = match std::mem::take(self) {
             Self::Empty => {
@@ -70,7 +71,7 @@ impl<K: PartialEq + Eq + Hash, V> SmallMap<K, V> {
         out
     }
 
-    pub fn insert(&mut self, key: K, value: V) {
+    pub(crate) fn insert(&mut self, key: K, value: V) {
         *self = match std::mem::take(self) {
             Self::Empty => Self::One([(key, value)]),
             Self::One([(k, v)]) => {
@@ -99,6 +100,49 @@ impl<K: PartialEq + Eq + Hash, V> SmallMap<K, V> {
             }
         };
     }
+
+    /// Returns a reference to the value for one key and a copy of the map without the key.
+    ///
+    /// This is an optimization over the following, where we only need a reference to `t1`. It
+    /// avoids cloning and then drop the ranges in each `prior_cause` call.
+    /// ```ignore
+    /// let mut package_terms = package_terms.clone();
+    //  let t1 = package_terms.remove(package).unwrap();
+    /// ```
+    pub(crate) fn split_one(&self, key: &K) -> Option<(&V, Self)>
+    where
+        K: Clone,
+        V: Clone,
+    {
+        match self {
+            Self::Empty => None,
+            Self::One([(k, v)]) => {
+                if k == key {
+                    Some((v, Self::Empty))
+                } else {
+                    None
+                }
+            }
+            Self::Two([(k1, v1), (k2, v2)]) => {
+                if k1 == key {
+                    Some((v1, Self::One([(k2.clone(), v2.clone())])))
+                } else if k2 == key {
+                    Some((v2, Self::One([(k1.clone(), v1.clone())])))
+                } else {
+                    None
+                }
+            }
+            Self::Flexible(map) => {
+                if let Some(value) = map.get(key) {
+                    let mut map = map.clone();
+                    map.remove(key).unwrap();
+                    Some((value, Self::Flexible(map)))
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
 impl<K: Clone + PartialEq + Eq + Hash, V: Clone> SmallMap<K, V> {
@@ -107,8 +151,8 @@ impl<K: Clone + PartialEq + Eq + Hash, V: Clone> SmallMap<K, V> {
     /// When a key is common to both,
     /// apply the provided function to both values.
     /// If the result is None, remove that key from the merged map,
-    /// otherwise add the content of the Some(_).
-    pub fn merge<'a>(
+    /// otherwise add the content of the `Some(_)`.
+    pub(crate) fn merge<'a>(
         &'a mut self,
         map_2: impl Iterator<Item = (&'a K, &'a V)>,
         f: impl Fn(&V, &V) -> Option<V>,
@@ -136,33 +180,12 @@ impl<K, V> Default for SmallMap<K, V> {
 }
 
 impl<K, V> SmallMap<K, V> {
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         match self {
             Self::Empty => 0,
             Self::One(_) => 1,
             Self::Two(_) => 2,
             Self::Flexible(data) => data.len(),
-        }
-    }
-}
-
-impl<K: Eq + Hash + Clone, V: Clone> SmallMap<K, V> {
-    pub fn as_map(&self) -> Map<K, V> {
-        match self {
-            Self::Empty => Map::default(),
-            Self::One([(k, v)]) => {
-                let mut map = Map::with_capacity_and_hasher(1, Default::default());
-                map.insert(k.clone(), v.clone());
-                map
-            }
-            Self::Two(data) => {
-                let mut map = Map::with_capacity_and_hasher(2, Default::default());
-                for (k, v) in data {
-                    map.insert(k.clone(), v.clone());
-                }
-                map
-            }
-            Self::Flexible(data) => data.clone(),
         }
     }
 }
@@ -184,7 +207,7 @@ impl<'a, K: 'a, V: 'a> Iterator for IterSmallMap<'a, K, V> {
 }
 
 impl<K, V> SmallMap<K, V> {
-    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         match self {
             Self::Empty => IterSmallMap::Inline([].iter()),
             Self::One(data) => IterSmallMap::Inline(data.iter()),

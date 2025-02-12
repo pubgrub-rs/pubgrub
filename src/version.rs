@@ -4,16 +4,8 @@
 
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
-use thiserror::Error;
 
-/// Versions have a minimal version (a "0" version)
-/// and are ordered such that every version has a next one.
-pub trait Version: Clone + Ord + Debug + Display {
-    /// Returns the lowest version.
-    fn lowest() -> Self;
-    /// Returns the next version, the smallest strictly higher version.
-    fn bump(&self) -> Self;
-}
+use thiserror::Error;
 
 /// Type for semantic versions: major.minor.patch.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -80,6 +72,21 @@ impl From<(u32, u32, u32)> for SemanticVersion {
     }
 }
 
+// Convert a &(major, minor, patch) into a version.
+impl From<&(u32, u32, u32)> for SemanticVersion {
+    fn from(tuple: &(u32, u32, u32)) -> Self {
+        let (major, minor, patch) = *tuple;
+        Self::new(major, minor, patch)
+    }
+}
+
+// Convert an &version into a version.
+impl From<&SemanticVersion> for SemanticVersion {
+    fn from(v: &SemanticVersion) -> Self {
+        *v
+    }
+}
+
 // Convert a version into a tuple (major, minor, patch).
 impl From<SemanticVersion> for (u32, u32, u32) {
     fn from(v: SemanticVersion) -> Self {
@@ -106,7 +113,7 @@ impl SemanticVersion {
 }
 
 /// Error creating [SemanticVersion] from [String].
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum VersionParseError {
     /// [SemanticVersion] must contain major, minor, patch versions.
     #[error("version {full_version} must contain 3 numbers separated by dot")]
@@ -211,50 +218,5 @@ fn from_str_for_semantic_version() {
 impl Display for SemanticVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
-    }
-}
-
-// Implement Version for SemanticVersion.
-impl Version for SemanticVersion {
-    fn lowest() -> Self {
-        Self::zero()
-    }
-    fn bump(&self) -> Self {
-        self.bump_patch()
-    }
-}
-
-/// Simplest versions possible, just a positive number.
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize,))]
-#[cfg_attr(feature = "serde", serde(transparent))]
-pub struct NumberVersion(pub u32);
-
-// Convert an usize into a version.
-impl From<u32> for NumberVersion {
-    fn from(v: u32) -> Self {
-        Self(v)
-    }
-}
-
-// Convert a version into an usize.
-impl From<NumberVersion> for u32 {
-    fn from(version: NumberVersion) -> Self {
-        version.0
-    }
-}
-
-impl Display for NumberVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl Version for NumberVersion {
-    fn lowest() -> Self {
-        Self(0)
-    }
-    fn bump(&self) -> Self {
-        Self(self.0 + 1)
     }
 }

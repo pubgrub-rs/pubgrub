@@ -1,38 +1,39 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::error::PubGrubError;
-use pubgrub::range::Range;
-use pubgrub::report::{DefaultStringReporter, Reporter};
-use pubgrub::solver::{resolve, OfflineDependencyProvider};
-use pubgrub::version::SemanticVersion;
+use pubgrub::{
+    resolve, DefaultStringReporter, OfflineDependencyProvider, PubGrubError, Ranges, Reporter,
+    SemanticVersion,
+};
+
+type SemVS = Ranges<SemanticVersion>;
 
 // https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting
 fn main() {
-    let mut dependency_provider = OfflineDependencyProvider::<&str, SemanticVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, SemVS>::new();
     #[rustfmt::skip]
     // root 1.0.0 depends on foo ^1.0.0 and baz ^1.0.0
         dependency_provider.add_dependencies(
         "root", (1, 0, 0),
-        vec![
-            ("foo", Range::between((1, 0, 0), (2, 0, 0))),
-            ("baz", Range::between((1, 0, 0), (2, 0, 0))),
+        [
+            ("foo", Ranges::from_range_bounds((1, 0, 0)..(2, 0, 0))),
+            ("baz", Ranges::from_range_bounds((1, 0, 0)..(2, 0, 0))),
         ],
     );
     #[rustfmt::skip]
     // foo 1.0.0 depends on bar ^2.0.0
         dependency_provider.add_dependencies(
         "foo", (1, 0, 0),
-        vec![("bar", Range::between((2, 0, 0), (3, 0, 0)))],
+        [("bar", Ranges::from_range_bounds((2, 0, 0)..(3, 0, 0)))],
     );
     #[rustfmt::skip]
     // bar 2.0.0 depends on baz ^3.0.0
         dependency_provider.add_dependencies(
         "bar", (2, 0, 0),
-        vec![("baz", Range::between((3, 0, 0), (4, 0, 0)))],
+        [("baz", Ranges::from_range_bounds((3, 0, 0)..(4, 0, 0)))],
     );
     // baz 1.0.0 and 3.0.0 have no dependencies
-    dependency_provider.add_dependencies("baz", (1, 0, 0), vec![]);
-    dependency_provider.add_dependencies("baz", (3, 0, 0), vec![]);
+    dependency_provider.add_dependencies("baz", (1, 0, 0), []);
+    dependency_provider.add_dependencies("baz", (3, 0, 0), []);
 
     // Run the algorithm.
     match resolve(&dependency_provider, "root", (1, 0, 0)) {

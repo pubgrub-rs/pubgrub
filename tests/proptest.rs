@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use std::{collections::BTreeSet as Set, error::Error};
+#![allow(clippy::type_complexity)]
 
-use pubgrub::error::PubGrubError;
-use pubgrub::package::Package;
-use pubgrub::range::Range;
-use pubgrub::report::{DefaultStringReporter, Reporter};
-use pubgrub::solver::{
-    choose_package_with_fewest_versions, resolve, Dependencies, DependencyProvider,
-    OfflineDependencyProvider,
-};
-use pubgrub::version::{NumberVersion, Version};
+use std::collections::BTreeSet as Set;
+use std::convert::Infallible;
+use std::fmt::{Debug, Display};
 
-use proptest::collection::{btree_map, vec};
+use proptest::collection::{btree_map, btree_set, vec};
 use proptest::prelude::*;
 use proptest::sample::Index;
 use proptest::string::string_regex;
+
+use pubgrub::{
+    resolve, DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, External,
+    OfflineDependencyProvider, Package, PackageResolutionStatistics, PubGrubError, Ranges,
+    Reporter, SelectedDependencies, VersionSet,
+};
 
 use crate::sat_dependency_provider::SatResolve;
 
@@ -24,22 +24,46 @@ mod sat_dependency_provider;
 /// The same as [OfflineDependencyProvider] but takes versions from the opposite end:
 /// if [OfflineDependencyProvider] returns versions from newest to oldest, this returns them from oldest to newest.
 #[derive(Clone)]
-struct OldestVersionsDependencyProvider<P: Package, V: Version>(OfflineDependencyProvider<P, V>);
+struct OldestVersionsDependencyProvider<P: Package, VS: VersionSet>(
+    OfflineDependencyProvider<P, VS>,
+);
 
-impl<P: Package, V: Version> DependencyProvider<P, V> for OldestVersionsDependencyProvider<P, V> {
-    fn choose_package_version<T: std::borrow::Borrow<P>, U: std::borrow::Borrow<Range<V>>>(
+impl<P: Package, VS: VersionSet> DependencyProvider for OldestVersionsDependencyProvider<P, VS> {
+    fn get_dependencies(
         &self,
-        potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<V>), Box<dyn Error>> {
-        Ok(choose_package_with_fewest_versions(
-            |p| self.0.versions(p).into_iter().flatten().cloned(),
-            potential_packages,
-        ))
-    }
-
-    fn get_dependencies(&self, p: &P, v: &V) -> Result<Dependencies<P, V>, Box<dyn Error>> {
+        p: &P,
+        v: &VS::V,
+    ) -> Result<Dependencies<P, VS, Self::M>, Infallible> {
         self.0.get_dependencies(p, v)
     }
+
+    fn choose_version(&self, package: &P, range: &VS) -> Result<Option<VS::V>, Infallible> {
+        Ok(self
+            .0
+            .versions(package)
+            .into_iter()
+            .flatten()
+            .find(|&v| range.contains(v))
+            .cloned())
+    }
+
+    type Priority = <OfflineDependencyProvider<P, VS> as DependencyProvider>::Priority;
+
+    fn prioritize(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+        package_statistics: &PackageResolutionStatistics,
+    ) -> Self::Priority {
+        self.0.prioritize(package, range, package_statistics)
+    }
+
+    type Err = Infallible;
+
+    type P = P;
+    type V = VS::V;
+    type VS = VS;
+    type M = String;
 }
 
 /// The same as DP but it has a timeout.
@@ -62,40 +86,74 @@ impl<DP> TimeoutDependencyProvider<DP> {
     }
 }
 
-impl<P: Package, V: Version, DP: DependencyProvider<P, V>> DependencyProvider<P, V>
-    for TimeoutDependencyProvider<DP>
-{
-    fn choose_package_version<T: std::borrow::Borrow<P>, U: std::borrow::Borrow<Range<V>>>(
+impl<DP: DependencyProvider> DependencyProvider for TimeoutDependencyProvider<DP> {
+    fn get_dependencies(
         &self,
-        potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<V>), Box<dyn Error>> {
-        self.dp.choose_package_version(potential_packages)
-    }
-
-    fn get_dependencies(&self, p: &P, v: &V) -> Result<Dependencies<P, V>, Box<dyn Error>> {
+        p: &DP::P,
+        v: &DP::V,
+    ) -> Result<Dependencies<DP::P, DP::VS, DP::M>, DP::Err> {
         self.dp.get_dependencies(p, v)
     }
 
-    fn should_cancel(&self) -> Result<(), Box<dyn Error>> {
+    fn should_cancel(&self) -> Result<(), DP::Err> {
         assert!(self.start_time.elapsed().as_secs() < 60);
         let calls = self.call_count.get();
         assert!(calls < self.max_calls);
         self.call_count.set(calls + 1);
         Ok(())
     }
+
+    fn choose_version(&self, package: &DP::P, range: &DP::VS) -> Result<Option<DP::V>, DP::Err> {
+        self.dp.choose_version(package, range)
+    }
+
+    type Priority = DP::Priority;
+
+    fn prioritize(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+        package_statistics: &PackageResolutionStatistics,
+    ) -> Self::Priority {
+        self.dp.prioritize(package, range, package_statistics)
+    }
+
+    type Err = DP::Err;
+
+    type P = DP::P;
+    type V = <DP::VS as VersionSet>::V;
+    type VS = DP::VS;
+    type M = DP::M;
 }
+
+fn timeout_resolve<DP: DependencyProvider>(
+    dependency_provider: DP,
+    name: DP::P,
+    version: impl Into<DP::V>,
+) -> Result<
+    SelectedDependencies<TimeoutDependencyProvider<DP>>,
+    PubGrubError<TimeoutDependencyProvider<DP>>,
+> {
+    resolve(
+        &TimeoutDependencyProvider::new(dependency_provider, 50_000),
+        name,
+        version,
+    )
+}
+
+type NumVS = Ranges<u32>;
 
 #[test]
 #[should_panic]
 fn should_cancel_can_panic() {
-    let mut dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
-    dependency_provider.add_dependencies(0, 0, vec![(666, Range::any())]);
+    let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
+    dependency_provider.add_dependencies(0, 0u32, [(666, Ranges::full())]);
 
     // Run the algorithm.
     let _ = resolve(
         &TimeoutDependencyProvider::new(dependency_provider, 1),
         0,
-        0,
+        0u32,
     );
 }
 
@@ -115,25 +173,15 @@ fn string_names() -> impl Strategy<Value = String> {
 /// This strategy has a high probability of having valid dependencies
 pub fn registry_strategy<N: Package + Ord>(
     name: impl Strategy<Value = N>,
-    bad_name: N,
-) -> impl Strategy<
-    Value = (
-        OfflineDependencyProvider<N, NumberVersion>,
-        Vec<(N, NumberVersion)>,
-    ),
-> {
+) -> impl Strategy<Value = (OfflineDependencyProvider<N, NumVS>, Vec<(N, u32)>)> {
     let max_crates = 40;
     let max_versions = 15;
     let shrinkage = 40;
     let complicated_len = 10usize;
 
-    // If this is false than the crate will depend on the nonexistent "bad"
-    // instead of the complex set we generated for it.
-    let allow_deps = prop::bool::weighted(0.99);
-
     let a_version = ..(max_versions as u32);
 
-    let list_of_versions = btree_map(a_version, allow_deps, 1..=max_versions)
+    let list_of_versions = btree_set(a_version, 1..=max_versions)
         .prop_map(move |ver| ver.into_iter().collect::<Vec<_>>());
 
     let list_of_crates_with_versions = btree_map(name, list_of_versions, 1..=max_crates);
@@ -166,51 +214,41 @@ pub fn registry_strategy<N: Package + Ord>(
     )
         .prop_map(
             move |(crate_vers_by_name, raw_dependencies, reverse_alphabetical, complicated_len)| {
-                let mut list_of_pkgid: Vec<(
-                    (N, NumberVersion),
-                    Option<Vec<(N, Range<NumberVersion>)>>,
-                )> = crate_vers_by_name
+                let mut list_of_pkgid: Vec<((N, u32), Vec<(N, NumVS)>)> = crate_vers_by_name
                     .iter()
-                    .flat_map(|(name, vers)| {
-                        vers.iter().map(move |x| {
-                            (
-                                (name.clone(), NumberVersion::from(x.0)),
-                                if x.1 { Some(vec![]) } else { None },
-                            )
-                        })
-                    })
+                    .flat_map(|(name, vers)| vers.iter().map(move |&x| ((name.clone(), x), vec![])))
                     .collect();
                 let len_all_pkgid = list_of_pkgid.len();
                 for (a, b, (c, d)) in raw_dependencies {
                     let (a, b) = order_index(a, b, len_all_pkgid);
                     let (a, b) = if reverse_alphabetical { (b, a) } else { (a, b) };
                     let ((dep_name, _), _) = list_of_pkgid[a].to_owned();
-                    if (list_of_pkgid[b].0).0 == dep_name {
+                    if list_of_pkgid[b].0 .0 == dep_name {
                         continue;
                     }
                     let s = &crate_vers_by_name[&dep_name];
                     let s_last_index = s.len() - 1;
-                    let (c, d) = order_index(c, d, s.len());
+                    let (c, d) = order_index(c, d, s.len() + 1);
 
-                    if let (_, Some(deps)) = &mut list_of_pkgid[b] {
-                        deps.push((
-                            dep_name,
-                            if c == 0 && d == s_last_index {
-                                Range::any()
-                            } else if c == 0 {
-                                Range::strictly_lower_than(s[d].0 + 1)
-                            } else if d == s_last_index {
-                                Range::higher_than(s[c].0)
-                            } else if c == d {
-                                Range::exact(s[c].0)
-                            } else {
-                                Range::between(s[c].0, s[d].0 + 1)
-                            },
-                        ))
-                    }
+                    list_of_pkgid[b].1.push((
+                        dep_name,
+                        if c > s_last_index {
+                            Ranges::empty()
+                        } else if c == 0 && d >= s_last_index {
+                            Ranges::full()
+                        } else if c == 0 {
+                            Ranges::strictly_lower_than(s[d] + 1)
+                        } else if d >= s_last_index {
+                            Ranges::higher_than(s[c])
+                        } else if c == d {
+                            Ranges::singleton(s[c])
+                        } else {
+                            Ranges::between(s[c], s[d] + 1)
+                        },
+                    ));
                 }
 
-                let mut dependency_provider = OfflineDependencyProvider::<N, NumberVersion>::new();
+                let mut dependency_provider = OfflineDependencyProvider::<N, NumVS>::new();
 
                 let complicated_len = std::cmp::min(complicated_len, list_of_pkgid.len());
                 let complicated: Vec<_> = if reverse_alphabetical {
@@ -223,11 +261,7 @@ pub fn registry_strategy<N: Package + Ord>(
                 .collect();
 
                 for ((name, ver), deps) in list_of_pkgid {
-                    dependency_provider.add_dependencies(
-                        name,
-                        ver,
-                        deps.unwrap_or_else(|| vec![(bad_name.clone(), Range::any())]),
-                    );
+                    dependency_provider.add_dependencies(name, ver, deps);
                 }
 
                 (dependency_provider, complicated)
@@ -243,7 +277,7 @@ fn meta_test_deep_trees_from_strategy() {
 
     let mut dis = [0; 21];
 
-    let strategy = registry_strategy(0u16..665, 666);
+    let strategy = registry_strategy(0u16..665);
     let mut test_runner = TestRunner::deterministic();
     for _ in 0..128 {
         let (dependency_provider, cases) = strategy
@@ -273,6 +307,110 @@ fn meta_test_deep_trees_from_strategy() {
     );
 }
 
+/// Removes versions from the dependency provider where the retain function returns false.
+/// Solutions are constructed as a set of versions.
+/// If there are fewer versions available, there are fewer valid solutions available.
+/// If there was no solution to a resolution in the original dependency provider,
+/// then there must still be no solution with some options removed.
+/// If there was a solution to a resolution in the original dependency provider,
+/// there may not be a solution after versions are removes iif removed versions were critical for all valid solutions.
+fn retain_versions<N: Package + Ord, VS: VersionSet>(
+    dependency_provider: &OfflineDependencyProvider<N, VS>,
+    mut retain: impl FnMut(&N, &VS::V) -> bool,
+) -> OfflineDependencyProvider<N, VS> {
+    let mut smaller_dependency_provider = OfflineDependencyProvider::new();
+
+    for n in dependency_provider.packages() {
+        for v in dependency_provider.versions(n).unwrap() {
+            if !retain(n, v) {
+                continue;
+            }
+            let deps = match dependency_provider.get_dependencies(n, v).unwrap() {
+                Dependencies::Unavailable(_) => panic!(),
+                Dependencies::Available(deps) => deps,
+            };
+            smaller_dependency_provider.add_dependencies(n.clone(), v.clone(), deps)
+        }
+    }
+    smaller_dependency_provider
+}
+
+/// Removes dependencies from the dependency provider where the retain function returns false.
+/// Solutions are constrained by having to fulfill all the dependencies.
+/// If there are fewer dependencies required, there are more valid solutions.
+/// If there was a solution to a resolution in the original dependency provider,
+/// then there must still be a solution after dependencies are removed.
+/// If there was no solution to a resolution in the original dependency provider,
+/// there may now be a solution after dependencies are removed.
+fn retain_dependencies<N: Package + Ord, VS: VersionSet>(
+    dependency_provider: &OfflineDependencyProvider<N, VS>,
+    mut retain: impl FnMut(&N, &VS::V, &N) -> bool,
+) -> OfflineDependencyProvider<N, VS> {
+    let mut smaller_dependency_provider = OfflineDependencyProvider::new();
+    for n in dependency_provider.packages() {
+        for v in dependency_provider.versions(n).unwrap() {
+            let deps = match dependency_provider.get_dependencies(n, v).unwrap() {
+                Dependencies::Unavailable(_) => panic!(),
+                Dependencies::Available(deps) => deps,
+            };
+            smaller_dependency_provider.add_dependencies(
+                n.clone(),
+                v.clone(),
+                deps.iter().filter_map(|(dep, range)| {
+                    if !retain(n, v, dep) {
+                        None
+                    } else {
+                        Some((dep.clone(), range.clone()))
+                    }
+                }),
+            );
+        }
+    }
+    smaller_dependency_provider
+}
+
+fn errors_the_same_with_only_report_dependencies<N: Package + Ord>(
+    dependency_provider: OfflineDependencyProvider<N, NumVS>,
+    name: N,
+    ver: u32,
+) {
+    let Err(PubGrubError::NoSolution(tree)) =
+        timeout_resolve(dependency_provider.clone(), name.clone(), ver)
+    else {
+        return;
+    };
+
+    fn recursive<N: Package + Ord, VS: VersionSet, M: Eq + Clone + Debug + Display>(
+        to_retain: &mut Vec<(N, VS, N)>,
+        tree: &DerivationTree<N, VS, M>,
+    ) {
+        match tree {
+            DerivationTree::External(External::FromDependencyOf(n1, vs1, n2, _)) => {
+                to_retain.push((n1.clone(), vs1.clone(), n2.clone()));
+            }
+            DerivationTree::Derived(d) => {
+                recursive(to_retain, &*d.cause1);
+                recursive(to_retain, &*d.cause2);
+            }
+            _ => {}
+        }
+    }
+
+    let mut to_retain = Vec::new();
+    recursive(&mut to_retain, &tree);
+
+    let removed_provider = retain_dependencies(&dependency_provider, |p, v, d| {
+        to_retain
+            .iter()
+            .any(|(n1, vs1, n2)| n1 == p && vs1.contains(v) && n2 == d)
+    });
+
+    assert!(
+        timeout_resolve(removed_provider.clone(), name, ver).is_err(),
+        "The full index errored filtering to only dependencies in the derivation tree succeeded"
+    );
+}
+
 proptest! {
     #![proptest_config(ProptestConfig {
     max_shrink_iters:
@@ -290,51 +428,57 @@ proptest! {
     #[test]
     /// This test is mostly for profiling.
     fn prop_passes_string(
-        (dependency_provider, cases) in registry_strategy(string_names(), "bad".to_owned())
+        (dependency_provider, cases) in registry_strategy(string_names())
     )  {
         for (name, ver) in cases {
-            let _ = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
+            _ = timeout_resolve(dependency_provider.clone(), name, ver);
         }
     }
 
     #[test]
     /// This test is mostly for profiling.
     fn prop_passes_int(
-        (dependency_provider, cases) in registry_strategy(0u16..665, 666)
+        (dependency_provider, cases) in registry_strategy(0u16..665)
     )  {
         for (name, ver) in cases {
-            let _ = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
+            _ = timeout_resolve(dependency_provider.clone(), name, ver);
         }
     }
 
     #[test]
     fn prop_sat_errors_the_same(
-        (dependency_provider, cases) in registry_strategy(0u16..665, 666)
+        (dependency_provider, cases) in registry_strategy(0u16..665)
     )  {
         let mut sat = SatResolve::new(&dependency_provider);
         for (name, ver) in cases {
-            if let Ok(s) = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver) {
-                prop_assert!(sat.sat_is_valid_solution(&s));
-            } else {
-                prop_assert!(!sat.sat_resolve(&name, &ver));
-            }
+            let res = timeout_resolve(dependency_provider.clone(), name, ver);
+            sat.check_resolve(&res, &name, &ver);
+        }
+    }
+
+    #[test]
+    fn prop_errors_the_same_with_only_report_dependencies(
+        (dependency_provider, cases) in registry_strategy(0u16..665)
+    )  {
+        for (name, ver) in cases {
+            errors_the_same_with_only_report_dependencies(dependency_provider.clone(), name, ver);
         }
     }
 
     #[test]
     /// This tests whether the algorithm is still deterministic.
     fn prop_same_on_repeated_runs(
-        (dependency_provider, cases) in registry_strategy(0u16..665, 666)
+        (dependency_provider, cases) in registry_strategy(0u16..665)
     )  {
         for (name, ver) in cases {
-            let one = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
+            let one = timeout_resolve(dependency_provider.clone(), name, ver);
             for _ in 0..3 {
-                match (&one, &resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver)) {
+                match (&one, &timeout_resolve(dependency_provider.clone(), name, ver)) {
                     (Ok(l), Ok(r)) => assert_eq!(l, r),
                     (Err(PubGrubError::NoSolution(derivation_l)), Err(PubGrubError::NoSolution(derivation_r))) => {
                         prop_assert_eq!(
-                            DefaultStringReporter::report(&derivation_l),
-                            DefaultStringReporter::report(&derivation_r)
+                            DefaultStringReporter::report(derivation_l),
+                            DefaultStringReporter::report(derivation_r)
                         )},
                     _ => panic!("not the same result")
                 }
@@ -346,12 +490,12 @@ proptest! {
     /// [ReverseDependencyProvider] changes what order the candidates
     /// are tried but not the existence of a solution.
     fn prop_reversed_version_errors_the_same(
-        (dependency_provider, cases) in registry_strategy(0u16..665, 666)
+        (dependency_provider, cases) in registry_strategy(0u16..665)
     )  {
         let reverse_provider = OldestVersionsDependencyProvider(dependency_provider.clone());
         for (name, ver) in cases {
-            let l = resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver);
-            let r = resolve(&TimeoutDependencyProvider::new(reverse_provider.clone(), 50_000), name, ver);
+            let l = timeout_resolve(dependency_provider.clone(), name, ver);
+            let r = timeout_resolve(reverse_provider.clone(), name, ver);
             match (&l, &r) {
                 (Ok(_), Ok(_)) => (),
                 (Err(_), Err(_)) => (),
@@ -362,48 +506,36 @@ proptest! {
 
     #[test]
     fn prop_removing_a_dep_cant_break(
-        (dependency_provider, cases) in registry_strategy(0u16..665, 666),
-        indexes_to_remove in prop::collection::vec((any::<prop::sample::Index>(), any::<prop::sample::Index>(), any::<prop::sample::Index>()), 1..10)
+        (dependency_provider, cases) in registry_strategy(0u16..665),
+        indexes_to_remove in vec((any::<Index>(), any::<Index>(), any::<Index>()), 1..10)
     ) {
         let packages: Vec<_> = dependency_provider.packages().collect();
-        let mut removed_provider = dependency_provider.clone();
+        let mut to_remove = Set::new();
         for (package_idx, version_idx, dep_idx) in indexes_to_remove {
             let package = package_idx.get(&packages);
             let versions: Vec<_> = dependency_provider
                 .versions(package)
                 .unwrap().collect();
             let version = version_idx.get(&versions);
-            let dependencies: Vec<(u16, Range<NumberVersion>)> = match dependency_provider
+            let dependencies: Vec<(u16, NumVS)> = match dependency_provider
                 .get_dependencies(package, version)
                 .unwrap()
             {
-                Dependencies::Unknown => panic!(),
-                Dependencies::Known(d) => d.into_iter().collect(),
+                Dependencies::Unavailable(_) => panic!(),
+                Dependencies::Available(d) => d.into_iter().collect(),
             };
             if !dependencies.is_empty() {
-                let dependency = dep_idx.get(&dependencies).0;
-                removed_provider.add_dependencies(
-                    **package,
-                    **version,
-                    dependencies.into_iter().filter(|x| x.0 != dependency),
-                )
+                to_remove.insert((package, **version, dep_idx.get(&dependencies).0));
             }
         }
+        let removed_provider = retain_dependencies(
+            &dependency_provider,
+            |p, v, d| {!to_remove.contains(&(&p, *v, *d))}
+        );
         for (name, ver) in cases {
-            if resolve(
-                &TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000),
-                name,
-                ver,
-            )
-            .is_ok()
-            {
+            if timeout_resolve(dependency_provider.clone(), name, ver).is_ok() {
                 prop_assert!(
-                    resolve(
-                        &TimeoutDependencyProvider::new(removed_provider.clone(), 50_000),
-                        name,
-                        ver
-                    )
-                    .is_ok(),
+                    timeout_resolve(removed_provider.clone(), name, ver).is_ok(),
                     "full index worked for `{} = \"={}\"` but removing some deps broke it!",
                     name,
                     ver,
@@ -414,38 +546,30 @@ proptest! {
 
     #[test]
     fn prop_limited_independence_of_irrelevant_alternatives(
-        (dependency_provider, cases) in registry_strategy(0u16..665, 666),
-        indexes_to_remove in prop::collection::vec(any::<prop::sample::Index>(), 1..10)
+        (dependency_provider, cases) in registry_strategy(0u16..665),
+        indexes_to_remove in vec(any::<Index>(), 1..10)
     )  {
-        let all_versions: Vec<(u16, NumberVersion)> = dependency_provider
+        let all_versions: Vec<(u16, u32)> = dependency_provider
             .packages()
             .flat_map(|&p| {
                 dependency_provider
                     .versions(&p)
                     .unwrap()
-                    .map(move |v| (p, v.clone()))
+                    .map(move |&v| (p, v))
             })
             .collect();
         let to_remove: Set<(_, _)> = indexes_to_remove.iter().map(|x| x.get(&all_versions)).cloned().collect();
         for (name, ver) in cases {
-            match resolve(&TimeoutDependencyProvider::new(dependency_provider.clone(), 50_000), name, ver) {
+            match timeout_resolve(dependency_provider.clone(), name, ver) {
                 Ok(used) => {
                     // If resolution was successful, then unpublishing a version of a crate
                     // that was not selected should not change that.
-                    let mut smaller_dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
-                    for &(n, v) in &all_versions {
-                        if used.get(&n) == Some(&v) // it was used
-                           || to_remove.get(&(n, v)).is_none() // or it is not one to be removed
-                        {
-                            let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
-                                Dependencies::Unknown => panic!(),
-                                Dependencies::Known(deps) => deps,
-                            };
-                            smaller_dependency_provider.add_dependencies(n, v, deps)
-                        }
-                    }
+                    let smaller_dependency_provider = retain_versions(&dependency_provider, |n, v| {
+                            used.get(n) == Some(v) // it was used
+                            || !to_remove.contains(&(*n, *v)) // or it is not one to be removed
+                        });
                     prop_assert!(
-                        resolve(&TimeoutDependencyProvider::new(smaller_dependency_provider.clone(), 50_000), name, ver).is_ok(),
+                        timeout_resolve(smaller_dependency_provider.clone(), name, ver).is_ok(),
                         "unpublishing {:?} stopped `{} = \"={}\"` from working",
                         to_remove,
                         name,
@@ -455,19 +579,11 @@ proptest! {
                 Err(_) => {
                     // If resolution was unsuccessful, then it should stay unsuccessful
                     // even if any version of a crate is unpublished.
-                    let mut smaller_dependency_provider = OfflineDependencyProvider::<_, NumberVersion>::new();
-                    for &(n, v) in &all_versions {
-                        if to_remove.get(&(n, v)).is_none() // it is not one to be removed
-                        {
-                            let deps = match dependency_provider.get_dependencies(&n, &v).unwrap() {
-                                Dependencies::Unknown => panic!(),
-                                Dependencies::Known(deps) => deps,
-                            };
-                            smaller_dependency_provider.add_dependencies(n, v, deps)
-                        }
-                    }
+                    let smaller_dependency_provider = retain_versions(&dependency_provider, |n, v| {
+                        to_remove.contains(&(*n, *v)) // it is one to be removed
+                    });
                     prop_assert!(
-                        resolve(&TimeoutDependencyProvider::new(smaller_dependency_provider.clone(), 50_000), name, ver).is_err(),
+                        timeout_resolve(smaller_dependency_provider.clone(), name, ver).is_err(),
                         "full index did not work for `{} = \"={}\"` but unpublishing {:?} fixed it!",
                         name,
                         ver,
@@ -485,36 +601,32 @@ fn large_case() {
     for case in std::fs::read_dir("test-examples").unwrap() {
         let case = case.unwrap().path();
         let name = case.file_name().unwrap().to_string_lossy();
-        eprintln!("{}", name);
+        eprint!("{} ", name);
         let data = std::fs::read_to_string(&case).unwrap();
-        if name.ends_with("u16_NumberVersion.ron") {
-            let dependency_provider: OfflineDependencyProvider<u16, NumberVersion> =
+        let start_time = std::time::Instant::now();
+        if name.ends_with("u16_NumberVersion.ron") || name.ends_with("u16_u32.ron") {
+            let dependency_provider: OfflineDependencyProvider<u16, NumVS> =
                 ron::de::from_str(&data).unwrap();
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {
-                for n in dependency_provider.versions(p).unwrap() {
-                    if let Ok(s) = resolve(&dependency_provider, p.clone(), n.clone()) {
-                        assert!(sat.sat_is_valid_solution(&s));
-                    } else {
-                        assert!(!sat.sat_resolve(p, &n));
-                    }
+                for &v in dependency_provider.versions(p).unwrap() {
+                    let res = resolve(&dependency_provider, *p, v);
+                    sat.check_resolve(&res, p, &v);
                 }
             }
         } else if name.ends_with("str_SemanticVersion.ron") {
             let dependency_provider: OfflineDependencyProvider<
                 &str,
-                pubgrub::version::SemanticVersion,
+                Ranges<pubgrub::SemanticVersion>,
             > = ron::de::from_str(&data).unwrap();
             let mut sat = SatResolve::new(&dependency_provider);
             for p in dependency_provider.packages() {
-                for n in dependency_provider.versions(p).unwrap() {
-                    if let Ok(s) = resolve(&dependency_provider, p.clone(), n.clone()) {
-                        assert!(sat.sat_is_valid_solution(&s));
-                    } else {
-                        assert!(!sat.sat_resolve(p, &n));
-                    }
+                for v in dependency_provider.versions(p).unwrap() {
+                    let res = resolve(&dependency_provider, *p, v);
+                    sat.check_resolve(&res, p, v);
                 }
             }
         }
+        eprintln!(" in {}s", start_time.elapsed().as_secs())
     }
 }

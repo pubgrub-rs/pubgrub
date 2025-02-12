@@ -8,29 +8,6 @@
 //! we should try to provide a very human-readable and clear
 //! explanation as to why that failed.
 //!
-//! # Package and Version traits
-//!
-//! All the code in this crate is manipulating packages and versions, and for this to work
-//! we defined a [Package](package::Package) and [Version](version::Version) traits
-//! that are used as bounds on most of the exposed types and functions.
-//!
-//! Package identifiers needs to implement our [Package](package::Package) trait,
-//! which is automatic if the type already implements
-//! [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
-//! So things like [String] will work out of the box.
-//!
-//! Our [Version](version::Version) trait requires
-//! [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display)
-//! and also the definition of two methods,
-//! [lowest() -> Self](version::Version::lowest) which returns the lowest version existing,
-//! and [bump(&self) -> Self](version::Version::bump) which returns the next smallest version
-//! strictly higher than the current one.
-//! For convenience, this library already provides
-//! two implementations of [Version](version::Version).
-//! The first one is [NumberVersion](version::NumberVersion), basically a newtype for [u32].
-//! The second one is [SemanticVersion](version::NumberVersion)
-//! that implements semantic versioning rules.
-//!
 //! # Basic example
 //!
 //! Let's imagine that we are building a user interface
@@ -46,46 +23,72 @@
 //!
 //! We can model that scenario with this library as follows
 //! ```
-//! # use pubgrub::solver::{OfflineDependencyProvider, resolve};
-//! # use pubgrub::version::NumberVersion;
-//! # use pubgrub::range::Range;
-//! #
-//! let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//! # use pubgrub::{OfflineDependencyProvider, resolve, Ranges};
+//!
+//! type NumVS = Ranges<u32>;
+//!
+//! let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //!
 //! dependency_provider.add_dependencies(
-//!     "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
+//!     "root",
+//!     1u32,
+//!     [("menu", Ranges::full()), ("icons", Ranges::full())],
 //! );
-//! dependency_provider.add_dependencies("menu", 1, vec![("dropdown", Range::any())]);
-//! dependency_provider.add_dependencies("dropdown", 1, vec![("icons", Range::any())]);
-//! dependency_provider.add_dependencies("icons", 1, vec![]);
+//! dependency_provider.add_dependencies("menu", 1u32, [("dropdown", Ranges::full())]);
+//! dependency_provider.add_dependencies("dropdown", 1u32, [("icons", Ranges::full())]);
+//! dependency_provider.add_dependencies("icons", 1u32, []);
 //!
 //! // Run the algorithm.
-//! let solution = resolve(&dependency_provider, "root", 1).unwrap();
+//! let solution = resolve(&dependency_provider, "root", 1u32).unwrap();
 //! ```
+//!
+//! # Package and Version flexibility
+//!
+//! The [OfflineDependencyProvider] used in that example is generic over the way package names,
+//! version requirements, and version numbers are represented.
+//!
+//! The first bound is the type of package names. It can be anything that implements our [Package] trait.
+//! The [Package] trait is automatic if the type already implements
+//! [Clone] + [Eq] + [Hash] + [Debug] + [Display](std::fmt::Display).
+//! So things like [String] will work out of the box.
+//!
+//! The second bound is the type of package requirements. It can be anything that implements our [VersionSet] trait.
+//! This trait is used to figure out how version requirements are combined.
+//! If the normal [Ord]/[PartialEq] operations are all that is needed for requirements, our [Ranges] type will work.
+//!
+//! The chosen `VersionSet` in turn specifies what can be used for version numbers.
+//! This type needs to at least implement [Clone] + [Ord] + [Debug] + [Display](std::fmt::Display).
+//! For convenience, this library provides [SemanticVersion] that implements the basics of semantic versioning rules.
 //!
 //! # DependencyProvider trait
 //!
 //! In our previous example we used the
-//! [OfflineDependencyProvider](solver::OfflineDependencyProvider),
-//! which is a basic implementation of the [DependencyProvider](solver::DependencyProvider) trait.
+//! [OfflineDependencyProvider],
+//! which is a basic implementation of the [DependencyProvider] trait.
 //!
-//! But we might want to implement the [DependencyProvider](solver::DependencyProvider)
+//! But we might want to implement the [DependencyProvider]
 //! trait for our own type.
 //! Let's say that we will use [String] for packages,
-//! and [SemanticVersion](version::SemanticVersion) for versions.
-//! This may be done quite easily by implementing the two following functions.
+//! and [SemanticVersion] for versions.
+//! This may be done quite easily by implementing the three following functions.
 //! ```
-//! # use pubgrub::solver::{DependencyProvider, Dependencies};
-//! # use pubgrub::version::SemanticVersion;
-//! # use pubgrub::range::Range;
-//! # use pubgrub::type_aliases::Map;
+//! # use pubgrub::{DependencyProvider, Dependencies, SemanticVersion, Ranges,
+//! #               DependencyConstraints, Map, PackageResolutionStatistics};
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
+//! # use std::convert::Infallible;
 //! #
 //! # struct MyDependencyProvider;
 //! #
-//! impl DependencyProvider<String, SemanticVersion> for MyDependencyProvider {
-//!     fn choose_package_version<T: Borrow<String>, U: Borrow<Range<SemanticVersion>>>(&self,packages: impl Iterator<Item=(T, U)>) -> Result<(T, Option<SemanticVersion>), Box<dyn Error>> {
+//! type SemVS = Ranges<SemanticVersion>;
+//!
+//! impl DependencyProvider for MyDependencyProvider {
+//!     fn choose_version(&self, package: &String, range: &SemVS) -> Result<Option<SemanticVersion>, Infallible> {
+//!         unimplemented!()
+//!     }
+//!
+//!     type Priority = usize;
+//!     fn prioritize(&self, package: &String, range: &SemVS, conflicts_counts: &PackageResolutionStatistics) -> Self::Priority {
 //!         unimplemented!()
 //!     }
 //!
@@ -93,34 +96,38 @@
 //!         &self,
 //!         package: &String,
 //!         version: &SemanticVersion,
-//!     ) -> Result<Dependencies<String, SemanticVersion>, Box<dyn Error>> {
-//!         unimplemented!()
+//!     ) -> Result<Dependencies<String, SemVS, Self::M>, Infallible> {
+//!         Ok(Dependencies::Available(DependencyConstraints::default()))
 //!     }
+//!
+//!     type Err = Infallible;
+//!     type P = String;
+//!     type V = SemanticVersion;
+//!     type VS = SemVS;
+//!     type M = String;
 //! }
 //! ```
 //!
 //! The first method
-//! [choose_package_version](crate::solver::DependencyProvider::choose_package_version)
-//! chooses a package and available version compatible with the provided options.
-//! A helper function
-//! [choose_package_with_fewest_versions](crate::solver::choose_package_with_fewest_versions)
-//! is provided for convenience
-//! in cases when lists of available versions for packages are easily obtained.
-//! The strategy of that helper function consists in choosing the package
-//! with the fewest number of compatible versions to speed up resolution.
+//! [choose_version](DependencyProvider::choose_version)
+//! chooses a version compatible with the provided range for a package.
+//! The second method
+//! [prioritize](DependencyProvider::prioritize)
+//! in which order different packages should be chosen.
+//! Usually prioritizing packages
+//! with the fewest number of compatible versions speeds up resolution.
 //! But in general you are free to employ whatever strategy suits you best
 //! to pick a package and a version.
 //!
-//! The second method [get_dependencies](crate::solver::DependencyProvider::get_dependencies)
+//! The third method [get_dependencies](DependencyProvider::get_dependencies)
 //! aims at retrieving the dependencies of a given package at a given version.
-//! Returns [None] if dependencies are unknown.
 //!
 //! In a real scenario, these two methods may involve reading the file system
 //! or doing network request, so you may want to hold a cache in your
-//! [DependencyProvider](solver::DependencyProvider) implementation.
+//! [DependencyProvider] implementation.
 //! How exactly this could be achieved is shown in `CachingDependencyProvider`
 //! (see `examples/caching_dependency_provider.rs`).
-//! You could also use the [OfflineDependencyProvider](solver::OfflineDependencyProvider)
+//! You could also use the [OfflineDependencyProvider]
 //! type defined by the crate as guidance,
 //! but you are free to use whatever approach makes sense in your situation.
 //!
@@ -129,10 +136,10 @@
 //! When everything goes well, the algorithm finds and returns the complete
 //! set of direct and indirect dependencies satisfying all the constraints.
 //! The packages and versions selected are returned as
-//! [SelectedDepedencies<P, V>](type_aliases::SelectedDependencies).
+//! [SelectedDependencies<P, V>](SelectedDependencies).
 //! But sometimes there is no solution because dependencies are incompatible.
-//! In such cases, [resolve(...)](solver::resolve) returns a
-//! [PubGrubError::NoSolution(derivation_tree)](error::PubGrubError::NoSolution),
+//! In such cases, [resolve(...)](resolve) returns a
+//! [PubGrubError::NoSolution(derivation_tree)](PubGrubError::NoSolution),
 //! where the provided derivation tree is a custom binary tree
 //! containing the full chain of reasons why there is no solution.
 //!
@@ -143,40 +150,37 @@
 //! External incompatibilities have reasons that are independent
 //! of the way this algorithm is implemented such as
 //!  - dependencies: "package_a" at version 1 depends on "package_b" at version 4
-//!  - missing dependencies: dependencies of "package_a" are unknown
+//!  - missing dependencies: dependencies of "package_a" are unavailable
 //!  - absence of version: there is no version of "package_a" in the range [3.1.0  4.0.0[
 //!
 //! Derived incompatibilities are obtained during the algorithm execution by deduction,
 //! such as if "a" depends on "b" and "b" depends on "c", "a" depends on "c".
 //!
-//! This crate defines a [Reporter](crate::report::Reporter) trait, with an associated
-//! [Output](crate::report::Reporter::Output) type and a single method.
+//! This crate defines a [Reporter] trait, with an associated
+//! [Output](Reporter::Output) type and a single method.
 //! ```
-//! # use pubgrub::package::Package;
-//! # use pubgrub::version::Version;
-//! # use pubgrub::report::DerivationTree;
+//! # use pubgrub::{Package, VersionSet, DerivationTree};
+//! # use std::fmt::{Debug, Display};
 //! #
-//! pub trait Reporter<P: Package, V: Version> {
+//! pub trait Reporter<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
 //!     type Output;
 //!
-//!     fn report(derivation_tree: &DerivationTree<P, V>) -> Self::Output;
+//!     fn report(derivation_tree: &DerivationTree<P, VS, M>) -> Self::Output;
 //! }
 //! ```
-//! Implementing a [Reporter](crate::report::Reporter) may involve a lot of heuristics
+//! Implementing a [Reporter] may involve a lot of heuristics
 //! to make the output human-readable and natural.
 //! For convenience, we provide a default implementation
-//! [DefaultStringReporter](crate::report::DefaultStringReporter)
-//! that outputs the report as a [String].
+//! [DefaultStringReporter] that outputs the report as a [String].
 //! You may use it as follows:
 //! ```
-//! # use pubgrub::solver::{resolve, OfflineDependencyProvider};
-//! # use pubgrub::report::{DefaultStringReporter, Reporter};
-//! # use pubgrub::error::PubGrubError;
-//! # use pubgrub::version::NumberVersion;
+//! # use pubgrub::{resolve, OfflineDependencyProvider, DefaultStringReporter, Reporter, PubGrubError, Ranges};
 //! #
-//! # let dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+//! # type NumVS = Ranges<u32>;
+//! #
+//! # let dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
 //! # let root_package = "root";
-//! # let root_version = 1;
+//! # let root_version = 1u32;
 //! #
 //! match resolve(&dependency_provider, root_package, root_version) {
 //!     Ok(solution) => println!("{:?}", solution),
@@ -188,9 +192,9 @@
 //! };
 //! ```
 //! Notice that we also used
-//! [collapse_no_versions()](crate::report::DerivationTree::collapse_no_versions) above.
+//! [collapse_no_versions()](DerivationTree::collapse_no_versions) above.
 //! This method simplifies the derivation tree to get rid of the
-//! [NoVersions](crate::report::External::NoVersions)
+//! [NoVersions](External::NoVersions)
 //! external incompatibilities in the derivation tree.
 //! So instead of seeing things like this in the report:
 //! ```txt
@@ -206,16 +210,32 @@
 //! with a cache, you may want to know that some versions
 //! do not exist in your cache.
 
-#![allow(clippy::rc_buffer)]
 #![warn(missing_docs)]
 
-pub mod error;
-pub mod package;
-pub mod range;
-pub mod report;
-pub mod solver;
-pub mod term;
-pub mod type_aliases;
-pub mod version;
+mod error;
+mod package;
+mod provider;
+mod report;
+mod solver;
+mod term;
+mod type_aliases;
+mod version;
+mod version_set;
+
+pub use error::{NoSolutionError, PubGrubError};
+pub use package::Package;
+pub use provider::OfflineDependencyProvider;
+pub use report::{
+    DefaultStringReportFormatter, DefaultStringReporter, DerivationTree, Derived, External,
+    ReportFormatter, Reporter,
+};
+pub use solver::{resolve, Dependencies, DependencyProvider, PackageResolutionStatistics};
+pub use term::Term;
+pub use type_aliases::{DependencyConstraints, Map, SelectedDependencies, Set};
+pub use version::{SemanticVersion, VersionParseError};
+pub use version_ranges::Ranges;
+#[deprecated(note = "Use `Ranges` instead")]
+pub use version_ranges::Ranges as Range;
+pub use version_set::VersionSet;
 
 mod internal;

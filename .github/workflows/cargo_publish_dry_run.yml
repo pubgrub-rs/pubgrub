@@ -4,6 +4,7 @@ name: Check crate publishing works
 on:
   pull_request:
     branches: [ release ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,28 +14,14 @@ jobs:
     name: Publishing works
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install stable Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Get Cargo version
         id: cargo_version
         run: echo "::set-output name=version::$(cargo -V | tr -d ' ')"
         shell: bash
-
-      - name: Download cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ steps.cargo_version.outputs.version }}-${{ hashFiles('Cargo.toml') }}
-          restore-keys: ${{ runner.os }}-${{ steps.cargo_version.outputs.version }}
 
       - name: Run `cargo publish --dry-run`
         run: cargo publish --dry-run

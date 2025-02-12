@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::range::Range;
-use pubgrub::solver::{resolve, OfflineDependencyProvider};
-use pubgrub::version::NumberVersion;
+use pubgrub::{resolve, OfflineDependencyProvider, Ranges};
+
+type NumVS = Ranges<u32>;
 
 // `root` depends on `menu` and `icons`
 // `menu` depends on `dropdown`
@@ -10,15 +10,15 @@ use pubgrub::version::NumberVersion;
 // `icons` has no dependency
 #[rustfmt::skip]
 fn main() {
-    let mut dependency_provider = OfflineDependencyProvider::<&str, NumberVersion>::new();
+    let mut dependency_provider = OfflineDependencyProvider::<&str, NumVS>::new();
     dependency_provider.add_dependencies(
-        "root", 1, vec![("menu", Range::any()), ("icons", Range::any())],
+        "root", 1u32, [("menu", Ranges::full()), ("icons", Ranges::full())],
     );
-    dependency_provider.add_dependencies("menu", 1, vec![("dropdown", Range::any())]);
-    dependency_provider.add_dependencies("dropdown", 1, vec![("icons", Range::any())]);
-    dependency_provider.add_dependencies("icons", 1, vec![]);
+    dependency_provider.add_dependencies("menu", 1u32, [("dropdown", Ranges::full())]);
+    dependency_provider.add_dependencies("dropdown", 1u32, [("icons", Ranges::full())]);
+    dependency_provider.add_dependencies("icons", 1u32, []);
 
     // Run the algorithm.
-    let solution = resolve(&dependency_provider, "root", 1);
+    let solution = resolve(&dependency_provider, "root", 1u32);
     println!("Solution: {:?}", solution);
 }

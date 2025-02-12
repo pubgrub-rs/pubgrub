@@ -1,6 +1,7 @@
 name: CI
 on:
   pull_request:
+  merge_group:
   push:
     branches: [ release, dev ]
   schedule: [ cron: "0 6 * * 4" ]
@@ -10,104 +11,54 @@ env:
 
 jobs:
   test:
-    name: Tests pass
+    name: Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Install stable Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-
-      - name: Get Cargo version
-        id: cargo_version
-        run: echo "::set-output name=version::$(cargo -V | tr -d ' ')"
-        shell: bash
-
-      - name: Download cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ steps.cargo_version.outputs.version }}-${{ hashFiles('Cargo.toml') }}
-          restore-keys: ${{ runner.os }}-${{ steps.cargo_version.outputs.version }}
-
-      - name: Build
-        run: cargo build --verbose
-
-      - name: Run tests
-        run: cargo test --features=serde --verbose
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --workspace
+      - run: cargo test --all-features --workspace
 
   clippy:
-    name: No warnings from Clippy
+    name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Install stable Rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
           components: clippy
-
       - name: Check Clippy lints
         env:
           RUSTFLAGS: -D warnings
-        run: cargo clippy
+        run: cargo clippy --workspace
 
   check_formatting:
-    name: Source code is formatted
+    name: Formatting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Install stable Rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
           components: rustfmt
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - run: cargo fmt --all -- --check
 
   check_documentation:
-    name: Documentation builds successfully
+    name: Docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Install nightly Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-
-      - name: Download cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: documentation
-
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo +nightly doc --no-deps --document-private-items
+        run: cargo doc --workspace --no-deps --document-private-items
 
-  check_commit_conventions:
-    name: Commit messages follow project guidelines
+  minimal-versions:
+    name: Minimal versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Check commit conventions
-        uses: wagoid/commitlint-github-action@v2
-        with:
-          configFile: .commitlintrc.yml
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo +nightly update -Zminimal-versions
+      - run: cargo +nightly build --workspace
+      - run: cargo +nightly test --all-features --workspace

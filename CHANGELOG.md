@@ -2,7 +2,57 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased [(diff)][unreleased-diff]
+## [0.3.0] - 2025-02-12 - [(diff with 0.2.1)][0.2.1-diff]
+
+PubGrub 0.3 has a more flexible interface and speeds resolution significantly. The public API is very different now, we
+recommend starting the migration by implementing the new `DependencyProvider` interface following the
+[Guide](https://pubgrub-rs.github.io/pubgrub/pubgrub/).
+
+All public interfaces are now in the root of the crate.
+
+In the main interface, `DependencyProvider`, `choose_package_version` was split into two methods: `prioritize`
+for choosing which package to decide next by assigning a priority to each package, and `choose_version`. The generic
+parameters became associated types. The version set is configurable by an associated type.
+
+`Dependencies` gained a generic parameter for custom incompatibility type outside version conflicts, such as packages
+not available for the current platform or permission errors. This type is on `DependencyProvider` as
+`DependencyProvider::M`.
+
+`pubgrub::range::Range` now lives in its own crate as [`version_ranges::Ranges`](https://docs.rs/version-ranges/0.1/version_ranges/struct.Ranges.html). A `Version` can be almost any
+ordered type now, it only needs to support set operations through `VersionSet`. 
+
+At a glance, this is the new `DependencyProvider` interface:
+
+```rust
+pub trait DependencyProvider {
+    type P: Package;
+    type V: Debug + Display + Clone + Ord;
+    type VS: VersionSet<V = Self::V>;
+    type M: Eq + Clone + Debug + Display;
+    type Priority: Ord + Clone;
+    type Err: Error + 'static;
+
+    fn prioritize(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+        package_conflicts_counts: &PackageResolutionStatistics,
+    ) -> Self::Priority;
+
+    fn choose_version(
+        &self,
+        package: &Self::P,
+        range: &Self::VS,
+    ) -> Result<Option<Self::V>, Self::Err>;
+
+    fn get_dependencies(
+        &self,
+        package: &Self::P,
+        version: &Self::V,
+    ) -> Result<Dependencies<Self::P, Self::VS, Self::M>, Self::Err>;
+
+}
+```
 
 ## [0.2.1] - 2021-06-30 - [(diff with 0.2.0)][0.2.0-diff]
 
@@ -48,7 +98,7 @@ The gist of it is:
 
 #### Added
 
-- Links to code items in the code documenation.
+- Links to code items in the code documentation.
 - New `"serde"` feature that allows serializing some library types, useful for making simple reproducible bug reports.
 - New variants for `error::PubGrubError` which are `DependencyOnTheEmptySet`,
   `SelfDependency`, `ErrorChoosingPackageVersion` and `ErrorInShouldCancel`.
@@ -161,10 +211,12 @@ The gist of it is:
 - `.gitignore` configured for a Rust project.
 - `.github/workflows/` CI to automatically build, test and document on push and pull requests.
 
+[0.3.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.3.0
 [0.2.1]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.2.1
 [0.2.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.2.0
 [0.1.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.1.0
 
 [unreleased-diff]: https://github.com/pubgrub-rs/pubgrub/compare/release...dev
+[0.2.1-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.2.1...v0.3.0
 [0.2.0-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.2.0...v0.2.1
 [0.1.0-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.1.0...v0.2.0
