@@ -27,7 +27,7 @@ indexmap = "2.7.0"
 # for debug logs in tests
 log = "0.4.26"
 priority-queue = "2.1.1"
-rustc-hash = "^2.0.0"
+rustc-hash = "^2.1.1"
 serde = { version = "1.0", features = ["derive"], optional = true }
 thiserror = "2.0"
 version-ranges = { version = "0.1.0", path = "version-ranges" }
