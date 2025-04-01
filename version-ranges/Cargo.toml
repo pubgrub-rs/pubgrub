@@ -10,7 +10,7 @@ include = ["LICENSE", "README.md", "number-line-ranges.svg", "src/**"]
 
 [dependencies]
 proptest = { version = "1.6.0", optional = true }
-serde = { version = "1.0.217", features = ["derive"], optional = true }
+serde = { version = "1.0.219", features = ["derive"], optional = true }
 smallvec = { version = "1.14.0", features = ["union"] }
 
 [features]
