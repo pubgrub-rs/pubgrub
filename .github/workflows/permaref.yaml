@@ -11,6 +11,8 @@ on:
 jobs:
   create-permaref:
     runs-on: ubuntu-latest
+    permissions:
+      contents: "write"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,7 +25,7 @@ jobs:
 
           echo "LAST_PERMA_NUMBER=$(\
             git ls-remote --tags --refs --sort="v:refname" \
-            https://github.com/zanieb/pubgrub.git | grep "tags/perma-" | tail -n1 | sed 's/.*\/perma-//' \
+            https://github.com/astral-sh/pubgrub.git | grep "tags/perma-" | tail -n1 | sed 's/.*\/perma-//' \
           )" >> $GITHUB_OUTPUT
 
       - name: Configure Git
