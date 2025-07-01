@@ -9,7 +9,7 @@ keywords = ["version", "pubgrub", "selector", "ranges"]
 include = ["LICENSE", "README.md", "number-line-ranges.svg", "src/**"]
 
 [dependencies]
-proptest = { version = "1.6.0", optional = true }
+proptest = { version = "1.7.0", optional = true }
 serde = { version = "1.0.219", features = ["derive"], optional = true }
 smallvec = { version = "1.14.0", features = ["union"] }
 
@@ -17,5 +17,5 @@ smallvec = { version = "1.14.0", features = ["union"] }
 serde = ["dep:serde", "smallvec/serde"]
 
 [dev-dependencies]
-proptest = "1.6.0"
+proptest = "1.7.0"
 ron = "0.10.1"
