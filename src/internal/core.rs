@@ -267,7 +267,7 @@ impl<DP: DependencyProvider> State<DP> {
                             current_incompat_changed,
                             previous_satisfier_level,
                         );
-                        log::info!("backtrack to {:?}", previous_satisfier_level);
+                        log::info!("backtrack to {previous_satisfier_level:?}");
                         satisfier_causes.push((package, current_incompat_id));
                         return Ok((package, current_incompat_id));
                     }

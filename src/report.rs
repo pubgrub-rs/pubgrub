@@ -168,39 +168,34 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Display for Ex
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotRoot(package, version) => {
-                write!(f, "we are solving dependencies of {} {}", package, version)
+                write!(f, "we are solving dependencies of {package} {version}")
             }
             Self::NoVersions(package, set) => {
                 if set == &VS::full() {
-                    write!(f, "there is no available version for {}", package)
+                    write!(f, "there is no available version for {package}")
                 } else {
-                    write!(f, "there is no version of {} in {}", package, set)
+                    write!(f, "there is no version of {package} in {set}")
                 }
             }
             Self::Custom(package, set, metadata) => {
                 if set == &VS::full() {
-                    write!(
-                        f,
-                        "dependencies of {} are unavailable {}",
-                        package, metadata
-                    )
+                    write!(f, "dependencies of {package} are unavailable {metadata}")
                 } else {
                     write!(
                         f,
-                        "dependencies of {} at version {} are unavailable {}",
-                        package, set, metadata
+                        "dependencies of {package} at version {set} are unavailable {metadata}"
                     )
                 }
             }
             Self::FromDependencyOf(p, set_p, dep, set_dep) => {
                 if set_p == &VS::full() && set_dep == &VS::full() {
-                    write!(f, "{} depends on {}", p, dep)
+                    write!(f, "{p} depends on {dep}")
                 } else if set_p == &VS::full() {
-                    write!(f, "{} depends on {} {}", p, dep, set_dep)
+                    write!(f, "{p} depends on {dep} {set_dep}")
                 } else if set_dep == &VS::full() {
-                    write!(f, "{} {} depends on {}", p, set_p, dep)
+                    write!(f, "{p} {set_p} depends on {dep}")
                 } else {
-                    write!(f, "{} {} depends on {} {}", p, set_p, dep, set_dep)
+                    write!(f, "{p} {set_p} depends on {dep} {set_dep}")
                 }
             }
         }
@@ -289,8 +284,8 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> ReportFormatte
         match terms_vec.as_slice() {
             [] => "version solving failed".into(),
             // TODO: special case when that unique package is root.
-            [(package, Term::Positive(range))] => format!("{} {} is forbidden", package, range),
-            [(package, Term::Negative(range))] => format!("{} {} is mandatory", package, range),
+            [(package, Term::Positive(range))] => format!("{package} {range} is forbidden"),
+            [(package, Term::Negative(range))] => format!("{package} {range} is mandatory"),
             [(p1, Term::Positive(r1)), (p2, Term::Negative(r2))] => self.format_external(
                 &External::<_, _, M>::FromDependencyOf(p1, r1.clone(), p2, r2.clone()),
             ),
@@ -298,7 +293,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> ReportFormatte
                 &External::<_, _, M>::FromDependencyOf(p2, r2.clone(), p1, r1.clone()),
             ),
             slice => {
-                let str_terms: Vec<_> = slice.iter().map(|(p, t)| format!("{} {}", p, t)).collect();
+                let str_terms: Vec<_> = slice.iter().map(|(p, t)| format!("{p} {t}")).collect();
                 str_terms.join(", ") + " are incompatible"
             }
         }
@@ -605,7 +600,7 @@ impl DefaultStringReporter {
         let new_count = self.ref_count + 1;
         self.ref_count = new_count;
         if let Some(line) = self.lines.last_mut() {
-            *line = format!("{} ({})", line, new_count);
+            *line = format!("{line} ({new_count})");
         }
     }
 

@@ -17,7 +17,7 @@ impl Display for Package {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Package::Root => write!(f, "root"),
-            Package::Package(name) => write!(f, "{}", name),
+            Package::Package(name) => write!(f, "{name}"),
         }
     }
 }
@@ -218,7 +218,7 @@ fn main() {
 
     // Run the algorithm
     match resolve(&dependency_provider, Package::Root, (0, 0, 0)) {
-        Ok(sol) => println!("{:?}", sol),
+        Ok(sol) => println!("{sol:?}"),
         Err(PubGrubError::NoSolution(derivation_tree)) => {
             eprintln!("No solution.\n");
 
@@ -239,6 +239,6 @@ fn main() {
             eprintln!("```");
             std::process::exit(1);
         }
-        Err(err) => panic!("{:?}", err),
+        Err(err) => panic!("{err:?}"),
     };
 }

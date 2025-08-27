@@ -491,7 +491,7 @@ pub(crate) mod tests {
                 .collect();
             let expected = BTreeMap::from([("root".to_string(), 0), ("foo".to_string(), 1)]);
 
-            assert_eq!(solution, expected, "{:?}", case);
+            assert_eq!(solution, expected, "{case:?}");
         }
     }
 }

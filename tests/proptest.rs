@@ -601,7 +601,7 @@ fn large_case() {
     for case in std::fs::read_dir("test-examples").unwrap() {
         let case = case.unwrap().path();
         let name = case.file_name().unwrap().to_string_lossy();
-        eprint!("{} ", name);
+        eprint!("{name} ");
         let data = std::fs::read_to_string(&case).unwrap();
         let start_time = std::time::Instant::now();
         if name.ends_with("u16_NumberVersion.ron") || name.ends_with("u16_u32.ron") {

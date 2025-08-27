@@ -144,9 +144,9 @@ impl<VS: VersionSet> Display for AssignmentsIntersection<VS> {
                 version,
                 term: _,
             } => {
-                write!(f, "Decision: level {}, v = {}", decision_level, version)
+                write!(f, "Decision: level {decision_level}, v = {version}")
             }
-            Self::Derivations(term) => write!(f, "Derivations term: {}", term),
+            Self::Derivations(term) => write!(f, "Derivations term: {term}"),
         }
     }
 }
@@ -216,10 +216,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
                     AssignmentsIntersection::Derivations(term) => {
                         debug_assert!(
                             term.contains(&version),
-                            "{:?}: {} was expected to be contained in {}",
-                            package,
-                            version,
-                            term,
+                            "{package:?}: {version} was expected to be contained in {term}",
                         )
                     }
                 },

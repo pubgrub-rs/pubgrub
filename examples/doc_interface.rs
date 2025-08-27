@@ -20,5 +20,5 @@ fn main() {
 
     // Run the algorithm.
     let solution = resolve(&dependency_provider, "root", 1u32);
-    println!("Solution: {:?}", solution);
+    println!("Solution: {solution:?}");
 }

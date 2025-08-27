@@ -89,5 +89,5 @@ fn main() {
         CachingDependencyProvider::new(remote_dependencies_provider);
 
     let solution = resolve(&caching_dependencies_provider, "root", 1u32);
-    println!("Solution: {:?}", solution);
+    println!("Solution: {solution:?}");
 }

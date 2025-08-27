@@ -21,7 +21,7 @@ impl serde::Serialize for SemanticVersion {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&format!("{}", self))
+        serializer.serialize_str(&format!("{self}"))
     }
 }
 

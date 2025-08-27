@@ -218,8 +218,8 @@ impl<VS: VersionSet> AsRef<Self> for Term<VS> {
 impl<VS: VersionSet + Display> Display for Term<VS> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Positive(set) => write!(f, "{}", set),
-            Self::Negative(set) => write!(f, "Not ( {} )", set),
+            Self::Positive(set) => write!(f, "{set}"),
+            Self::Negative(set) => write!(f, "Not ( {set} )"),
         }
     }
 }
