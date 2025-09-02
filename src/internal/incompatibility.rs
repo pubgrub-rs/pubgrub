@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use crate::internal::{Arena, HashArena, Id, SmallMap};
 use crate::{
-    term, DependencyProvider, DerivationTree, Derived, External, Map, Package, Set, Term,
-    VersionSet,
+    DependencyProvider, DerivationTree, Derived, External, Map, Package, Set, Term, VersionSet,
+    term,
 };
 
 /// An incompatibility is a set of terms for different packages
@@ -363,16 +363,20 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
             [(package, Term::Negative(range))] => {
                 format!("{} {} is mandatory", package_store[*package], range)
             }
-            [(p_pos, Term::Positive(r_pos)), (p_neg, Term::Negative(r_neg))]
-            | [(p_neg, Term::Negative(r_neg)), (p_pos, Term::Positive(r_pos))] => {
-                External::<_, _, M>::FromDependencyOf(
-                    &package_store[*p_pos],
-                    r_pos.clone(),
-                    &package_store[*p_neg],
-                    r_neg.clone(),
-                )
-                .to_string()
-            }
+            [
+                (p_pos, Term::Positive(r_pos)),
+                (p_neg, Term::Negative(r_neg)),
+            ]
+            | [
+                (p_neg, Term::Negative(r_neg)),
+                (p_pos, Term::Positive(r_pos)),
+            ] => External::<_, _, M>::FromDependencyOf(
+                &package_store[*p_pos],
+                r_pos.clone(),
+                &package_store[*p_neg],
+                r_neg.clone(),
+            )
+            .to_string(),
             slice => {
                 let str_terms: Vec<_> = slice
                     .iter()
@@ -479,10 +483,12 @@ pub(crate) mod tests {
             state.add_package_version_dependencies(next, 1, case.clone());
             state.unit_propagation(next).unwrap();
 
-            assert!(state
-                .partial_solution
-                .pick_highest_priority_pkg(|_p, _r| (0, Reverse(0)))
-                .is_none());
+            assert!(
+                state
+                    .partial_solution
+                    .pick_highest_priority_pkg(|_p, _r| (0, Reverse(0)))
+                    .is_none()
+            );
 
             let solution: BTreeMap<String, usize> = state
                 .partial_solution

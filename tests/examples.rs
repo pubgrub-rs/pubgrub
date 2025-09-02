@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::{
-    resolve, DefaultStringReporter, Map, OfflineDependencyProvider, PubGrubError, Ranges,
-    Reporter as _, SemanticVersion, Set,
+    DefaultStringReporter, Map, OfflineDependencyProvider, PubGrubError, Ranges, Reporter as _,
+    SemanticVersion, Set, resolve,
 };
 
 type NumVS = Ranges<u32>;

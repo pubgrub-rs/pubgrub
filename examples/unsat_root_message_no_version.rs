@@ -3,8 +3,8 @@
 use std::fmt::{self, Display};
 
 use pubgrub::{
-    resolve, DefaultStringReporter, Derived, External, Map, OfflineDependencyProvider,
-    PubGrubError, Ranges, ReportFormatter, Reporter, SemanticVersion, Term,
+    DefaultStringReporter, Derived, External, Map, OfflineDependencyProvider, PubGrubError, Ranges,
+    ReportFormatter, Reporter, SemanticVersion, Term, resolve,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -78,7 +78,9 @@ impl ReportFormatter<Package, Ranges<SemanticVersion>, String> for CustomReportF
                 if set == &Ranges::full() {
                     format!("dependencies of {package} are unavailable because {reason}")
                 } else {
-                    format!("dependencies of {package} at version {set} are unavailable because {reason}")
+                    format!(
+                        "dependencies of {package} at version {set} are unavailable because {reason}"
+                    )
                 }
             }
             External::FromDependencyOf(package, package_set, dependency, dependency_set) => {

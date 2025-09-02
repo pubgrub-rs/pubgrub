@@ -12,9 +12,9 @@ use proptest::sample::Index;
 use proptest::string::string_regex;
 
 use pubgrub::{
-    resolve, DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, External,
+    DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, External,
     OfflineDependencyProvider, Package, PackageResolutionStatistics, PubGrubError, Ranges,
-    Reporter, SelectedDependencies, VersionSet,
+    Reporter, SelectedDependencies, VersionSet, resolve,
 };
 
 use crate::sat_dependency_provider::SatResolve;
@@ -223,7 +223,7 @@ pub fn registry_strategy<N: Package + Ord>(
                     let (a, b) = order_index(a, b, len_all_pkgid);
                     let (a, b) = if reverse_alphabetical { (b, a) } else { (a, b) };
                     let ((dep_name, _), _) = list_of_pkgid[a].to_owned();
-                    if list_of_pkgid[b].0 .0 == dep_name {
+                    if list_of_pkgid[b].0.0 == dep_name {
                         continue;
                     }
                     let s = &crate_vers_by_name[&dep_name];
@@ -551,11 +551,11 @@ proptest! {
     )  {
         let all_versions: Vec<(u16, u32)> = dependency_provider
             .packages()
-            .flat_map(|&p| {
+            .flat_map(|p| {
                 dependency_provider
                     .versions(&p)
                     .unwrap()
-                    .map(move |&v| (p, v))
+                    .map(move |&v| (*p, v))
             })
             .collect();
         let to_remove: Set<(_, _)> = indexes_to_remove.iter().map(|x| x.get(&all_versions)).cloned().collect();

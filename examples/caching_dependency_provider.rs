@@ -3,8 +3,8 @@
 use std::cell::RefCell;
 
 use pubgrub::{
-    resolve, Dependencies, DependencyProvider, OfflineDependencyProvider,
-    PackageResolutionStatistics, Ranges,
+    Dependencies, DependencyProvider, OfflineDependencyProvider, PackageResolutionStatistics,
+    Ranges, resolve,
 };
 
 type NumVS = Ranges<u32>;

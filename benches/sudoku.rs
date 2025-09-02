@@ -3,7 +3,7 @@
 //! Uses `Arc<usize>` for being closer to real versions.
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::{resolve, OfflineDependencyProvider, Range};
+use pubgrub::{OfflineDependencyProvider, Range, resolve};
 use std::fmt;
 use std::sync::Arc;
 use version_ranges::Ranges;

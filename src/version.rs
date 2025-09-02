@@ -167,15 +167,17 @@ impl FromStr for SemanticVersion {
 #[test]
 fn from_str_for_semantic_version() {
     let parse = |str: &str| str.parse::<SemanticVersion>();
-    assert!(parse(
-        &SemanticVersion {
-            major: 0,
-            minor: 1,
-            patch: 0
-        }
-        .to_string()
-    )
-    .is_ok());
+    assert!(
+        parse(
+            &SemanticVersion {
+                major: 0,
+                minor: 1,
+                patch: 0
+            }
+            .to_string()
+        )
+        .is_ok()
+    );
     assert!(parse("1.2.3").is_ok());
     assert_eq!(
         parse("1.abc.3"),

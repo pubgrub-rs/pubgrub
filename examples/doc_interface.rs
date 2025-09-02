@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::{resolve, OfflineDependencyProvider, Ranges};
+use pubgrub::{OfflineDependencyProvider, Ranges, resolve};
 
 type NumVS = Ranges<u32>;
 
