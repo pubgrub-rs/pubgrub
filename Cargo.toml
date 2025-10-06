@@ -33,7 +33,7 @@ thiserror = "2.0"
 version-ranges = { version = "0.1.0", path = "version-ranges" }
 
 [dev-dependencies]
-criterion = { version = "2.7.2", package = "codspeed-criterion-compat" }
+criterion = { version = "4.0.1", package = "codspeed-criterion-compat" }
 env_logger = "0.11.6"
 proptest = "1.6.0"
 ron = "0.11.0"
