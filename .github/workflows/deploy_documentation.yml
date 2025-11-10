@@ -21,8 +21,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@stable
-
       - name: Build documentation
         run: cargo doc --no-deps
 
