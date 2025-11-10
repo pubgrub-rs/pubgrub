@@ -3,11 +3,13 @@
 name: Check crate publishing works
 on:
   pull_request:
-    branches: [ release ]
+    branches: [release]
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
+
+permissions: {}
 
 jobs:
   cargo_publish_dry_run:
@@ -15,6 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          persist-credentials: false
+
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
