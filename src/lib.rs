@@ -23,7 +23,7 @@
 //!
 //! We can model that scenario with this library as follows
 //! ```
-//! # use astral_pubgrub::{OfflineDependencyProvider, resolve, Ranges};
+//! # use pubgrub::{OfflineDependencyProvider, resolve, Ranges};
 //!
 //! type NumVS = Ranges<u32>;
 //!
@@ -72,7 +72,7 @@
 //! and [SemanticVersion] for versions.
 //! This may be done quite easily by implementing the three following functions.
 //! ```
-//! # use astral_pubgrub::{DependencyProvider, Dependencies, SemanticVersion, Ranges,
+//! # use pubgrub::{DependencyProvider, Dependencies, SemanticVersion, Ranges,
 //! #               DependencyConstraints, Map, PackageResolutionStatistics};
 //! # use std::error::Error;
 //! # use std::borrow::Borrow;
@@ -159,7 +159,7 @@
 //! This crate defines a [Reporter] trait, with an associated
 //! [Output](Reporter::Output) type and a single method.
 //! ```
-//! # use astral_pubgrub::{Package, VersionSet, DerivationTree};
+//! # use pubgrub::{Package, VersionSet, DerivationTree};
 //! # use std::fmt::{Debug, Display};
 //! #
 //! pub trait Reporter<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
@@ -174,7 +174,7 @@
 //! [DefaultStringReporter] that outputs the report as a [String].
 //! You may use it as follows:
 //! ```
-//! # use astral_pubgrub::{resolve, OfflineDependencyProvider, DefaultStringReporter, Reporter, PubGrubError, Ranges};
+//! # use pubgrub::{resolve, OfflineDependencyProvider, DefaultStringReporter, Reporter, PubGrubError, Ranges};
 //! #
 //! # type NumVS = Ranges<u32>;
 //! #

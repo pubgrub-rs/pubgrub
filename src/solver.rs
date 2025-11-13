@@ -155,7 +155,7 @@ impl<P: Package, V> IntoIterator for SelectedDependencies<P, V> {
 ///
 /// ```
 /// # use std::convert::Infallible;
-/// # use astral_pubgrub::{resolve, OfflineDependencyProvider, PubGrubError, Ranges};
+/// # use pubgrub::{resolve, OfflineDependencyProvider, PubGrubError, Ranges};
 /// #
 /// # type NumVS = Ranges<u32>;
 /// #

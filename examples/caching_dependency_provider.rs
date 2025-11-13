@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use astral_pubgrub::{
+use pubgrub::{
     Dependencies, DependencyProvider, OfflineDependencyProvider, PackageResolutionStatistics,
     Ranges, resolve,
 };

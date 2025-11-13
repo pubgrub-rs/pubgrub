@@ -5,9 +5,7 @@ use std::time::Duration;
 use criterion::*;
 use serde::de::Deserialize;
 
-use astral_pubgrub::{
-    OfflineDependencyProvider, Package, Range, SemanticVersion, VersionSet, resolve,
-};
+use pubgrub::{OfflineDependencyProvider, Package, Range, SemanticVersion, VersionSet, resolve};
 
 fn bench<'a, P: Package + Deserialize<'a>, VS: VersionSet + Deserialize<'a>>(
     b: &mut Bencher,

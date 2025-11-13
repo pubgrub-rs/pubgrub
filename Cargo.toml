@@ -24,6 +24,9 @@ rust-version = "1.92"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "pubgrub"
+
 [dependencies]
 indexmap = "2.7.0"
 # for debug logs in tests
