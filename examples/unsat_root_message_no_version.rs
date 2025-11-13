@@ -2,7 +2,7 @@
 
 use std::fmt::{self, Display};
 
-use pubgrub::{
+use astral_pubgrub::{
     DefaultStringReporter, Derived, External, Map, OfflineDependencyProvider, PubGrubError, Ranges,
     ReportFormatter, Reporter, SemanticVersion, Term, resolve,
 };

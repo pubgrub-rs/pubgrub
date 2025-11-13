@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use pubgrub::{
+use astral_pubgrub::{
     DefaultStringReporter, Map, OfflineDependencyProvider, PubGrubError, Ranges, Reporter as _,
     SelectedDependencies, SemanticVersion, Set, resolve,
 };
