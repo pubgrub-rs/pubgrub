@@ -86,6 +86,7 @@ dependencies = [
 name = "astral-pubgrub"
 version = "0.4.0"
 dependencies = [
+ "astral-version-ranges",
  "cc",
  "codspeed-criterion-compat",
  "env_logger",
@@ -98,7 +99,17 @@ dependencies = [
  "serde",
  "thiserror 2.0.18",
  "varisat",
- "version-ranges",
+]
+
+[[package]]
+name = "astral-version-ranges"
+version = "0.1.4"
+dependencies = [
+ "proptest",
+ "ron",
+ "semver",
+ "serde",
+ "smallvec",
 ]
 
 [[package]]
@@ -1157,17 +1168,6 @@ name = "vec_mut_scan"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68ed610a8d5e63d9c0e31300e8fdb55104c5f21e422743a9dc74848fa8317fd2"
-
-[[package]]
-name = "version-ranges"
-version = "0.1.4"
-dependencies = [
- "proptest",
- "ron",
- "semver",
- "serde",
- "smallvec",
-]
 
 [[package]]
 name = "wait-timeout"
