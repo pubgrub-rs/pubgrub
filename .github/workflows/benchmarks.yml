@@ -29,7 +29,7 @@ jobs:
         run: cargo codspeed build --features serde
 
       - name: Run the benchmarks
-        uses: CodSpeedHQ/action@bb005fe1c1eea036d3894f02c049cb6b154a1c27 # v4.3.3
+        uses: CodSpeedHQ/action@6a8e2b874c338bf81cc5e8be715ada75908d3871 # v4.3.4
         with:
           run: cargo codspeed run
           mode: instrumentation
