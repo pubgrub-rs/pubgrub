@@ -36,7 +36,7 @@ version-ranges = { version = "0.1.0", path = "version-ranges" }
 criterion = { version = "4.0.1", package = "codspeed-criterion-compat" }
 env_logger = "0.11.6"
 proptest = "1.6.0"
-ron = "0.11.0"
+ron = "0.12.0"
 varisat = "0.2.2"
 version-ranges = { version = "0.1.0", path = "version-ranges", features = ["proptest"] }
 
