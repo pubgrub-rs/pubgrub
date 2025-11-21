@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "astral-pubgrub"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "astral-version-ranges",
  "cc",

@@ -5,7 +5,7 @@ members = ["version-ranges"]
 
 [package]
 name = "astral-pubgrub"
-version = "0.4.2"
+version = "0.4.3"
 authors = [
     "Matthieu Pizenberg <matthieu.pizenberg@gmail.com>",
     "Alex Tokarev <aleksator@gmail.com>",
