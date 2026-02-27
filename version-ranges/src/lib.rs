@@ -35,6 +35,9 @@
 //!   also supports it.
 //! * `proptest`: Exports are proptest strategy for [`Ranges<u32>`].
 
+#[cfg(feature = "semver")]
+pub mod semver;
+
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
