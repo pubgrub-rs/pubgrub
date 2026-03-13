@@ -99,8 +99,15 @@ fn ranges_wildcard(major: u64, minor: Option<u64>, _patch: Option<u64>) -> Range
     }
 }
 
-impl From<VersionReq> for Ranges<Version> {
-    fn from(req: VersionReq) -> Self {
+impl Ranges<Version> {
+    /// Convert from a semver version requirement.
+    ///
+    /// Note that this is not a lossless conversion.
+    /// Semver additionally require the `VersionReq` to contain prereleases for versions with prereleases to be matched.
+    /// Therefore the `Ranges` constraint after conversion will be **looser** than original as it does only interval arithmetics based on ordering of versions.
+    ///
+    /// The behavior is undefined unless all major, minor and patch numbers in `VersionReq` are less than `u64::MAX` due to integer overflow.
+    pub fn from_req(req: VersionReq) -> Self {
         let mut ranges = Ranges::full();
         for cmp in req.comparators {
             let new = match cmp.op {
