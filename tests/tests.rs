@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::{
-    Dependencies, DependencyProvider, OfflineDependencyProvider, Package,
-    PackageResolutionStatistics, PubGrubError, Ranges, VersionSet, resolve,
+    DefaultStringReporter, Dependencies, DependencyProvider, OfflineDependencyProvider, Package,
+    PackageResolutionStatistics, PubGrubError, Ranges, Reporter, SemanticVersion, VersionSet,
+    resolve,
 };
 use std::convert::Infallible;
 
@@ -133,4 +134,73 @@ fn same_result_across_platforms() {
     let resolution = resolve(&dependency_provider, name, ver).unwrap();
     let (p, _v) = resolution.into_iter().find(|(_p, v)| *v == 2).unwrap();
     assert_eq!(p, "0".to_string());
+}
+
+/// Regression test for <https://github.com/pubgrub-rs/pubgrub/issues/293>.
+///
+/// A deeply nested derivation tree must not blow the stack when displayed or
+/// formatted with `Debug`.
+#[test]
+fn deep_derivation_tree_no_stack_overflow() {
+    let depth: u32 = 100;
+    let branching_factor: u32 = 50;
+
+    let mut dependency_provider =
+        OfflineDependencyProvider::<String, Ranges<SemanticVersion>>::new();
+
+    let root_deps = [
+        ("backtrack_trap_v0_0".into(), Ranges::full()),
+        ("cloaking".into(), Ranges::full()),
+    ];
+    dependency_provider.add_dependencies("root".into(), (0, 0, 0), root_deps);
+
+    dependency_provider.add_dependencies(
+        "cloaking".into(),
+        (0, 0, 0),
+        [("constrained".into(), Ranges::between((1, 0, 0), (1, 1, 0)))],
+    );
+
+    for v in 1..branching_factor + 10 {
+        dependency_provider.add_dependencies("constrained".into(), (1, 0, v), []);
+    }
+    dependency_provider.add_dependencies("constrained".into(), (1, 1, 0), []);
+
+    for n in 0..depth {
+        for v in 1..branching_factor {
+            let v = (1, 0, v);
+            dependency_provider.add_dependencies(
+                format!("backtrack_trap_v0_{n}"),
+                v,
+                [(format!("backtrack_trap_v1_{n}"), Ranges::singleton(v))],
+            );
+            dependency_provider.add_dependencies(
+                format!("backtrack_trap_v1_{n}"),
+                v,
+                [(format!("backtrack_trap_v2_{n}"), Ranges::singleton(v))],
+            );
+            dependency_provider.add_dependencies(
+                format!("backtrack_trap_v2_{n}"),
+                v,
+                [(format!("backtrack_trap_v0_{}", n + 1), Ranges::full())],
+            );
+        }
+    }
+    for v in 1..branching_factor {
+        let v = (1, 0, v);
+        dependency_provider.add_dependencies(
+            format!("backtrack_trap_v0_{depth}"),
+            v,
+            [("constrained".into(), Ranges::between((1, 1, 0), (2, 0, 0)))],
+        );
+    }
+
+    let res = resolve(&dependency_provider, "root".into(), (0, 0, 0));
+
+    let Err(PubGrubError::NoSolution(error)) = res else {
+        panic!("expected no solution");
+    };
+
+    // These operations must not panic.
+    let _ = format!("{error:?}");
+    let _ = DefaultStringReporter::report(&error);
 }

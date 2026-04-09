@@ -27,7 +27,7 @@ pub trait Reporter<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> 
 }
 
 /// Derivation tree resulting in the impossibility to solve the dependencies of our root package.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum DerivationTree<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     /// External incompatibility.
     External(External<P, VS, M>),
@@ -49,7 +49,7 @@ pub enum External<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
 }
 
 /// Incompatibility derived from two others.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Derived<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     /// Terms of the incompatibility.
     pub terms: Map<P, Term<VS>>,
@@ -64,28 +64,110 @@ pub struct Derived<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> 
     pub cause2: Arc<DerivationTree<P, VS, M>>,
 }
 
+// Manual iterative `Debug` implementations for `DerivationTree` and `Derived`. The auto-derived
+// `Debug` walks `cause1`/`cause2: Arc<DerivationTree>` recursively and treats the DAG as a tree,
+// which blows both the stack *and* the output-size budget on deep derivation trees: a single
+// root-to-leaf path has ~5k frames, and unfolding the DAG without deduping causes exponential
+// output (see <https://github.com/pubgrub-rs/pubgrub/issues/293>).
+//
+// Instead, walk iteratively and dedup shared subtrees by pointer, emitting a `#N` back-reference
+// on the second and later visits.
+
+/// One step of the iterative debug walk.
+enum DebugStep<'a, P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
+    Tree(&'a DerivationTree<P, VS, M>),
+    Derived(&'a Derived<P, VS, M>),
+    Str(&'static str),
+}
+
+fn debug_walk<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display>(
+    start: DebugStep<'_, P, VS, M>,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    let mut stack = vec![start];
+    // Maps a `Derived`'s address to the index at which it was first emitted.
+    // Subsequent visits emit `#N` instead of expanding the subtree again.
+    let mut seen: Map<*const Derived<P, VS, M>, usize> = Map::default();
+    while let Some(step) = stack.pop() {
+        match step {
+            DebugStep::Str(s) => f.write_str(s)?,
+            DebugStep::Tree(DerivationTree::External(external)) => {
+                write!(f, "External({external:?})")?;
+            }
+            DebugStep::Tree(DerivationTree::Derived(d)) => {
+                let key = d as *const Derived<P, VS, M>;
+                if let Some(&id) = seen.get(&key) {
+                    write!(f, "Derived(#{id})")?;
+                    continue;
+                }
+                let id = seen.len();
+                seen.insert(key, id);
+                write!(f, "Derived(#{id} ")?;
+                stack.push(DebugStep::Str(")"));
+                stack.push(DebugStep::Derived(d));
+            }
+            DebugStep::Derived(d) => {
+                // Direct `Debug::fmt` on a `Derived` (not via `DerivationTree`) does not go
+                // through the `seen` registration path, so it may emit a full subtree on its
+                // own. That's fine: subsequent repeated subtrees are still deduped.
+                write!(
+                    f,
+                    "Derived {{ terms: {:?}, shared_id: {:?}, cause1: ",
+                    d.terms, d.shared_id
+                )?;
+                stack.push(DebugStep::Str(" }"));
+                stack.push(DebugStep::Tree(&d.cause2));
+                stack.push(DebugStep::Str(", cause2: "));
+                stack.push(DebugStep::Tree(&d.cause1));
+            }
+        }
+    }
+    Ok(())
+}
+
+impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Debug
+    for DerivationTree<P, VS, M>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        debug_walk(DebugStep::Tree(self), f)
+    }
+}
+
+impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Debug for Derived<P, VS, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        debug_walk(DebugStep::Derived(self), f)
+    }
+}
+
 impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree<P, VS, M> {
     /// Get all packages referred to in the derivation tree.
     pub fn packages(&self) -> Set<&P> {
         let mut packages = Set::default();
-        match self {
-            Self::External(external) => match external {
-                External::FromDependencyOf(p, _, p2, _) => {
-                    packages.insert(p);
-                    packages.insert(p2);
+        let mut stack: Vec<&Self> = vec![self];
+        // Dedup shared subtrees by their address. The derivation tree is a DAG, not a tree:
+        // many `Derived` nodes can be reached via multiple `Arc` parents.
+        let mut seen: Set<*const Self> = Set::default();
+        while let Some(node) = stack.pop() {
+            if !seen.insert(node as *const _) {
+                continue;
+            }
+            match node {
+                Self::External(external) => match external {
+                    External::FromDependencyOf(p, _, p2, _) => {
+                        packages.insert(p);
+                        packages.insert(p2);
+                    }
+                    External::NoVersions(p, _)
+                    | External::NotRoot(p, _)
+                    | External::Custom(p, _, _) => {
+                        packages.insert(p);
+                    }
+                },
+                Self::Derived(derived) => {
+                    packages.extend(derived.terms.keys());
+                    stack.push(&derived.cause1);
+                    stack.push(&derived.cause2);
                 }
-                External::NoVersions(p, _)
-                | External::NotRoot(p, _)
-                | External::Custom(p, _, _) => {
-                    packages.insert(p);
-                }
-            },
-            Self::Derived(derived) => {
-                // Less efficient than recursing with a `&mut Set<&P>`, but it's sufficient for
-                // small to medium-sized inputs such as a single `DerivationTree`.
-                packages.extend(derived.terms.keys());
-                packages.extend(derived.cause1.packages().iter());
-                packages.extend(derived.cause2.packages().iter());
             }
         }
         packages
@@ -100,34 +182,79 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
     /// was not run in some kind of offline mode that may not
     /// have access to all versions existing.
     pub fn collapse_no_versions(&mut self) {
-        match self {
-            DerivationTree::External(_) => {}
-            DerivationTree::Derived(derived) => {
-                match (
-                    Arc::make_mut(&mut derived.cause1),
-                    Arc::make_mut(&mut derived.cause2),
-                ) {
-                    (DerivationTree::External(External::NoVersions(p, r)), ref mut cause2) => {
-                        cause2.collapse_no_versions();
-                        *self = cause2
-                            .clone()
-                            .merge_no_versions(p.to_owned(), r.to_owned())
-                            .unwrap_or_else(|| self.to_owned());
-                    }
-                    (ref mut cause1, DerivationTree::External(External::NoVersions(p, r))) => {
-                        cause1.collapse_no_versions();
-                        *self = cause1
-                            .clone()
-                            .merge_no_versions(p.to_owned(), r.to_owned())
-                            .unwrap_or_else(|| self.to_owned());
-                    }
-                    _ => {
-                        Arc::make_mut(&mut derived.cause1).collapse_no_versions();
-                        Arc::make_mut(&mut derived.cause2).collapse_no_versions();
-                    }
-                }
+        // Bottom-up rewrite of the DAG. We walk the tree in post-order, computing the
+        // collapsed version of each unique node and memoizing the result by the source
+        // node's address. This avoids both the recursive walk (stack overflow on deep
+        // trees) and the implicit cloning of shared subtrees that the previous
+        // `Arc::make_mut`-based recursive impl performed at every level.
+        type NodePtr<P, VS, M> = *const DerivationTree<P, VS, M>;
+
+        // Step 1: collect each unique node in post-order using an explicit stack.
+        let mut topo: Vec<&Self> = Vec::new();
+        let mut visited: Set<NodePtr<P, VS, M>> = Set::default();
+        let mut work: Vec<(&Self, bool)> = vec![(self, false)];
+        while let Some((node, processed)) = work.pop() {
+            if processed {
+                topo.push(node);
+                continue;
+            }
+            let key = node as NodePtr<P, VS, M>;
+            if !visited.insert(key) {
+                continue;
+            }
+            work.push((node, true));
+            if let DerivationTree::Derived(d) = node {
+                work.push((&d.cause1, false));
+                work.push((&d.cause2, false));
             }
         }
+
+        // Step 2: compute the collapsed result for each unique node, in topological order.
+        let mut memo: Map<NodePtr<P, VS, M>, Arc<DerivationTree<P, VS, M>>> = Map::default();
+        for node in &topo {
+            let key = *node as NodePtr<P, VS, M>;
+            let result: Arc<DerivationTree<P, VS, M>> = match node {
+                DerivationTree::External(_) => Arc::new((*node).clone()),
+                DerivationTree::Derived(d) => {
+                    let cause1 = memo[&(Arc::as_ptr(&d.cause1) as NodePtr<P, VS, M>)].clone();
+                    let cause2 = memo[&(Arc::as_ptr(&d.cause2) as NodePtr<P, VS, M>)].clone();
+                    let collapsed_derived = || {
+                        Arc::new(DerivationTree::Derived(Derived {
+                            terms: d.terms.clone(),
+                            shared_id: d.shared_id,
+                            cause1: cause1.clone(),
+                            cause2: cause2.clone(),
+                        }))
+                    };
+                    match (cause1.deref(), cause2.deref()) {
+                        (DerivationTree::External(External::NoVersions(p, r)), _) => {
+                            match (*cause2).clone().merge_no_versions(p.clone(), r.clone()) {
+                                Some(merged) => Arc::new(merged),
+                                None => collapsed_derived(),
+                            }
+                        }
+                        (_, DerivationTree::External(External::NoVersions(p, r))) => {
+                            match (*cause1).clone().merge_no_versions(p.clone(), r.clone()) {
+                                Some(merged) => Arc::new(merged),
+                                None => collapsed_derived(),
+                            }
+                        }
+                        _ => collapsed_derived(),
+                    }
+                }
+            };
+            memo.insert(key, result);
+        }
+
+        // Step 3: replace `*self` with the root's collapsed version.
+        let root_key = self as NodePtr<P, VS, M>;
+        let root = memo.remove(&root_key).expect("root was visited");
+        // The root may still be referenced by `memo` entries for other nodes (if shared),
+        // in which case `try_unwrap` returns `Err` and we fall back to cloning the inner.
+        *self = match Arc::try_unwrap(root) {
+            Ok(inner) => inner,
+            Err(arc) => (*arc).clone(),
+        };
     }
 
     fn merge_no_versions(self, package: P, set: VS) -> Option<Self> {
@@ -399,6 +526,42 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> ReportFormatte
     }
 }
 
+/// One step of the iterative report builder. Reifies the call stack of the
+/// previously-recursive `build_recursive` / `build_recursive_helper` functions.
+enum BuildFrame<'a, P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
+    /// Equivalent to one call to the original `build_recursive(derived)`:
+    /// dispatches on the cause types and pushes follow-up frames.
+    Process(&'a Derived<P, VS, M>),
+    /// Equivalent to the post-step of the original `build_recursive`: if
+    /// `shared_id` is set and not yet registered, register it and add a line
+    /// reference to the most recently emitted line.
+    PostShared(Option<usize>),
+    /// Emit `and_explain_prior_and_external(prior_external, external, current_terms)`.
+    EmitPriorAndExternal {
+        prior_external: &'a External<P, VS, M>,
+        external: &'a External<P, VS, M>,
+        current_terms: &'a Map<P, Term<VS>>,
+    },
+    /// Emit `and_explain_external(external, current_terms)`.
+    EmitExternal {
+        external: &'a External<P, VS, M>,
+        current_terms: &'a Map<P, Term<VS>>,
+    },
+    /// Emit `and_explain_ref(ref_id, derived, current_terms)`.
+    EmitRef {
+        ref_id: usize,
+        derived: &'a Derived<P, VS, M>,
+        current_terms: &'a Map<P, Term<VS>>,
+    },
+    /// Continuation of the `(None, None)` sub-branch in the (Derived, Derived)
+    /// case, executed after `derived1` has been fully processed.
+    PostD1OfNoneNone {
+        current: &'a Derived<P, VS, M>,
+        derived1: &'a Derived<P, VS, M>,
+        derived2: &'a Derived<P, VS, M>,
+    },
+}
+
 /// Default reporter able to generate an explanation as a [String].
 pub struct DefaultStringReporter {
     /// Number of explanations already with a line reference.
@@ -420,6 +583,14 @@ impl DefaultStringReporter {
         }
     }
 
+    /// Iteratively walk the derivation tree to build the report.
+    ///
+    /// This used to be implemented as mutually recursive functions
+    /// (`build_recursive` / `build_recursive_helper` / `report_one_each` /
+    /// `report_recurse_one_each`), which blew the stack on deep derivation trees
+    /// (see <https://github.com/pubgrub-rs/pubgrub/issues/293>). It is now driven
+    /// by an explicit work stack of [`BuildFrame`]s. The control flow exactly
+    /// mirrors the original recursive version.
     fn build_recursive<
         P: Package,
         VS: VersionSet,
@@ -430,166 +601,175 @@ impl DefaultStringReporter {
         derived: &Derived<P, VS, M>,
         formatter: &F,
     ) {
-        self.build_recursive_helper(derived, formatter);
-        if let Some(id) = derived.shared_id {
-            #[allow(clippy::map_entry)] // `add_line_ref` not compatible with proposed fix.
-            if !self.shared_with_ref.contains_key(&id) {
-                self.add_line_ref();
-                self.shared_with_ref.insert(id, self.ref_count);
-            }
-        };
-    }
-
-    fn build_recursive_helper<
-        P: Package,
-        VS: VersionSet,
-        M: Eq + Clone + Debug + Display,
-        F: ReportFormatter<P, VS, M, Output = String>,
-    >(
-        &mut self,
-        current: &Derived<P, VS, M>,
-        formatter: &F,
-    ) {
-        match (current.cause1.deref(), current.cause2.deref()) {
-            (DerivationTree::External(external1), DerivationTree::External(external2)) => {
-                // Simplest case, we just combine two external incompatibilities.
-                self.lines.push(formatter.explain_both_external(
-                    external1,
-                    external2,
-                    &current.terms,
-                ));
-            }
-            (DerivationTree::Derived(derived), DerivationTree::External(external)) => {
-                // One cause is derived, so we explain this first
-                // then we add the one-line external part
-                // and finally conclude with the current incompatibility.
-                self.report_one_each(derived, external, &current.terms, formatter);
-            }
-            (DerivationTree::External(external), DerivationTree::Derived(derived)) => {
-                self.report_one_each(derived, external, &current.terms, formatter);
-            }
-            (DerivationTree::Derived(derived1), DerivationTree::Derived(derived2)) => {
-                // This is the most complex case since both causes are also derived.
-                match (
-                    self.line_ref_of(derived1.shared_id),
-                    self.line_ref_of(derived2.shared_id),
-                ) {
-                    // If both causes already have been referenced (shared_id),
-                    // the explanation simply uses those references.
-                    (Some(ref1), Some(ref2)) => self.lines.push(formatter.explain_both_ref(
-                        ref1,
-                        derived1,
-                        ref2,
-                        derived2,
-                        &current.terms,
-                    )),
-                    // Otherwise, if one only has a line number reference,
-                    // we recursively call the one without reference and then
-                    // add the one with reference to conclude.
-                    (Some(ref1), None) => {
-                        self.build_recursive(derived2, formatter);
-                        self.lines
-                            .push(formatter.and_explain_ref(ref1, derived1, &current.terms));
-                    }
-                    (None, Some(ref2)) => {
-                        self.build_recursive(derived1, formatter);
-                        self.lines
-                            .push(formatter.and_explain_ref(ref2, derived2, &current.terms));
-                    }
-                    // Finally, if no line reference exists yet,
-                    // we call recursively the first one and then,
-                    //   - if this was a shared node, it will get a line ref
-                    //     and we can simply recall this with the current node.
-                    //   - otherwise, we add a line reference to it,
-                    //     recursively call on the second node,
-                    //     and finally conclude.
-                    (None, None) => {
-                        self.build_recursive(derived1, formatter);
-                        if derived1.shared_id.is_some() {
-                            self.lines.push("".into());
-                            self.build_recursive(current, formatter);
-                        } else {
-                            self.add_line_ref();
-                            let ref1 = self.ref_count;
-                            self.lines.push("".into());
-                            self.build_recursive(derived2, formatter);
-                            self.lines.push(formatter.and_explain_ref(
-                                ref1,
-                                derived1,
-                                &current.terms,
+        let mut stack: Vec<BuildFrame<'_, P, VS, M>> = vec![BuildFrame::Process(derived)];
+        while let Some(frame) = stack.pop() {
+            match frame {
+                // Equivalent to one call to the original `build_recursive(d)`.
+                BuildFrame::Process(d) => {
+                    // The shared-id post-step runs after everything `d` produces, so
+                    // it must be pushed first (LIFO order).
+                    stack.push(BuildFrame::PostShared(d.shared_id));
+                    // Inlined `build_recursive_helper(d)`.
+                    match (d.cause1.deref(), d.cause2.deref()) {
+                        (
+                            DerivationTree::External(external1),
+                            DerivationTree::External(external2),
+                        ) => {
+                            // Simplest case, we just combine two external incompatibilities.
+                            self.lines.push(formatter.explain_both_external(
+                                external1, external2, &d.terms,
                             ));
+                        }
+                        (DerivationTree::Derived(child), DerivationTree::External(external))
+                        | (DerivationTree::External(external), DerivationTree::Derived(child)) => {
+                            // Inlined `report_one_each(child, external, &d.terms, formatter)`.
+                            match self.line_ref_of(child.shared_id) {
+                                Some(ref_id) => {
+                                    self.lines.push(formatter.explain_ref_and_external(
+                                        ref_id, child, external, &d.terms,
+                                    ));
+                                }
+                                None => {
+                                    // Inlined `report_recurse_one_each(child, external, ...)`.
+                                    match (child.cause1.deref(), child.cause2.deref()) {
+                                        (
+                                            DerivationTree::Derived(prior_derived),
+                                            DerivationTree::External(prior_external),
+                                        )
+                                        | (
+                                            DerivationTree::External(prior_external),
+                                            DerivationTree::Derived(prior_derived),
+                                        ) => {
+                                            stack.push(BuildFrame::EmitPriorAndExternal {
+                                                prior_external,
+                                                external,
+                                                current_terms: &d.terms,
+                                            });
+                                            stack.push(BuildFrame::Process(prior_derived));
+                                        }
+                                        _ => {
+                                            stack.push(BuildFrame::EmitExternal {
+                                                external,
+                                                current_terms: &d.terms,
+                                            });
+                                            stack.push(BuildFrame::Process(child));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        (
+                            DerivationTree::Derived(derived1),
+                            DerivationTree::Derived(derived2),
+                        ) => {
+                            // The most complex case: both causes are derived.
+                            match (
+                                self.line_ref_of(derived1.shared_id),
+                                self.line_ref_of(derived2.shared_id),
+                            ) {
+                                // If both causes already have been referenced (shared_id),
+                                // the explanation simply uses those references.
+                                (Some(ref1), Some(ref2)) => {
+                                    self.lines.push(formatter.explain_both_ref(
+                                        ref1, derived1, ref2, derived2, &d.terms,
+                                    ));
+                                }
+                                // Otherwise, if one only has a line number reference,
+                                // we recursively call the one without reference and then
+                                // add the one with reference to conclude.
+                                (Some(ref1), None) => {
+                                    stack.push(BuildFrame::EmitRef {
+                                        ref_id: ref1,
+                                        derived: derived1,
+                                        current_terms: &d.terms,
+                                    });
+                                    stack.push(BuildFrame::Process(derived2));
+                                }
+                                (None, Some(ref2)) => {
+                                    stack.push(BuildFrame::EmitRef {
+                                        ref_id: ref2,
+                                        derived: derived2,
+                                        current_terms: &d.terms,
+                                    });
+                                    stack.push(BuildFrame::Process(derived1));
+                                }
+                                // No line reference exists yet: process derived1, then
+                                // decide based on whether processing derived1 created a
+                                // line ref for it.
+                                (None, None) => {
+                                    stack.push(BuildFrame::PostD1OfNoneNone {
+                                        current: d,
+                                        derived1,
+                                        derived2,
+                                    });
+                                    stack.push(BuildFrame::Process(derived1));
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
-    }
-
-    /// Report a derived and an external incompatibility.
-    ///
-    /// The result will depend on the fact that the derived incompatibility
-    /// has already been explained or not.
-    fn report_one_each<
-        P: Package,
-        VS: VersionSet,
-        M: Eq + Clone + Debug + Display,
-        F: ReportFormatter<P, VS, M, Output = String>,
-    >(
-        &mut self,
-        derived: &Derived<P, VS, M>,
-        external: &External<P, VS, M>,
-        current_terms: &Map<P, Term<VS>>,
-        formatter: &F,
-    ) {
-        match self.line_ref_of(derived.shared_id) {
-            Some(ref_id) => self.lines.push(formatter.explain_ref_and_external(
-                ref_id,
-                derived,
-                external,
-                current_terms,
-            )),
-            None => self.report_recurse_one_each(derived, external, current_terms, formatter),
-        }
-    }
-
-    /// Report one derived (without a line ref yet) and one external.
-    fn report_recurse_one_each<
-        P: Package,
-        VS: VersionSet,
-        M: Eq + Clone + Debug + Display,
-        F: ReportFormatter<P, VS, M, Output = String>,
-    >(
-        &mut self,
-        derived: &Derived<P, VS, M>,
-        external: &External<P, VS, M>,
-        current_terms: &Map<P, Term<VS>>,
-        formatter: &F,
-    ) {
-        match (derived.cause1.deref(), derived.cause2.deref()) {
-            // If the derived cause has itself one external prior cause,
-            // we can chain the external explanations.
-            (DerivationTree::Derived(prior_derived), DerivationTree::External(prior_external)) => {
-                self.build_recursive(prior_derived, formatter);
-                self.lines.push(formatter.and_explain_prior_and_external(
+                BuildFrame::PostShared(shared_id) => {
+                    if let Some(id) = shared_id {
+                        #[allow(clippy::map_entry)] // `add_line_ref` mutates `self.lines`.
+                        if !self.shared_with_ref.contains_key(&id) {
+                            self.add_line_ref();
+                            self.shared_with_ref.insert(id, self.ref_count);
+                        }
+                    }
+                }
+                BuildFrame::EmitPriorAndExternal {
                     prior_external,
                     external,
                     current_terms,
-                ));
-            }
-            // If the derived cause has itself one external prior cause,
-            // we can chain the external explanations.
-            (DerivationTree::External(prior_external), DerivationTree::Derived(prior_derived)) => {
-                self.build_recursive(prior_derived, formatter);
-                self.lines.push(formatter.and_explain_prior_and_external(
-                    prior_external,
+                } => {
+                    self.lines.push(formatter.and_explain_prior_and_external(
+                        prior_external,
+                        external,
+                        current_terms,
+                    ));
+                }
+                BuildFrame::EmitExternal {
                     external,
                     current_terms,
-                ));
-            }
-            _ => {
-                self.build_recursive(derived, formatter);
-                self.lines
-                    .push(formatter.and_explain_external(external, current_terms));
+                } => {
+                    self.lines
+                        .push(formatter.and_explain_external(external, current_terms));
+                }
+                BuildFrame::EmitRef {
+                    ref_id,
+                    derived,
+                    current_terms,
+                } => {
+                    self.lines
+                        .push(formatter.and_explain_ref(ref_id, derived, current_terms));
+                }
+                BuildFrame::PostD1OfNoneNone {
+                    current,
+                    derived1,
+                    derived2,
+                } => {
+                    // Mirrors the post-`build_recursive(derived1)` logic in the original
+                    // (None, None) branch. By the time we get here, `derived1` has been
+                    // fully processed (including its `PostShared` frame), so the
+                    // `shared_with_ref` map already reflects whether it gained a line ref.
+                    if derived1.shared_id.is_some() {
+                        self.lines.push("".into());
+                        // Re-process `current`. This time, the `(None, None)` branch
+                        // will see that `derived1` has a line ref and dispatch into the
+                        // `(None, Some(ref))` sub-branch instead.
+                        stack.push(BuildFrame::Process(current));
+                    } else {
+                        self.add_line_ref();
+                        let ref1 = self.ref_count;
+                        self.lines.push("".into());
+                        stack.push(BuildFrame::EmitRef {
+                            ref_id: ref1,
+                            derived: derived1,
+                            current_terms: &current.terms,
+                        });
+                        stack.push(BuildFrame::Process(derived2));
+                    }
+                }
             }
         }
     }
