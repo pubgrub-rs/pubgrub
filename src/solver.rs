@@ -324,6 +324,12 @@ impl<P, VS> Default for DependencyConstraints<P, VS> {
     }
 }
 
+impl<P, VS> From<Vec<(P, VS)>> for DependencyConstraints<P, VS> {
+    fn from(value: Vec<(P, VS)>) -> Self {
+        Self(value)
+    }
+}
+
 impl<P, VS> FromIterator<(P, VS)> for DependencyConstraints<P, VS> {
     fn from_iter<T: IntoIterator<Item = (P, VS)>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
