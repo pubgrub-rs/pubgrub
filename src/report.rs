@@ -643,28 +643,24 @@ impl DefaultStringReporter {
                                 &current.terms,
                             ));
                         }
-                        (DerivationTreeNode::Derived(derived), DerivationTreeNode::External(_)) => {
-                            self.push_report_one_each(
+                        (DerivationTreeNode::Derived(_), DerivationTreeNode::External(_)) => self
+                            .push_report_one_each(
                                 &mut stack,
                                 tree,
                                 current.cause1,
-                                derived,
                                 current.cause2,
                                 current_id,
                                 formatter,
-                            )
-                        }
-                        (DerivationTreeNode::External(_), DerivationTreeNode::Derived(derived)) => {
-                            self.push_report_one_each(
+                            ),
+                        (DerivationTreeNode::External(_), DerivationTreeNode::Derived(_)) => self
+                            .push_report_one_each(
                                 &mut stack,
                                 tree,
                                 current.cause2,
-                                derived,
                                 current.cause1,
                                 current_id,
                                 formatter,
-                            )
-                        }
+                            ),
                         (
                             DerivationTreeNode::Derived(derived1),
                             DerivationTreeNode::Derived(derived2),
@@ -772,11 +768,11 @@ impl DefaultStringReporter {
         stack: &mut Vec<ReportStep>,
         tree: &DerivationTree<P, VS, M>,
         derived_id: DerivationTreeId,
-        derived: &Derived<P, VS, M>,
         external_id: DerivationTreeId,
         current_id: DerivationTreeId,
         formatter: &F,
     ) {
+        let derived = tree.derived(derived_id);
         match self.line_ref_of(derived.shared_id) {
             Some(ref_id) => self.lines.push(formatter.explain_ref_and_external(
                 ref_id,
