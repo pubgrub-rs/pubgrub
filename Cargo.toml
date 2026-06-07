@@ -35,8 +35,10 @@ thiserror = "2.0"
 version-ranges = { version = "0.1.0", path = "version-ranges" }
 
 [dev-dependencies]
-criterion = { version = "4.0.1", package = "codspeed-criterion-compat" }
+criterion = { version = "4.7.0", package = "codspeed-criterion-compat" }
 env_logger = "0.11.6"
+# Lower-bound guard for `codspeed-criterion-compat` in the minimal-versions CI job.
+cc = "1.2.40"
 proptest = "1.6.0"
 ron = "0.12.0"
 varisat = "0.2.2"
