@@ -1,12 +1,36 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::{
-    Dependencies, DependencyProvider, OfflineDependencyProvider, Package,
-    PackageResolutionStatistics, PubGrubError, Ranges, VersionSet, resolve,
+    DefaultStringReporter, Dependencies, DependencyProvider, OfflineDependencyProvider, Package,
+    PackageResolutionStatistics, PubGrubError, Ranges, Reporter as _, VersionSet, resolve,
 };
 use std::convert::Infallible;
 
 type NumVS = Ranges<u32>;
+
+fn deep_derivation_tree(depth: usize) -> pubgrub::DerivationTree<String, NumVS, String> {
+    let mut dependency_provider = OfflineDependencyProvider::<String, NumVS>::new();
+    dependency_provider.add_dependencies(
+        "root".to_string(),
+        1u32,
+        [("package-0".to_string(), Ranges::singleton(1u32))],
+    );
+    for i in 0..depth {
+        dependency_provider.add_dependencies(
+            format!("package-{i}"),
+            1u32,
+            [(format!("package-{}", i + 1), Ranges::singleton(1u32))],
+        );
+    }
+
+    let Err(PubGrubError::NoSolution(derivation_tree)) =
+        resolve(&dependency_provider, "root".to_string(), 1u32)
+    else {
+        panic!("the dependency chain should be unsatisfiable");
+    };
+
+    derivation_tree
+}
 
 #[test]
 fn same_result_on_repeated_runs() {
@@ -59,29 +83,25 @@ fn depend_on_self() {
 fn deep_derivation_tree_does_not_overflow_stack() {
     const DEPTH: usize = 20_000;
 
-    let mut dependency_provider = OfflineDependencyProvider::<String, NumVS>::new();
-    dependency_provider.add_dependencies(
-        "root".to_string(),
-        1u32,
-        [("package-0".to_string(), Ranges::singleton(1u32))],
-    );
-    for i in 0..DEPTH {
-        dependency_provider.add_dependencies(
-            format!("package-{i}"),
-            1u32,
-            [(format!("package-{}", i + 1), Ranges::singleton(1u32))],
-        );
-    }
-
-    let Err(PubGrubError::NoSolution(derivation_tree)) =
-        resolve(&dependency_provider, "root".to_string(), 1u32)
-    else {
-        panic!("the dependency chain should be unsatisfiable");
-    };
-
+    let derivation_tree = deep_derivation_tree(DEPTH);
     let packages = derivation_tree.packages();
     assert!(packages.contains(&"root".to_string()));
     assert!(packages.contains(&format!("package-{DEPTH}")));
+}
+
+#[test]
+fn deep_derivation_tree_debug_and_report_do_not_overflow_stack() {
+    // Regression test for https://github.com/pubgrub-rs/pubgrub/issues/293.
+    const DEPTH: usize = 20_000;
+
+    let derivation_tree = deep_derivation_tree(DEPTH);
+
+    let debug = format!("{derivation_tree:?}");
+    assert!(!debug.is_empty());
+    drop(debug);
+
+    let report = DefaultStringReporter::report(&derivation_tree);
+    assert!(!report.is_empty());
 }
 
 /// Test the prioritization is stable across platforms.
