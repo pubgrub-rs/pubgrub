@@ -140,8 +140,8 @@
 //! But sometimes there is no solution because dependencies are incompatible.
 //! In such cases, [resolve(...)](resolve) returns a
 //! [PubGrubError::NoSolution(derivation_tree)](PubGrubError::NoSolution),
-//! where the provided derivation tree is a custom binary tree
-//! containing the full chain of reasons why there is no solution.
+//! where the provided derivation tree is an arena-backed tree containing
+//! the full chain of reasons why there is no solution.
 //!
 //! All the items in the tree are called incompatibilities
 //! and may be of two types, either "external" or "derived".
@@ -226,8 +226,8 @@ pub use error::{NoSolutionError, PubGrubError};
 pub use package::Package;
 pub use provider::OfflineDependencyProvider;
 pub use report::{
-    DefaultStringReportFormatter, DefaultStringReporter, DerivationTree, Derived, External,
-    ReportFormatter, Reporter,
+    DefaultStringReportFormatter, DefaultStringReporter, DerivationTree, DerivationTreeId,
+    DerivationTreeNode, Derived, External, ReportFormatter, Reporter,
 };
 pub use solver::{
     Dependencies, DependencyConstraints, DependencyProvider, PackageResolutionStatistics,

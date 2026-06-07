@@ -12,9 +12,9 @@ use proptest::sample::Index;
 use proptest::string::string_regex;
 
 use pubgrub::{
-    DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, External,
-    OfflineDependencyProvider, Package, PackageResolutionStatistics, PubGrubError, Ranges,
-    Reporter, SelectedDependencies, VersionSet, resolve,
+    DefaultStringReporter, Dependencies, DependencyProvider, DerivationTree, DerivationTreeNode,
+    External, OfflineDependencyProvider, Package, PackageResolutionStatistics, PubGrubError,
+    Ranges, Reporter, SelectedDependencies, VersionSet, resolve,
 };
 
 use crate::sat_dependency_provider::SatResolve;
@@ -381,15 +381,18 @@ fn errors_the_same_with_only_report_dependencies<N: Package + Ord>(
         to_retain: &mut Vec<(N, VS, N)>,
         tree: &DerivationTree<N, VS, M>,
     ) {
-        match tree {
-            DerivationTree::External(External::FromDependencyOf(n1, vs1, n2, _)) => {
-                to_retain.push((n1.clone(), vs1.clone(), n2.clone()));
+        let mut stack = vec![tree.root_id()];
+        while let Some(id) = stack.pop() {
+            match tree.node(id) {
+                DerivationTreeNode::External(External::FromDependencyOf(n1, vs1, n2, _)) => {
+                    to_retain.push((n1.clone(), vs1.clone(), n2.clone()));
+                }
+                DerivationTreeNode::Derived(d) => {
+                    stack.push(d.cause1);
+                    stack.push(d.cause2);
+                }
+                _ => {}
             }
-            DerivationTree::Derived(d) => {
-                recursive(to_retain, &*d.cause1);
-                recursive(to_retain, &*d.cause2);
-            }
-            _ => {}
         }
     }
 

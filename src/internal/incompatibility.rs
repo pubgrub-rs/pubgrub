@@ -4,12 +4,11 @@
 //! that should never be satisfied all together.
 
 use std::fmt::{Debug, Display};
-use std::sync::Arc;
 
 use crate::internal::{Arena, DecisionLevel, HashArena, Id, SmallMap};
 use crate::{
-    DependencyProvider, DerivationTree, Derived, External, Map, Package, Set, Term, VersionSet,
-    term,
+    DependencyProvider, DerivationTreeId, DerivationTreeNode, Derived, External, Map, Package, Set,
+    Term, VersionSet, term,
 };
 
 #[derive(Debug, Clone)]
@@ -342,52 +341,51 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         }
     }
 
-    /// Build a derivation tree for error reporting.
-    pub(crate) fn build_derivation_tree(
+    /// Build a derivation tree node for error reporting.
+    pub(crate) fn build_derivation_tree_node(
         self_id: Id<Self>,
         shared_ids: &Set<Id<Self>>,
         store: &Arena<Self>,
         package_store: &HashArena<P>,
-        precomputed: &Map<Id<Self>, Arc<DerivationTree<P, VS, M>>>,
-    ) -> DerivationTree<P, VS, M> {
+        precomputed: &Map<Id<Self>, DerivationTreeId>,
+    ) -> DerivationTreeNode<P, VS, M> {
         match store[self_id].kind.clone() {
             Kind::DerivedFrom(id1, id2) => {
-                let derived: Derived<P, VS, M> = Derived {
-                    terms: store[self_id]
+                let derived = Derived::new(
+                    store[self_id]
                         .package_terms
                         .iter()
                         .map(|(&a, b)| (package_store[a].clone(), b.clone()))
                         .collect(),
-                    shared_id: shared_ids.get(&self_id).map(|id| id.into_raw()),
-                    cause1: precomputed
+                    shared_ids.get(&self_id).map(|id| id.into_raw()),
+                    *precomputed
                         .get(&id1)
-                        .expect("Non-topological calls building tree")
-                        .clone(),
-                    cause2: precomputed
+                        .expect("Non-topological calls building tree"),
+                    *precomputed
                         .get(&id2)
-                        .expect("Non-topological calls building tree")
-                        .clone(),
-                };
-                DerivationTree::Derived(derived)
+                        .expect("Non-topological calls building tree"),
+                );
+                DerivationTreeNode::Derived(derived)
             }
-            Kind::NotRoot(package, version) => {
-                DerivationTree::External(External::NotRoot(package_store[package].clone(), version))
-            }
-            Kind::NoVersions(package, set) => DerivationTree::External(External::NoVersions(
+            Kind::NotRoot(package, version) => DerivationTreeNode::External(External::NotRoot(
+                package_store[package].clone(),
+                version,
+            )),
+            Kind::NoVersions(package, set) => DerivationTreeNode::External(External::NoVersions(
                 package_store[package].clone(),
                 set.clone(),
             )),
             Kind::FromDependencyOf(package, dep_package) => {
                 let (package_versions, dependency_versions) =
                     store[self_id].dependency_terms(package, dep_package);
-                DerivationTree::External(External::FromDependencyOf(
+                DerivationTreeNode::External(External::FromDependencyOf(
                     package_store[package].clone(),
                     package_versions.clone(),
                     package_store[dep_package].clone(),
                     dependency_versions.cloned().unwrap_or_else(VS::empty),
                 ))
             }
-            Kind::Custom(package, set, metadata) => DerivationTree::External(External::Custom(
+            Kind::Custom(package, set, metadata) => DerivationTreeNode::External(External::Custom(
                 package_store[package].clone(),
                 set.clone(),
                 metadata.clone(),
@@ -607,14 +605,14 @@ pub(crate) mod tests {
     ) {
         let mut store = Arena::new();
         let id = store.alloc(incompatibility);
-        let tree = Incompatibility::build_derivation_tree(
+        let tree = Incompatibility::build_derivation_tree_node(
             id,
             &Set::default(),
             &store,
             package_store,
             &Map::default(),
         );
-        let DerivationTree::External(External::FromDependencyOf(
+        let DerivationTreeNode::External(External::FromDependencyOf(
             actual_package,
             actual_versions,
             actual_dependency,
