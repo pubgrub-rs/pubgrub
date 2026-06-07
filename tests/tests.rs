@@ -55,6 +55,35 @@ fn depend_on_self() {
     assert!(resolve(&dependency_provider, "a", 66u32).is_err());
 }
 
+#[test]
+fn deep_derivation_tree_does_not_overflow_stack() {
+    const DEPTH: usize = 20_000;
+
+    let mut dependency_provider = OfflineDependencyProvider::<String, NumVS>::new();
+    dependency_provider.add_dependencies(
+        "root".to_string(),
+        1u32,
+        [("package-0".to_string(), Ranges::singleton(1u32))],
+    );
+    for i in 0..DEPTH {
+        dependency_provider.add_dependencies(
+            format!("package-{i}"),
+            1u32,
+            [(format!("package-{}", i + 1), Ranges::singleton(1u32))],
+        );
+    }
+
+    let Err(PubGrubError::NoSolution(derivation_tree)) =
+        resolve(&dependency_provider, "root".to_string(), 1u32)
+    else {
+        panic!("the dependency chain should be unsatisfiable");
+    };
+
+    let packages = derivation_tree.packages();
+    assert!(packages.contains(&"root".to_string()));
+    assert!(packages.contains(&format!("package-{DEPTH}")));
+}
+
 /// Test the prioritization is stable across platforms.
 ///
 /// https://github.com/pubgrub-rs/pubgrub/issues/373#issuecomment-3384608891
