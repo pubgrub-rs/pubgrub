@@ -82,7 +82,7 @@ jobs:
 
       - run: rustup toolchain install nightly
 
-      - run: cargo +nightly update -Zminimal-versions
+      - run: cargo +nightly update -Zdirect-minimal-versions
 
       - run: cargo build --workspace
 
