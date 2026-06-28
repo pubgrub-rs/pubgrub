@@ -15,7 +15,9 @@ jobs:
       contents: "write"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: Get the permanent ref number
         id: get_version
@@ -28,15 +30,20 @@ jobs:
             https://github.com/astral-sh/pubgrub.git | grep "tags/perma-" | tail -n1 | sed 's/.*\/perma-//' \
           )" >> $GITHUB_OUTPUT
 
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
       - name: Create and push the new tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LAST_PERMA_NUMBER: ${{ steps.get_version.outputs.LAST_PERMA_NUMBER }}
         run: |
           TAG="perma-$((LAST_PERMA_NUMBER + 1))"
-          git tag -a "$TAG" -m 'Automatically created on push to `main`'
-          git push origin "$TAG"
-        env:
-          LAST_PERMA_NUMBER: ${{ steps.get_version.outputs.LAST_PERMA_NUMBER }}
+          TAG_SHA="$(
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags" \
+              -f tag="$TAG" \
+              -f message='Automatically created on push to `main`' \
+              -f object="$GITHUB_SHA" \
+              -f type=commit \
+              --jq .sha
+          )"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/tags/$TAG" \
+            -f sha="$TAG_SHA"
