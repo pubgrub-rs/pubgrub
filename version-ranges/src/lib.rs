@@ -934,7 +934,7 @@ impl<V: Ord + Clone> Ranges<V> {
     }
 
     /// Iterate over the parts of the range.
-    pub fn iter(&self) -> impl Iterator<Item = (&Bound<V>, &Bound<V>)> {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (&Bound<V>, &Bound<V>)> {
         self.segments.iter().map(|(start, end)| (start, end))
     }
 }
