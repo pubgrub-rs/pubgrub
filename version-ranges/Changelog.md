@@ -4,10 +4,6 @@ Changelog for the version-ranges crate.
 
 ## Unreleased
 
-### Breaking
-
-- `Ranges::iter` now returns `(Bound<&V>, Bound<&V>)`, consistent with `Ranges::bounding_range`, instead of references to stored `Bound<V>` values ([Astral #30](https://github.com/astral-sh/pubgrub/pull/30)).
-
 ### Added
 
 - Add classification of subset, disjoint, and overlapping ranges.
@@ -16,9 +12,20 @@ Changelog for the version-ranges crate.
 - Add `Ranges::widen_versions`, which widens each segment to the largest interval containing the same given versions and merges segments that no version separates ([Astral #75](https://github.com/astral-sh/pubgrub/pull/75)).
 - Add `Ranges::narrow_versions`, the display-oriented inverse of `Ranges::widen_versions`, which shrinks each segment's bounded ends to inclusive bounds on the given versions it contains, keeping unbounded ends ([Astral #75](https://github.com/astral-sh/pubgrub/pull/75)).
 
-## v0.1.5 - 2026-06-28
+## v0.2.0 - 2026-06-29
 
-- Add classification of subset, disjoint, and overlapping ranges.
+### Breaking
+
+- `Ranges::iter` now returns `(Bound<&V>, Bound<&V>)`, consistent with `Ranges::bounding_range`, instead of references to stored `Bound<V>` values ([#30](https://github.com/astral-sh/pubgrub/pull/30)).
+
+### Added
+
+- Expose `DoubleEndedIterator` from `Ranges::iter` ([#62](https://github.com/astral-sh/pubgrub/pull/62)).
+- Add `SetRelation` and `Ranges::relation` for classifying two ranges as equal, subset, disjoint, or overlapping in one pass ([#66](https://github.com/astral-sh/pubgrub/pull/66)).
+
+### Changed
+
+- Short-circuit equality when checking multi-segment subset relationships ([#64](https://github.com/astral-sh/pubgrub/pull/64)).
 
 ## v0.1.3 - 2026-04-09
 

@@ -13,6 +13,25 @@ All notable changes to this project will be documented in this file.
 - Add `VersionSet::difference` with an optimized `Ranges` implementation, and use it in `Term` intersections and unions of mixed-polarity terms instead of materializing a complement ([#432](https://github.com/pubgrub-rs/pubgrub/pull/432)).
 - Add `VersionSet::contains_many`, forwarded to `Ranges::contains_many` for `Ranges`, and use it in `OfflineDependencyProvider::prioritize` to count matching versions in one pass over the sorted versions.
 
+## 0.5.0 - 2026-06-29
+
+### Breaking
+
+- `VersionSet` now requires `Hash`; `Ranges<V>` implements `VersionSet` only when `V: Hash` ([#65](https://github.com/astral-sh/pubgrub/pull/65)).
+- `Kind::FromDependencyOf` now stores only the dependent and dependency package IDs. Use `Incompatibility::dependency_version_sets()` to borrow their version sets ([#67](https://github.com/astral-sh/pubgrub/pull/67)).
+- Upgrade `astral-version-ranges` to 0.2.0, whose `Ranges::iter` now returns borrowed endpoints instead of references to stored bounds ([#30](https://github.com/astral-sh/pubgrub/pull/30)).
+
+### Added
+
+- Add `SetRelation` and `VersionSet::relation` for classifying two version sets in one pass ([#66](https://github.com/astral-sh/pubgrub/pull/66)).
+- Expose `DoubleEndedIterator` from `Ranges::iter` ([#62](https://github.com/astral-sh/pubgrub/pull/62)).
+
+### Changed
+
+- Reduce propagation and backtracking overhead with niche-optimized arena IDs and inline contradiction caching ([#58](https://github.com/astral-sh/pubgrub/pull/58), [#59](https://github.com/astral-sh/pubgrub/pull/59)).
+- Avoid repeated work when comparing and merging dependencies through equality shortcuts, hash-indexed candidates, and fused range relations ([#64](https://github.com/astral-sh/pubgrub/pull/64), [#65](https://github.com/astral-sh/pubgrub/pull/65), [#66](https://github.com/astral-sh/pubgrub/pull/66)).
+- Avoid cloning dependency version sets and reserve known arena batch capacity ([#67](https://github.com/astral-sh/pubgrub/pull/67), [#68](https://github.com/astral-sh/pubgrub/pull/68)).
+
 ## 0.4.0 - 2026-04-09
 
 ### Breaking
