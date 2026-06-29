@@ -22,6 +22,9 @@ type FnvIndexSet<T> = indexmap::IndexSet<T, BuildHasherDefault<FxHasher>>;
 pub(crate) struct DecisionLevel(pub(crate) u32);
 
 impl DecisionLevel {
+    /// Sentinel for a decision level not associated with a cached contradiction.
+    pub(crate) const MAX: Self = Self(u32::MAX);
+
     pub(crate) fn increment(self) -> Self {
         Self(self.0 + 1)
     }
@@ -64,8 +67,9 @@ pub(crate) struct PartialSolution<DP: DependencyProvider> {
     /// Packages whose derivations changed since the last time `prioritize` was called and need
     /// their priorities to be updated.
     outdated_priorities: FnvIndexSet<Id<DP::P>>,
-    /// Whether we have never backtracked, to enable fast path optimizations.
-    has_ever_backtracked: bool,
+    /// For each completed backtrack generation, the highest decision level that remains valid.
+    /// The active generation is represented by the missing entry after the end of this vector.
+    last_valid_decision_levels: Vec<DecisionLevel>,
 }
 
 /// A package assignment is either a decision or a list of (accumulated) derivations without a
@@ -172,13 +176,30 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
             package_assignments: FnvIndexMap::default(),
             prioritized_potential_packages: PriorityQueue::default(),
             outdated_priorities: FnvIndexSet::default(),
-            has_ever_backtracked: false,
+            last_valid_decision_levels: vec![DecisionLevel(0)],
         }
     }
 
-    /// Returns whether the solver has backtracked at least once.
+    pub(crate) fn is_contradicted(
+        &self,
+        incompatibility: &Incompatibility<DP::P, DP::VS, DP::M>,
+    ) -> bool {
+        incompatibility.is_contradicted(&self.last_valid_decision_levels)
+    }
+
+    pub(crate) fn mark_contradicted(
+        &self,
+        incompatibility: &mut Incompatibility<DP::P, DP::VS, DP::M>,
+    ) {
+        incompatibility.mark_contradicted(
+            self.current_decision_level(),
+            self.last_valid_decision_levels.len() as u32,
+        );
+    }
+
+    /// Returns whether at least one backtrack generation has completed.
     pub(crate) fn has_backtracked(&self) -> bool {
-        self.has_ever_backtracked
+        self.last_valid_decision_levels.len() > 1
     }
 
     pub(crate) fn display<'a>(&'a self, package_store: &'a HashArena<DP::P>) -> impl Display + 'a {
@@ -405,7 +426,13 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
                 true
             }
         });
-        self.has_ever_backtracked = true;
+        // Close the active generation, then lower every generation invalidated by this backtrack
+        // to the new highest valid decision level.
+        self.last_valid_decision_levels.push(DecisionLevel::MAX);
+        let index = self
+            .last_valid_decision_levels
+            .partition_point(|&level| level <= decision_level);
+        self.last_valid_decision_levels[index..].fill(decision_level);
     }
 
     /// Add a package version as decision if none of its dependencies conflicts with the partial
