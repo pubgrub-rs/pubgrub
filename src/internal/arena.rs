@@ -105,6 +105,7 @@ impl<T> Arena<T> {
 
     pub(crate) fn alloc_iter<I: Iterator<Item = T>>(&mut self, values: I) -> Range<Id<T>> {
         let start = Id::from(self.data.len() as u32);
+        self.data.reserve(values.size_hint().0);
         values.for_each(|v| {
             self.alloc(v);
         });
@@ -165,5 +166,37 @@ impl<T: Hash + Eq> Index<Id<T>> for HashArena<T> {
     type Output = T;
     fn index(&self, id: Id<T>) -> &T {
         &self.data[id.raw as usize]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Arena, Id};
+
+    #[test]
+    fn alloc_iter_preserves_order_and_duplicates() {
+        let mut arena = Arena::new();
+        let existing = arena.alloc("existing".to_owned());
+
+        let appended = arena.alloc_iter(
+            ["first", "duplicate", "duplicate"]
+                .into_iter()
+                .map(str::to_owned),
+        );
+
+        assert_eq!(existing.into_raw(), 0);
+        assert_eq!(arena[existing], "existing");
+        assert_eq!(appended.start.into_raw(), 1);
+        assert_eq!(appended.end.into_raw(), 4);
+        let appended_values: Vec<_> = Id::range_to_iter(appended.clone())
+            .map(|id| arena[id].as_str())
+            .collect();
+        assert_eq!(appended_values, ["first", "duplicate", "duplicate"]);
+
+        let empty = arena.alloc_iter(std::iter::empty::<String>());
+        assert_eq!(empty.start.into_raw(), 4);
+        assert_eq!(empty.end.into_raw(), 4);
+        assert_eq!(arena.data.len(), 4);
+        assert_eq!(arena[existing], "existing");
     }
 }
