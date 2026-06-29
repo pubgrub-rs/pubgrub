@@ -1,6 +1,7 @@
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
+use std::num::NonZeroU32;
 use std::ops::{Index, Range};
 
 type FnvIndexSet<V> = indexmap::IndexSet<V, rustc_hash::FxBuildHasher>;
@@ -12,10 +13,17 @@ type FnvIndexSet<V> = indexmap::IndexSet<V, rustc_hash::FxBuildHasher>;
 /// that we actually don't need since it is phantom.
 ///
 /// <https://github.com/rust-lang/rust/issues/26925>
+///
+/// The zero-based index is stored as `index + 1` in a [`NonZeroU32`], allowing
+/// `Option<Id<T>>` to use the zero niche and remain four bytes. The largest
+/// representable index is therefore `u32::MAX - 1`.
 pub(crate) struct Id<T> {
-    raw: u32,
+    raw: NonZeroU32,
     _ty: PhantomData<fn() -> T>,
 }
+
+// Store the zero-based index plus one so `None` can use the zero niche.
+const _: () = assert!(std::mem::size_of::<Option<Id<()>>>() == std::mem::size_of::<u32>());
 
 impl<T> Clone for Id<T> {
     fn clone(&self) -> Self {
@@ -35,7 +43,7 @@ impl<T> Eq for Id<T> {}
 
 impl<T> Hash for Id<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.raw.hash(state)
+        (self.into_raw() as u32).hash(state)
     }
 }
 
@@ -45,24 +53,27 @@ impl<T> fmt::Debug for Id<T> {
         if let Some(id) = type_name.rfind(':') {
             type_name = &type_name[id + 1..]
         }
-        write!(f, "Id::<{}>({})", type_name, self.raw)
+        write!(f, "Id::<{}>({})", type_name, self.into_raw())
     }
 }
 
 impl<T> Id<T> {
     pub(crate) fn into_raw(self) -> usize {
-        self.raw as usize
+        (self.raw.get() - 1) as usize
     }
-    fn from(n: u32) -> Self {
+
+    fn from_usize(index: usize) -> Self {
+        assert!(index < u32::MAX as usize, "id index exceeds u32::MAX - 1");
         Self {
-            raw: n,
+            raw: NonZeroU32::new(index as u32 + 1).expect("checked id index must be non-zero"),
             _ty: PhantomData,
         }
     }
+
     pub(crate) fn range_to_iter(range: Range<Self>) -> impl Iterator<Item = Self> {
-        let start = range.start.raw;
-        let end = range.end.raw;
-        (start..end).map(Self::from)
+        let start = range.start.into_raw();
+        let end = range.end.into_raw();
+        (start..end).map(Self::from_usize)
     }
 }
 
@@ -98,17 +109,17 @@ impl<T> Arena<T> {
     }
 
     pub(crate) fn alloc(&mut self, value: T) -> Id<T> {
-        let raw = self.data.len();
+        let id = Id::from_usize(self.data.len());
         self.data.push(value);
-        Id::from(raw as u32)
+        id
     }
 
     pub(crate) fn alloc_iter<I: Iterator<Item = T>>(&mut self, values: I) -> Range<Id<T>> {
-        let start = Id::from(self.data.len() as u32);
+        let start = Id::from_usize(self.data.len());
         values.for_each(|v| {
             self.alloc(v);
         });
-        let end = Id::from(self.data.len() as u32);
+        let end = Id::from_usize(self.data.len());
         Range { start, end }
     }
 }
@@ -116,14 +127,14 @@ impl<T> Arena<T> {
 impl<T> Index<Id<T>> for Arena<T> {
     type Output = T;
     fn index(&self, id: Id<T>) -> &T {
-        &self.data[id.raw as usize]
+        &self.data[id.into_raw()]
     }
 }
 
 impl<T> Index<Range<Id<T>>> for Arena<T> {
     type Output = [T];
     fn index(&self, id: Range<Id<T>>) -> &[T] {
-        &self.data[(id.start.raw as usize)..(id.end.raw as usize)]
+        &self.data[id.start.into_raw()..id.end.into_raw()]
     }
 }
 
@@ -156,14 +167,70 @@ impl<T: Hash + Eq> HashArena<T> {
     }
 
     pub fn alloc(&mut self, value: T) -> Id<T> {
+        assert!(
+            self.data.len() < u32::MAX as usize || self.data.contains(&value),
+            "id index exceeds u32::MAX - 1"
+        );
         let (raw, _) = self.data.insert_full(value);
-        Id::from(raw as u32)
+        Id::from_usize(raw)
     }
 }
 
 impl<T: Hash + Eq> Index<Id<T>> for HashArena<T> {
     type Output = T;
     fn index(&self, id: Id<T>) -> &T {
-        &self.data[id.raw as usize]
+        &self.data[id.into_raw()]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::hash::BuildHasher;
+
+    use super::{Arena, HashArena, Id};
+
+    #[test]
+    fn ids_preserve_logical_indices_and_hashes() {
+        for index in [0, 1, u32::MAX - 1] {
+            let id = Id::<()>::from_usize(index as usize);
+            assert_eq!(id.into_raw(), index as usize);
+            assert_eq!(
+                rustc_hash::FxBuildHasher.hash_one(id),
+                rustc_hash::FxBuildHasher.hash_one(index),
+            );
+            assert_eq!(format!("{id:?}"), format!("Id::<()>({index})"));
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "id index exceeds u32::MAX - 1")]
+    fn ids_reject_unrepresentable_indices() {
+        Id::<()>::from_usize(u32::MAX as usize);
+    }
+
+    #[test]
+    fn arenas_preserve_indexing_and_deduplication() {
+        let mut arena = Arena::new();
+        let first = arena.alloc("first");
+        let rest = arena.alloc_iter(["second", "third"].into_iter());
+        assert_eq!(first.into_raw(), 0);
+        assert_eq!(arena[first], "first");
+        assert_eq!(&arena[rest.clone()], &["second", "third"]);
+        assert_eq!(
+            Id::range_to_iter(rest)
+                .map(|id| arena[id])
+                .collect::<Vec<_>>(),
+            ["second", "third"],
+        );
+        let empty = arena.alloc_iter(std::iter::empty());
+        assert_eq!(empty.start.into_raw(), 3);
+        assert_eq!(empty.start, empty.end);
+
+        let mut arena = HashArena::new();
+        let first = arena.alloc("first");
+        assert_eq!(arena.alloc("first"), first);
+        let second = arena.alloc("second");
+        assert_eq!(second.into_raw(), 1);
+        assert_eq!(arena[second], "second");
     }
 }
