@@ -1,6 +1,6 @@
 [package]
 name = "astral-version-ranges"
-version = "0.1.4"
+version = "0.1.5"
 description = "Performance-optimized type for generic version ranges and operations on them."
 edition = "2021"
 repository = "https://github.com/astral-sh/pubgrub"
