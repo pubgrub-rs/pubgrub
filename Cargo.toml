@@ -32,7 +32,7 @@ priority-queue = "2.3.1"
 rustc-hash = "^2.1.1"
 serde = { version = "1.0.219", features = ["derive"], optional = true }
 thiserror = "2.0"
-version-ranges = { version = "0.1.0", path = "version-ranges" }
+version-ranges = { version = "0.1.4", path = "version-ranges" }
 
 [dev-dependencies]
 criterion = { version = "4.7.0", package = "codspeed-criterion-compat" }
@@ -42,7 +42,7 @@ cc = "1.2.40"
 proptest = "1.6.0"
 ron = "0.12.0"
 varisat = "0.2.2"
-version-ranges = { version = "0.1.0", path = "version-ranges", features = ["proptest"] }
+version-ranges = { version = "0.1.4", path = "version-ranges", features = ["proptest"] }
 
 [features]
 serde = ["dep:serde", "version-ranges/serde"]
