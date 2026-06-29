@@ -207,9 +207,12 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         (versions, dependency_versions)
     }
 
-    pub(crate) fn as_dependency(&self) -> Option<(Id<P>, Id<P>)> {
+    pub(crate) fn as_dependency(&self) -> Option<(Id<P>, Id<P>, Option<&VS>)> {
         match &self.kind {
-            Kind::FromDependencyOf(p1, p2) => Some((*p1, *p2)),
+            Kind::FromDependencyOf(p1, p2) => {
+                let (_, dependency_range) = self.dependency_terms(*p1, *p2);
+                Some((*p1, *p2, dependency_range))
+            }
             _ => None,
         }
     }
@@ -228,11 +231,11 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         debug_assert!(self.as_dependency().is_some());
         // Check that both incompatibilities are of the shape p1 depends on p2,
         // with the same p1 and p2.
-        let self_pkgs = self.as_dependency()?;
-        if self_pkgs != other.as_dependency()? {
+        let (p1, p2, _) = self.as_dependency()?;
+        let (other_p1, other_p2, _) = other.as_dependency()?;
+        if (p1, p2) != (other_p1, other_p2) {
             return None;
         }
-        let (p1, p2) = self_pkgs;
         // We ignore self-dependencies. They are always either trivially true or trivially false,
         // as the package version implies whether the constraint will always be fulfilled or always
         // violated.
@@ -505,7 +508,7 @@ pub(crate) mod tests {
         ]));
     }
 
-    #[derive(Debug, Eq, Hash, PartialEq)]
+    #[derive(Debug, Eq, PartialEq, Hash)]
     struct PanicOnCloneRanges(Ranges<usize>);
 
     impl Clone for PanicOnCloneRanges {
