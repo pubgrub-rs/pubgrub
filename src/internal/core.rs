@@ -508,7 +508,7 @@ mod dependency_merge_tests {
             let first = (version % 2) * 2;
             state.add_incompatibility_from_dependencies(
                 package,
-                version,
+                CollidingRanges::singleton(version),
                 [
                     ("dependency", CollidingRanges::singleton(first)),
                     ("dependency", CollidingRanges::singleton(first + 1)),

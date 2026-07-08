@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking
 
-- `VersionSet` now requires `Hash`; `Ranges<V>` implements `VersionSet` only when `V: Hash`.
+- `State::add_package_version_dependencies` now takes the set of versions that share the dependencies. Pass `VS::singleton(version)` for the previous behavior. Callers that know which versions exist can instead widen the version being decided over the gaps to its neighboring versions (e.g. with `Ranges::widen_versions`), so rejecting versions one by one excludes contiguous sets instead of accumulating version sets with one hole per rejected version ([#73](https://github.com/astral-sh/pubgrub/pull/73)).
 
 ### Added
 
