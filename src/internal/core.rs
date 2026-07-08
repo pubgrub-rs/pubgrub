@@ -66,18 +66,38 @@ impl<DP: DependencyProvider> State<DP> {
         }
     }
 
-    /// Add the dependencies for the current version of the current package as incompatibilities.
+    /// Add the dependencies for the version being decided of the current package as
+    /// incompatibilities.
+    ///
+    /// `versions` is the set of versions that share these dependencies, in the simplest case the
+    /// version being decided: `VS::singleton(version)`. A caller that knows which versions exist
+    /// can widen the version being decided to a set that contains no other existing version,
+    /// e.g. with `Ranges::widen_versions`: If `2` is the only existing version between `1` and
+    /// `3`, the dependency incompatibilities for `{2}` can instead be created for `>1, <3`. When
+    /// resolution then rejects the version, the version sets derived from these
+    /// incompatibilities exclude a contiguous set instead of accumulating one hole per rejected
+    /// version, and the incompatibilities of adjacent versions merge into contiguous sets,
+    /// keeping the version sets and the operations on them minimal.
+    ///
+    /// `versions` must contain `version`, every existing version in `versions` must have exactly
+    /// the given dependencies, and the set of existing versions must not grow while resolution
+    /// is running.
     pub(crate) fn add_package_version_dependencies(
         &mut self,
         package: Id<DP::P>,
         version: DP::V,
+        versions: DP::VS,
         dependencies: impl IntoIterator<Item = (DP::P, DP::VS)>,
     ) -> Option<IncompId<DP::P, DP::VS, DP::M>> {
+        debug_assert!(
+            versions.contains(&version),
+            "the version being decided must be in the version set sharing its dependencies",
+        );
         let dep_incompats =
-            self.add_incompatibility_from_dependencies(package, version.clone(), dependencies);
+            self.add_incompatibility_from_dependencies(package, versions, dependencies);
         self.partial_solution.add_package_version_incompatibilities(
             package,
-            version.clone(),
+            version,
             dep_incompats,
             &self.incompatibility_store,
         )
@@ -133,7 +153,7 @@ impl<DP: DependencyProvider> State<DP> {
     pub(crate) fn add_incompatibility_from_dependencies(
         &mut self,
         package: Id<DP::P>,
-        version: DP::V,
+        versions: DP::VS,
         deps: impl IntoIterator<Item = (DP::P, DP::VS)>,
     ) -> std::ops::Range<IncompDpId<DP>> {
         // Create incompatibilities and allocate them in the store.
@@ -141,11 +161,7 @@ impl<DP: DependencyProvider> State<DP> {
             self.incompatibility_store
                 .alloc_iter(deps.into_iter().map(|(dep_p, dep_vs)| {
                     let dep_pid = self.package_store.alloc(dep_p);
-                    Incompatibility::from_dependency(
-                        package,
-                        <DP::VS as VersionSet>::singleton(version.clone()),
-                        (dep_pid, dep_vs),
-                    )
+                    Incompatibility::from_dependency(package, versions.clone(), (dep_pid, dep_vs))
                 }));
         // Merge the newly created incompatibilities with the older ones.
         for id in IncompDpId::<DP>::range_to_iter(new_incompats_id_range.clone()) {
@@ -418,3 +434,6 @@ impl<DP: DependencyProvider> State<DP> {
         Arc::into_inner(precomputed.remove(&incompat).unwrap()).unwrap()
     }
 }
+
+#[cfg(test)]
+mod widened_dependencies;
