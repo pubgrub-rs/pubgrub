@@ -2,15 +2,12 @@
 
 Changelog for the version-ranges crate.
 
-## Unreleased
+## v0.2.1 - 2026-07-08
 
 ### Added
 
-- Add classification of subset, disjoint, and overlapping ranges.
-
-- Add `Ranges::difference`, which computes the versions contained in `self` but not in `other` in a single pass, without materializing the complement ([#432](https://github.com/pubgrub-rs/pubgrub/pull/432)).
-- Add `Ranges::widen_versions`, which widens each segment to the largest interval containing the same given versions and merges segments that no version separates ([Astral #75](https://github.com/astral-sh/pubgrub/pull/75)).
-- Add `Ranges::narrow_versions`, the display-oriented inverse of `Ranges::widen_versions`, which shrinks each segment's bounded ends to inclusive bounds on the given versions it contains, keeping unbounded ends ([Astral #75](https://github.com/astral-sh/pubgrub/pull/75)).
+- Add `Ranges::widen_versions`, which widens each segment to the largest interval containing the same given versions and merges segments that no version separates ([#75](https://github.com/astral-sh/pubgrub/pull/75)).
+- Add `Ranges::narrow_versions`, the display-oriented inverse of `Ranges::widen_versions`, which shrinks each segment's bounded ends to inclusive bounds on the given versions it contains, keeping unbounded ends ([#75](https://github.com/astral-sh/pubgrub/pull/75)).
 
 ## v0.2.0 - 2026-06-29
 

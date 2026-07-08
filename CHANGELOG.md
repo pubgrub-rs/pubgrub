@@ -4,14 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Add `VersionSet::contains_many`, forwarded to `Ranges::contains_many` for `Ranges`, and use it in `OfflineDependencyProvider::prioritize` to count matching versions in one pass over the sorted versions.
+
+## 0.6.0 - 2026-07-08
+
 ### Breaking
 
 - `State::add_package_version_dependencies` now takes the set of versions that share the dependencies. Pass `VS::singleton(version)` for the previous behavior. Callers that know which versions exist can instead widen the version being decided over the gaps to its neighboring versions (e.g. with `Ranges::widen_versions`), so rejecting versions one by one excludes contiguous sets instead of accumulating version sets with one hole per rejected version ([#73](https://github.com/astral-sh/pubgrub/pull/73)).
-
-### Added
-
-- Add `VersionSet::difference` with an optimized `Ranges` implementation, and use it in `Term` intersections and unions of mixed-polarity terms instead of materializing a complement ([#432](https://github.com/pubgrub-rs/pubgrub/pull/432)).
-- Add `VersionSet::contains_many`, forwarded to `Ranges::contains_many` for `Ranges`, and use it in `OfflineDependencyProvider::prioritize` to count matching versions in one pass over the sorted versions.
 
 ## 0.5.0 - 2026-06-29
 
