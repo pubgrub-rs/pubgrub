@@ -174,7 +174,7 @@ pub fn resolve<DP: DependencyProvider>(
 
         info!(
             "unit_propagation: {:?} = '{}'",
-            &next, state.package_store[next]
+            next, state.package_store[next]
         );
         let satisfier_causes = state.unit_propagation(next)?;
         for (affected, incompat) in satisfier_causes {
@@ -226,7 +226,7 @@ pub fn resolve<DP: DependencyProvider>(
 
         info!(
             "DP chose: {:?} = '{}' @ {:?}",
-            &next, state.package_store[next], decision
+            next, state.package_store[next], decision
         );
 
         // Pick the next compatible version.
@@ -295,7 +295,7 @@ pub fn resolve<DP: DependencyProvider>(
             // terms and can add the decision directly.
             info!(
                 "add_decision (not first time): {:?} = '{}' @ {}",
-                &next, state.package_store[next], v
+                next, state.package_store[next], v
             );
             state.partial_solution.add_decision(next, v);
         }
