@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use std::collections::BTreeSet as Set;
+
+#[cfg(feature = "experimental-conflict")]
+use std::collections::HashMap;
+
+#[cfg(feature = "experimental-conflict")]
+use crate::internal::SmallMap;
+
 use std::error::Error;
 use std::fmt::{Debug, Display};
 
@@ -141,6 +148,25 @@ pub fn resolve<DP: DependencyProvider>(
     let mut conflict_tracker: Map<Id<DP::P>, PackageResolutionStatistics> = Map::default();
     let mut added_dependencies: Map<Id<DP::P>, Set<DP::V>> = Map::default();
     let mut next = state.root_package;
+
+    #[cfg(feature = "experimental-conflict")]
+    {
+        let conflict = dependency_provider.init_conflict();
+
+        for grp in conflict {
+            let mut map = SmallMap::Empty;
+
+            for (k, v) in grp {
+                let id = state.package_store.alloc(k);
+                map.insert(id, v);
+            }
+
+            let incompat = Incompatibility::conflict(map);
+
+            state.add_incompatibility(incompat);
+        }
+    }
+
     loop {
         dependency_provider
             .should_cancel()
@@ -442,5 +468,13 @@ pub trait DependencyProvider {
     /// If not provided the resolver will run as long as needed.
     fn should_cancel(&self) -> Result<(), Self::Err> {
         Ok(())
+    }
+
+    /// Externally specify conflicts between specific version ranges of packages.
+    ///
+    /// This method is called once at the start of the resolution process and the resolver will learn the conflicts as internal incompatibilities.
+    #[cfg(feature = "experimental-conflict")]
+    fn init_conflict(&self) -> Vec<HashMap<Self::P, Self::VS>> {
+        vec![]
     }
 }

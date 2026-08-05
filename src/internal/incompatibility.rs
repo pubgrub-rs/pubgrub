@@ -49,11 +49,13 @@ enum Kind<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     /// This incompatibility drives the resolution, it requires that we pick the (virtual) root
     /// packages.
     NotRoot(Id<P>, VS::V),
+
     /// There are no versions in the given range for this package.
     ///
     /// This incompatibility is used when we tried all versions in a range and no version
     /// worked, so we have to backtrack
     NoVersions(Id<P>, VS),
+
     /// Incompatibility coming from the dependencies of a given package.
     ///
     /// If a@1 depends on b>=1,<2, we create an incompatibility with terms `{a 1, b <1,>=2}` with
@@ -62,10 +64,16 @@ enum Kind<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     /// We can merge multiple dependents with the same version. For example, if a@1 depends on b and
     /// a@2 depends on b, we can say instead a@1||2 depends on b.
     FromDependencyOf(Id<P>, VS, Id<P>, VS),
+
     /// Derived from two causes. Stores cause ids.
     ///
     /// For example, if a -> b and b -> c, we can derive a -> c.
     DerivedFrom(IncompId<P, VS, M>, IncompId<P, VS, M>),
+
+    /// Incompatibility coming from externally specified conflicts between packages.
+    #[cfg(feature = "experimental-conflict")]
+    Conflict(SmallMap<Id<P>, VS>),
+
     /// The package is unavailable for reasons outside pubgrub.
     ///
     /// Examples:
@@ -92,6 +100,17 @@ pub(crate) enum Relation<P: Package> {
 }
 
 impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibility<P, VS, M> {
+    #[cfg(feature = "experimental-conflict")]
+    pub(crate) fn conflict(grp: SmallMap<Id<P>, VS>) -> Self {
+        Self {
+            package_terms: grp
+                .iter()
+                .map(|(k, v)| (k.clone(), Term::Positive(v.clone())))
+                .collect(),
+            kind: Kind::Conflict(grp),
+        }
+    }
+
     /// Create the initial "not Root" incompatibility.
     pub(crate) fn not_root(package: Id<P>, version: VS::V) -> Self {
         Self {
@@ -313,6 +332,13 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
                     dep_set.clone(),
                 ))
             }
+            #[cfg(feature = "experimental-conflict")]
+            Kind::Conflict(small_map) => DerivationTree::External(External::Conflict(
+                small_map
+                    .iter()
+                    .map(|(k, v)| (package_store[*k].clone(), v.clone()))
+                    .collect(),
+            )),
             Kind::Custom(package, set, metadata) => DerivationTree::External(External::Custom(
                 package_store[package].clone(),
                 set.clone(),
