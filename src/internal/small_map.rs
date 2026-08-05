@@ -211,3 +211,16 @@ impl<K, V> SmallMap<K, V> {
         }
     }
 }
+
+impl<K, V> FromIterator<(K, V)> for SmallMap<K, V>
+where
+    K: Eq + Hash,
+{
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        let mut map = Self::Empty;
+        for (k, v) in iter {
+            map.insert(k, v);
+        }
+        map
+    }
+}
