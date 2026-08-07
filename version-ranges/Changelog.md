@@ -2,6 +2,12 @@
 
 Changelog for the version-ranges crate.
 
+## Unreleased
+
+### Added
+
+- Add `Ranges::difference`, which computes the versions contained in `self` but not in `other` in a single pass, without materializing the complement ([#77](https://github.com/astral-sh/pubgrub/pull/77)).
+
 ## v0.2.1 - 2026-07-08
 
 ### Added

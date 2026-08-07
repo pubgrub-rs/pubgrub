@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Add `VersionSet::contains_many`, forwarded to `Ranges::contains_many` for `Ranges`, and use it in `OfflineDependencyProvider::prioritize` to count matching versions in one pass over the sorted versions.
+- Add `VersionSet::difference` with an optimized `Ranges` implementation, and use it in `Term` intersections and unions of mixed-polarity terms instead of materializing a complement ([#77](https://github.com/astral-sh/pubgrub/pull/77)).
 
 ## 0.6.0 - 2026-07-08
 
