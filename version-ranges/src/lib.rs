@@ -513,6 +513,17 @@ fn valid_segment<T: PartialOrd>(start: &Bound<T>, end: &Bound<T>) -> bool {
     }
 }
 
+/// The complementary bound at the same position: the end bound just below a start bound, or the
+/// start bound just above an end bound. `None` for [`Unbounded`], whose complementary side is
+/// empty.
+fn complement_bound<V>(bound: &Bound<V>) -> Option<Bound<&V>> {
+    match bound {
+        Included(version) => Some(Excluded(version)),
+        Excluded(version) => Some(Included(version)),
+        Unbounded => None,
+    }
+}
+
 /// The end of one interval is before the start of the next one, so they can't be concatenated
 /// into a single interval. The `union` method calling with both intervals and then the intervals
 /// switched. If either is true, the intervals are separate in the union and if both are false, they
@@ -706,6 +717,69 @@ impl<V: Ord + Clone> Ranges<V> {
             // Now we clone and push a new segment.
             // By dealing with references until now we ensure that NO cloning happens when we reject the segment.
             output.push((start.cloned(), end.clone()))
+        }
+
+        Self { segments: output }.check_invariants()
+    }
+
+    /// Compute the difference of two sets of versions: the versions contained in `self` but not
+    /// in `other`.
+    ///
+    /// Equivalent to `self.intersection(&other.complement())`, without materializing the
+    /// complement.
+    pub fn difference(&self, other: &Self) -> Self {
+        let mut output = SmallVec::new();
+        let mut right_iter = other.segments.iter().peekable();
+        for (left_start, left_end) in &self.segments {
+            // The start of the part of the left segment not yet known to be covered. Bounds stay
+            // references until push, so cloning only happens for segments in the output.
+            let mut current_start = left_start.as_ref();
+            loop {
+                // Drop right segments that end before the uncovered part starts: they cannot
+                // overlap it, nor any later left segment.
+                // Ensures left start < right end
+                while let Some((_, right_end)) = right_iter.peek() {
+                    if valid_segment(&current_start, &right_end.as_ref()) {
+                        break;
+                    }
+                    right_iter.next();
+                }
+                let Some((right_start, right_end)) = right_iter.peek().copied() else {
+                    // No right segment reaches the uncovered part; all of it survives.
+                    output.push((current_start.cloned(), left_end.clone()));
+                    break;
+                };
+                // Ensures right start < left end
+                if !valid_segment(&right_start.as_ref(), &left_end.as_ref()) {
+                    // The next right segment starts after this left segment ends.
+                    output.push((current_start.cloned(), left_end.clone()));
+                    break;
+                }
+
+                // If left start < right start, left start to right start is the new segment.
+                if let Some(cut_end) = complement_bound(right_start) {
+                    if valid_segment(&current_start, &cut_end) {
+                        output.push((current_start.cloned(), cut_end.cloned()));
+                    }
+                }
+                let Some(next_start) = complement_bound(right_end) else {
+                    // The right segment is unbounded above, so it also covers every later
+                    // left segment.
+                    return Self { segments: output }.check_invariants();
+                };
+                // If right ends later, keep right for overlapping with future left segments,
+                // if left ends later, keep left for checking if it overlaps with future right
+                // segments.
+                if valid_segment(&next_start, &left_end.as_ref()) {
+                    // Continue with the part of the left segment above the right segment.
+                    current_start = next_start;
+                    right_iter.next();
+                } else {
+                    // The right segment overlaps the current left segment entirely, but this right
+                    // segment may also overlap the next left segment too, so keep it.
+                    break;
+                }
+            }
         }
 
         Self { segments: output }.check_invariants()
@@ -1240,6 +1314,21 @@ pub mod tests {
             assert_ne!(range.contains(&version), range.complement().contains(&version));
         }
 
+        // Testing difference ------------------------------
+
+        #[test]
+        fn difference_is_intersection_with_complement(r1 in proptest_strategy(), r2 in proptest_strategy()) {
+            assert_eq!(r1.difference(&r2), r1.intersection(&r2.complement()));
+        }
+
+        #[test]
+        fn difference_contains(r1 in proptest_strategy(), r2 in proptest_strategy(), version in version_strat()) {
+            assert_eq!(
+                r1.difference(&r2).contains(&version),
+                r1.contains(&version) && !r2.contains(&version)
+            );
+        }
+
         // Testing intersection ----------------------------
 
         #[test]
@@ -1384,6 +1473,77 @@ pub mod tests {
             let actual =  Ranges::from_iter(segments.clone());
             assert_eq!(expected, actual, "{segments:?}");
         }
+    }
+
+    #[test]
+    fn difference_ties_and_singletons() {
+        fn check(left: Ranges<u32>, right: Ranges<u32>, expected: Ranges<u32>) {
+            assert_eq!(left.difference(&right), expected, "{left} minus {right}");
+            assert_eq!(
+                left.difference(&right),
+                left.intersection(&right.complement()),
+                "{left} minus {right}"
+            );
+        }
+
+        // Touching bounds at a shared version, all four inclusivity combinations.
+        check(
+            Ranges::from_range_bounds(1u32..=5),
+            Ranges::from_range_bounds(5u32..=9),
+            Ranges::from_range_bounds(1u32..5),
+        );
+        check(
+            Ranges::from_range_bounds(1u32..5),
+            Ranges::from_range_bounds(5u32..=9),
+            Ranges::from_range_bounds(1u32..5),
+        );
+        check(
+            Ranges::from_range_bounds(1u32..=5),
+            Ranges::from_range_bounds((Excluded(5u32), Included(9u32))),
+            Ranges::from_range_bounds(1u32..=5),
+        );
+        check(
+            Ranges::from_range_bounds(1u32..5),
+            Ranges::from_range_bounds((Excluded(5u32), Excluded(9u32))),
+            Ranges::from_range_bounds(1u32..5),
+        );
+
+        // Singleton operands.
+        check(
+            Ranges::singleton(3u32),
+            Ranges::from_range_bounds(1u32..=3),
+            Ranges::empty(),
+        );
+        check(
+            Ranges::from_range_bounds(1u32..=5),
+            Ranges::singleton(3u32),
+            Ranges::from_range_bounds(1u32..3)
+                .union(&Ranges::from_range_bounds((Excluded(3u32), Included(5u32)))),
+        );
+
+        // The singleton gap between two excluded-bound right segments survives.
+        check(
+            Ranges::from_range_bounds(0u32..=10),
+            Ranges::from_range_bounds((Excluded(2u32), Excluded(4u32)))
+                .union(&Ranges::from_range_bounds((Excluded(4u32), Excluded(6u32)))),
+            Ranges::from_range_bounds(0u32..=2)
+                .union(&Ranges::singleton(4u32))
+                .union(&Ranges::from_range_bounds(6u32..=10)),
+        );
+
+        // An unbounded-above right segment covers every later left segment.
+        check(
+            Ranges::from_range_bounds(0u32..=1)
+                .union(&Ranges::from_range_bounds(5u32..=6))
+                .union(&Ranges::from_range_bounds(8u32..=9)),
+            Ranges::higher_than(5u32),
+            Ranges::from_range_bounds(0u32..=1),
+        );
+
+        // Empty and full operands.
+        check(Ranges::full(), Ranges::empty(), Ranges::full());
+        check(Ranges::empty(), Ranges::full(), Ranges::empty());
+        check(Ranges::full(), Ranges::full(), Ranges::empty());
     }
 
     #[test]

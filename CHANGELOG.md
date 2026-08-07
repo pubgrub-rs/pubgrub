@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- Add `VersionSet::difference` with an optimized `Ranges` implementation, and use it in `Term` intersections and unions of mixed-polarity terms instead of materializing a complement ([#432](https://github.com/pubgrub-rs/pubgrub/pull/432)).
+
 ## 0.4.0 - 2026-04-09
 
 ### Breaking
