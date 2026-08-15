@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use std::borrow::Borrow;
 use std::fmt::{Debug, Display};
 
 use crate::Ranges;
@@ -50,6 +51,18 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
     fn contains(&self, v: &Self::V) -> bool;
 
     // Automatically implemented functions
+
+    /// Whether each version is part of this set, in iterator order.
+    ///
+    /// `versions` must be in nondecreasing order. Implementations can override this to walk the
+    /// versions and the set together.
+    fn contains_many<'s, I, BV>(&'s self, versions: I) -> impl Iterator<Item = bool> + 's
+    where
+        I: Iterator<Item = BV> + 's,
+        BV: Borrow<Self::V> + 's,
+    {
+        versions.map(move |v| self.contains(v.borrow()))
+    }
 
     /// The set containing all versions.
     ///
@@ -110,6 +123,14 @@ impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Ranges<T> {
         Ranges::contains(self, v)
     }
 
+    fn contains_many<'s, I, BV>(&'s self, versions: I) -> impl Iterator<Item = bool> + 's
+    where
+        I: Iterator<Item = BV> + 's,
+        BV: Borrow<Self::V> + 's,
+    {
+        Ranges::contains_many(self, versions)
+    }
+
     fn full() -> Self {
         Ranges::full()
     }
@@ -128,5 +149,70 @@ impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Ranges<T> {
 
     fn subset_of(&self, other: &Self) -> bool {
         Ranges::subset_of(self, other)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Formatter;
+
+    use super::*;
+
+    /// A version set that does not override [`VersionSet::contains_many`].
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct ScalarSet(Ranges<u32>);
+
+    impl Display for ScalarSet {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            Display::fmt(&self.0, f)
+        }
+    }
+
+    impl VersionSet for ScalarSet {
+        type V = u32;
+
+        fn empty() -> Self {
+            Self(Ranges::empty())
+        }
+
+        fn singleton(v: Self::V) -> Self {
+            Self(Ranges::singleton(v))
+        }
+
+        fn complement(&self) -> Self {
+            Self(self.0.complement())
+        }
+
+        fn intersection(&self, other: &Self) -> Self {
+            Self(self.0.intersection(&other.0))
+        }
+
+        fn contains(&self, v: &Self::V) -> bool {
+            self.0.contains(v)
+        }
+    }
+
+    #[test]
+    fn contains_many_default() {
+        let set = ScalarSet(Ranges::from_range_bounds(2u32..=4));
+        let versions = [1, 2, 2, 4, 5];
+
+        assert_eq!(
+            set.contains_many(versions.iter()).collect::<Vec<_>>(),
+            [false, true, true, true, false]
+        );
+        assert!(set.contains_many([].iter()).next().is_none());
+    }
+
+    #[test]
+    fn contains_many_ranges_matches_default() {
+        let range = Ranges::from_range_bounds(1u32..=2).union(&Ranges::from_range_bounds(5u32..=6));
+        let scalar = ScalarSet(range.clone());
+        let versions = [0u32, 1, 2, 3, 5, 6, 7];
+
+        assert_eq!(
+            VersionSet::contains_many(&range, versions.iter()).collect::<Vec<_>>(),
+            scalar.contains_many(versions.iter()).collect::<Vec<_>>()
+        );
     }
 }
