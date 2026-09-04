@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
+use std::borrow::Borrow;
 use std::fmt::{Debug, Display};
 
 use crate::Ranges;
@@ -50,6 +51,18 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
     fn contains(&self, v: &Self::V) -> bool;
 
     // Automatically implemented functions
+
+    /// Whether each version is part of this set, in iterator order.
+    ///
+    /// `versions` must be in nondecreasing order. Implementations can override this to walk the
+    /// versions and the set together.
+    fn contains_many<'s, I, BV>(&'s self, versions: I) -> impl Iterator<Item = bool> + 's
+    where
+        I: Iterator<Item = BV> + 's,
+        BV: Borrow<Self::V> + 's,
+    {
+        versions.map(move |v| self.contains(v.borrow()))
+    }
 
     /// The set containing all versions.
     ///
@@ -108,6 +121,14 @@ impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Ranges<T> {
 
     fn contains(&self, v: &Self::V) -> bool {
         Ranges::contains(self, v)
+    }
+
+    fn contains_many<'s, I, BV>(&'s self, versions: I) -> impl Iterator<Item = bool> + 's
+    where
+        I: Iterator<Item = BV> + 's,
+        BV: Borrow<Self::V> + 's,
+    {
+        Ranges::contains_many(self, versions)
     }
 
     fn full() -> Self {
