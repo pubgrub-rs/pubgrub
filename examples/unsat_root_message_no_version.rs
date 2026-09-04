@@ -2,6 +2,9 @@
 
 use std::fmt::{self, Display};
 
+#[cfg(feature = "experimental-conflict")]
+use std::fmt::Write;
+
 use pubgrub::{
     DefaultStringReporter, Derived, External, Map, OfflineDependencyProvider, PubGrubError, Ranges,
     ReportFormatter, Reporter, SemanticVersion, Term, resolve,
@@ -101,6 +104,22 @@ impl ReportFormatter<Package, Ranges<SemanticVersion>, String> for CustomReportF
                 } else {
                     format!("{package} {package_set} depends on {dependency} {dependency_set}")
                 }
+            }
+            #[cfg(feature = "experimental-conflict")]
+            External::Conflict(hash_map) => {
+                let mut buf = String::new();
+                write!(buf, "packages ").unwrap();
+                for (idx, (k, v)) in hash_map.iter().enumerate() {
+                    if idx == hash_map.len() - 2 {
+                        write!(buf, "and ").unwrap();
+                    }
+                    write!(buf, "{k} in {v}").unwrap();
+                    if idx != hash_map.len() - 1 {
+                        write!(buf, ", ").unwrap();
+                    }
+                }
+                write!(buf, "conflict").unwrap();
+                buf
             }
         }
     }

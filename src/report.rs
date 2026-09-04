@@ -3,6 +3,8 @@
 //! Build a report as clear as possible as to why
 //! dependency solving failed.
 
+#[cfg(feature = "experimental-conflict")]
+use std::collections::HashMap;
 use std::fmt::{self, Debug, Display};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -40,10 +42,17 @@ pub enum DerivationTree<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Disp
 pub enum External<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     /// Initial incompatibility aiming at picking the root package for the first decision.
     NotRoot(P, VS::V),
+
     /// There are no versions in the given set for this package.
     NoVersions(P, VS),
+
     /// Incompatibility coming from the dependencies of a given package.
     FromDependencyOf(P, VS, P, VS),
+
+    /// Incompatibility coming from externally specified conflicts between packages.
+    #[cfg(feature = "experimental-conflict")]
+    Conflict(HashMap<P, VS>),
+
     /// The package is unusable for reasons outside pubgrub.
     Custom(P, VS, M),
 }
@@ -74,6 +83,8 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
                     packages.insert(p);
                     packages.insert(p2);
                 }
+                #[cfg(feature = "experimental-conflict")]
+                External::Conflict(small_map) => packages.extend(small_map.iter().map(|(k, _)| k)),
                 External::NoVersions(p, _)
                 | External::NotRoot(p, _)
                 | External::Custom(p, _, _) => {
@@ -158,6 +169,8 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
                     )))
                 }
             }
+            #[cfg(feature = "experimental-conflict")]
+            DerivationTree::External(External::Conflict(_)) => None,
             // Cannot be merged because the reason may not match
             DerivationTree::External(External::Custom(_, _, _)) => None,
         }
@@ -197,6 +210,20 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Display for Ex
                 } else {
                     write!(f, "{p} {set_p} depends on {dep} {set_dep}")
                 }
+            }
+            #[cfg(feature = "experimental-conflict")]
+            Self::Conflict(hash_map) => {
+                write!(f, "packages ")?;
+                for (idx, (k, v)) in hash_map.iter().enumerate() {
+                    if idx == hash_map.len() - 2 {
+                        write!(f, "and ")?;
+                    }
+                    write!(f, "{k} in {v}")?;
+                    if idx != hash_map.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "conflict")
             }
         }
     }

@@ -46,6 +46,8 @@ version-ranges = { version = "0.1.0", path = "version-ranges", features = ["prop
 
 [features]
 serde = ["dep:serde", "version-ranges/serde"]
+experimental-conflict = []
+# default = ["experimental-conflict"]
 
 [[bench]]
 name = "backtracking"
