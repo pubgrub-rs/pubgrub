@@ -83,10 +83,14 @@ fn depend_on_self() {
 fn deep_derivation_tree_does_not_overflow_stack() {
     const DEPTH: usize = 20_000;
 
-    let derivation_tree = deep_derivation_tree(DEPTH);
+    let mut derivation_tree = deep_derivation_tree(DEPTH);
     let packages = derivation_tree.packages();
     assert!(packages.contains(&"root".to_string()));
     assert!(packages.contains(&format!("package-{DEPTH}")));
+    drop(packages);
+    drop(derivation_tree.clone());
+    derivation_tree.collapse_no_versions();
+    assert!(!DefaultStringReporter::report(&derivation_tree).is_empty());
 }
 
 #[test]

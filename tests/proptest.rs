@@ -446,6 +446,23 @@ proptest! {
     }
 
     #[test]
+    fn prop_can_report_and_collapse(
+        (dependency_provider, cases) in registry_strategy(0u16..665)
+    ) {
+        for (name, ver) in cases {
+            if let Err(PubGrubError::NoSolution(mut tree)) =
+                timeout_resolve(dependency_provider.clone(), name, ver)
+            {
+                prop_assert!(!DefaultStringReporter::report(&tree).is_empty());
+                let packages: Set<_> = tree.packages().into_iter().copied().collect();
+                tree.collapse_no_versions();
+                prop_assert!(!DefaultStringReporter::report(&tree).is_empty());
+                prop_assert!(tree.packages().iter().all(|p| packages.contains(p)));
+            }
+        }
+    }
+
+    #[test]
     fn prop_sat_errors_the_same(
         (dependency_provider, cases) in registry_strategy(0u16..665)
     )  {
