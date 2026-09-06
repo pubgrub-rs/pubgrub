@@ -5,6 +5,7 @@
 
 use std::fmt::{self, Debug, Display};
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use crate::{Map, Package, Set, Term, VersionSet};
 
@@ -30,13 +31,24 @@ pub trait Reporter<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> 
 /// The tree is stored as an arena of nodes. Causes of derived incompatibilities are represented as
 /// node ids instead of recursive ownership, so very deep derivation trees can be traversed and
 /// dropped without recursively consuming stack.
+///
+/// To inspect a tree, match on [`Self::root`] or look up causes with [`Self::node`]. To construct
+/// or transform one, start with [`Self::new`], append causes before their parents with
+/// [`Self::push`], and select the conclusion with [`Self::set_root`]. [`Self::into_nodes`] yields
+/// owned nodes in cause-first order for transformations that rebuild a tree.
+///
+/// Cloning a tree shares its arena in constant time. Appending nodes or consuming a shared arena
+/// clones its nodes; subsequent edits to either tree do not affect the other.
 #[derive(Debug, Clone)]
 pub struct DerivationTree<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
-    arena: Vec<DerivationTreeNode<P, VS, M>>,
+    arena: Arc<Vec<DerivationTreeNode<P, VS, M>>>,
     root: DerivationTreeId,
 }
 
 /// Identifier of a node in a [DerivationTree].
+///
+/// An id belongs to the tree that allocated it (or an unmodified clone of that tree). It must not
+/// be used with an unrelated tree. [`DerivationTree::collapse_no_versions`] invalidates old ids.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DerivationTreeId(usize);
 
@@ -80,7 +92,11 @@ pub struct Derived<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> 
 }
 
 impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Derived<P, VS, M> {
-    pub(crate) fn new(
+    /// Construct an incompatibility from two causes in the same tree.
+    ///
+    /// When constructing a shared incompatibility, use a unique `shared_id` so reporters can
+    /// explain it once and refer back to it on subsequent uses.
+    pub fn new(
         terms: Map<P, Term<VS>>,
         shared_id: Option<usize>,
         cause1: DerivationTreeId,
@@ -103,12 +119,82 @@ impl DerivationTreeId {
 }
 
 impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree<P, VS, M> {
+    /// Start a tree with an external incompatibility as its root.
+    ///
+    /// ```
+    /// use pubgrub::{DerivationTree, DerivationTreeNode, Derived, External, Map, Ranges};
+    ///
+    /// let mut tree = DerivationTree::<&str, Ranges<u32>, String>::new(
+    ///     External::NoVersions("bar", Ranges::full()),
+    /// );
+    /// let missing = tree.root_id();
+    /// let dependency = tree.push(DerivationTreeNode::External(External::FromDependencyOf(
+    ///     "foo", Ranges::full(), "bar", Ranges::full(),
+    /// )));
+    /// let conclusion = tree.push(DerivationTreeNode::Derived(Derived::new(
+    ///     Map::from_iter([("foo", pubgrub::Term::Positive(Ranges::full()))]),
+    ///     None,
+    ///     dependency,
+    ///     missing,
+    /// )));
+    /// tree.set_root(conclusion);
+    /// ```
+    pub fn new(external: External<P, VS, M>) -> Self {
+        Self {
+            arena: Arc::new(vec![DerivationTreeNode::External(external)]),
+            root: DerivationTreeId(0),
+        }
+    }
+
+    /// Append a node, returning its id. The root is unchanged.
+    ///
+    /// Causes must already have been allocated in this tree. This keeps nodes in topological
+    /// order and prevents cycles.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either cause is outside this tree's arena.
+    pub fn push(&mut self, node: DerivationTreeNode<P, VS, M>) -> DerivationTreeId {
+        if let DerivationTreeNode::Derived(derived) = &node {
+            assert!(derived.cause1.0 < self.arena.len(), "invalid first cause");
+            assert!(derived.cause2.0 < self.arena.len(), "invalid second cause");
+        }
+        Self::alloc_node(Arc::make_mut(&mut self.arena), node)
+    }
+
+    /// Select the tree's conclusion. The id must belong to this tree.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the id is outside this tree's arena.
+    pub fn set_root(&mut self, root: DerivationTreeId) {
+        assert!(root.0 < self.arena.len(), "invalid root");
+        self.root = root;
+    }
+
+    /// Consume the arena, yielding each node and its old id, with causes before their parents.
+    ///
+    /// This includes nodes unreachable from the root. Save [`Self::root_id`] before consuming
+    /// the tree if you need to identify its conclusion. When rebuilding a tree, map each old id
+    /// to the id returned by [`Self::push`] for use in subsequent causes.
+    pub fn into_nodes(
+        self,
+    ) -> impl ExactSizeIterator<Item = (DerivationTreeId, DerivationTreeNode<P, VS, M>)> {
+        Arc::unwrap_or_clone(self.arena)
+            .into_iter()
+            .enumerate()
+            .map(|(id, node)| (DerivationTreeId(id), node))
+    }
+
     pub(crate) fn from_arena(
         arena: Vec<DerivationTreeNode<P, VS, M>>,
         root: DerivationTreeId,
     ) -> Self {
         debug_assert!(root.0 < arena.len());
-        Self { arena, root }
+        Self {
+            arena: Arc::new(arena),
+            root,
+        }
     }
 
     pub(crate) fn alloc_node(
@@ -130,7 +216,11 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
         self.node(self.root)
     }
 
-    /// Return a node from the derivation tree.
+    /// Return a node from the derivation tree. The id must belong to this tree.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the id is outside this tree's arena.
     pub fn node(&self, id: DerivationTreeId) -> &DerivationTreeNode<P, VS, M> {
         &self.arena[id.0]
     }
@@ -188,17 +278,17 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
     /// [DependencyProvider](crate::solver::DependencyProvider)
     /// was not run in some kind of offline mode that may not
     /// have access to all versions existing.
+    ///
+    /// This invalidates previously obtained node ids; obtain the new root with [`Self::root_id`].
     pub fn collapse_no_versions(&mut self) {
         let old_arena = std::mem::take(&mut self.arena);
         let old_root = self.root;
-        let mut order = Vec::new();
-        let mut seen = Set::default();
+        let mut seen = vec![false; old_arena.len()];
         let mut stack = vec![old_root];
         while let Some(id) = stack.pop() {
-            if !seen.insert(id) {
+            if std::mem::replace(&mut seen[id.0], true) {
                 continue;
             }
-            order.push(id);
             if let DerivationTreeNode::Derived(derived) = &old_arena[id.0] {
                 stack.push(derived.cause1);
                 stack.push(derived.cause2);
@@ -206,16 +296,21 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
         }
 
         let mut new_arena = Vec::with_capacity(old_arena.len());
-        let mut remapped = Map::default();
-        for old_id in order.into_iter().rev() {
-            let new_id = match &old_arena[old_id.0] {
+        let mut remapped = vec![None; old_arena.len()];
+        // Nodes are allocated after their causes. Reversing DFS visitation order is not
+        // topological when a cause is shared between branches.
+        for (old_id, node) in old_arena.iter().enumerate() {
+            if !seen[old_id] {
+                continue;
+            }
+            let new_id = match node {
                 DerivationTreeNode::External(external) => Self::alloc_node(
                     &mut new_arena,
                     DerivationTreeNode::External(external.clone()),
                 ),
                 DerivationTreeNode::Derived(derived) => {
-                    let cause1 = remapped[&derived.cause1];
-                    let cause2 = remapped[&derived.cause2];
+                    let cause1 = remapped[derived.cause1.0].expect("cause must precede its parent");
+                    let cause2 = remapped[derived.cause2.0].expect("cause must precede its parent");
                     match (&old_arena[derived.cause1.0], &old_arena[derived.cause2.0]) {
                         (DerivationTreeNode::External(External::NoVersions(package, set)), _) => {
                             self.merge_no_versions_id(
@@ -267,11 +362,11 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
                     }
                 }
             };
-            remapped.insert(old_id, new_id);
+            remapped[old_id] = Some(new_id);
         }
 
-        self.root = remapped[&old_root];
-        self.arena = new_arena;
+        self.root = remapped[old_root.0].expect("root must be reachable");
+        self.arena = Arc::new(new_arena);
     }
 
     fn merge_no_versions_id(
@@ -852,5 +947,46 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Reporter<P, VS
                 reporter.lines.join("\n")
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Ranges;
+
+    type Tree = DerivationTree<&'static str, Ranges<u32>, String>;
+
+    #[test]
+    fn collapse_shared_causes_in_topological_order() {
+        let mut arena = Vec::new();
+        let a = Tree::alloc_node(
+            &mut arena,
+            DerivationTreeNode::External(External::Custom("a", Ranges::full(), "a".into())),
+        );
+        let b = Tree::alloc_node(
+            &mut arena,
+            DerivationTreeNode::External(External::Custom("b", Ranges::full(), "b".into())),
+        );
+        let shared = Tree::alloc_node(
+            &mut arena,
+            DerivationTreeNode::Derived(Derived::new(Map::default(), Some(0), a, b)),
+        );
+        let left = Tree::alloc_node(
+            &mut arena,
+            DerivationTreeNode::Derived(Derived::new(Map::default(), None, shared, a)),
+        );
+        let right = Tree::alloc_node(
+            &mut arena,
+            DerivationTreeNode::Derived(Derived::new(Map::default(), None, b, shared)),
+        );
+        let root = Tree::alloc_node(
+            &mut arena,
+            DerivationTreeNode::Derived(Derived::new(Map::default(), None, left, right)),
+        );
+        let mut tree = Tree::from_arena(arena, root);
+        let report = DefaultStringReporter::report(&tree);
+        tree.collapse_no_versions();
+        assert_eq!(DefaultStringReporter::report(&tree), report);
     }
 }
