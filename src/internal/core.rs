@@ -4,7 +4,6 @@
 //! to write a functional PubGrub algorithm.
 
 use std::collections::HashSet as Set;
-use std::sync::Arc;
 
 use crate::internal::{
     Arena, DecisionLevel, HashArena, Id, IncompDpId, IncompId, Incompatibility, PartialSolution,
@@ -409,17 +408,19 @@ impl<DP: DependencyProvider> State<DP> {
         let mut sorted_ids = all_ids.into_iter().collect::<Vec<_>>();
         sorted_ids.sort_unstable_by_key(|id| id.into_raw());
         let mut precomputed = Map::default();
+        let mut arena = Vec::with_capacity(sorted_ids.len());
         for id in sorted_ids {
-            let tree = Incompatibility::build_derivation_tree(
+            let node = Incompatibility::build_derivation_tree_node(
                 id,
                 &shared_ids,
                 &self.incompatibility_store,
                 &self.package_store,
                 &precomputed,
             );
-            precomputed.insert(id, Arc::new(tree));
+            let node_id = DerivationTree::alloc_node(&mut arena, node);
+            precomputed.insert(id, node_id);
         }
         // Now the user can refer to the entire tree from its root.
-        Arc::into_inner(precomputed.remove(&incompat).unwrap()).unwrap()
+        DerivationTree::from_arena(arena, precomputed.remove(&incompat).unwrap())
     }
 }
