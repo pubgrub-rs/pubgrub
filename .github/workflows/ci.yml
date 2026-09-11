@@ -3,7 +3,7 @@ on:
   pull_request:
   merge_group:
   push:
-    branches: [release, dev]
+    branches: [release, main]
   schedule: [cron: "0 6 * * 4"]
 
 permissions: {}
