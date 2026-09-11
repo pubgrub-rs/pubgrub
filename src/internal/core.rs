@@ -21,12 +21,6 @@ pub(crate) struct State<DP: DependencyProvider> {
     #[allow(clippy::type_complexity)]
     incompatibilities: Map<Id<DP::P>, Vec<IncompDpId<DP>>>,
 
-    /// As an optimization, store the ids of incompatibilities that are already contradicted.
-    ///
-    /// For each one keep track of the decision level when it was found to be contradicted.
-    /// These will stay contradicted until we have backtracked beyond its associated decision level.
-    contradicted_incompatibilities: Map<IncompDpId<DP>, DecisionLevel>,
-
     /// All incompatibilities expressing dependencies,
     /// with common dependents merged.
     #[allow(clippy::type_complexity)]
@@ -64,7 +58,6 @@ impl<DP: DependencyProvider> State<DP> {
             root_package,
             root_version,
             incompatibilities,
-            contradicted_incompatibilities: Map::default(),
             partial_solution: PartialSolution::empty(),
             incompatibility_store,
             package_store,
@@ -91,7 +84,12 @@ impl<DP: DependencyProvider> State<DP> {
     }
 
     /// Add an incompatibility to the state.
-    pub(crate) fn add_incompatibility(&mut self, incompat: Incompatibility<DP::P, DP::VS, DP::M>) {
+    pub(crate) fn add_incompatibility(
+        &mut self,
+        mut incompat: Incompatibility<DP::P, DP::VS, DP::M>,
+    ) {
+        // Cached contradictions are only valid in the state that recorded them.
+        incompat.reset_contradiction_cache();
         let id = self.incompatibility_store.alloc(incompat);
         self.merge_incompatibility(id);
     }
@@ -177,8 +175,8 @@ impl<DP: DependencyProvider> State<DP> {
             // We only care about incompatibilities if it contains the current package.
             for &incompat_id in self.incompatibilities[&current_package].iter().rev() {
                 if self
-                    .contradicted_incompatibilities
-                    .contains_key(&incompat_id)
+                    .partial_solution
+                    .is_contradicted(&self.incompatibility_store[incompat_id])
                 {
                     continue;
                 }
@@ -209,12 +207,12 @@ impl<DP: DependencyProvider> State<DP> {
                             &self.incompatibility_store,
                         );
                         // With the partial solution updated, the incompatibility is now contradicted.
-                        self.contradicted_incompatibilities
-                            .insert(incompat_id, self.partial_solution.current_decision_level());
+                        self.partial_solution
+                            .mark_contradicted(&mut self.incompatibility_store[incompat_id]);
                     }
                     Relation::Contradicted(_) => {
-                        self.contradicted_incompatibilities
-                            .insert(incompat_id, self.partial_solution.current_decision_level());
+                        self.partial_solution
+                            .mark_contradicted(&mut self.incompatibility_store[incompat_id]);
                     }
                     _ => {}
                 }
@@ -235,8 +233,8 @@ impl<DP: DependencyProvider> State<DP> {
                 );
                 // After conflict resolution and the partial solution update,
                 // the root cause incompatibility is now contradicted.
-                self.contradicted_incompatibilities
-                    .insert(root_cause, self.partial_solution.current_decision_level());
+                self.partial_solution
+                    .mark_contradicted(&mut self.incompatibility_store[root_cause]);
             }
         }
         // If there are no more changed packages, unit propagation is done.
@@ -330,9 +328,6 @@ impl<DP: DependencyProvider> State<DP> {
         decision_level: DecisionLevel,
     ) {
         self.partial_solution.backtrack(decision_level);
-        // Remove contradicted incompatibilities that depend on decisions we just backtracked away.
-        self.contradicted_incompatibilities
-            .retain(|_, dl| *dl <= decision_level);
         if incompat_changed {
             self.merge_incompatibility(incompat);
         }

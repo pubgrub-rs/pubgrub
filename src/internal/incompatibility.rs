@@ -6,11 +6,38 @@
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 
-use crate::internal::{Arena, HashArena, Id, SmallMap};
+use crate::internal::{Arena, DecisionLevel, HashArena, Id, SmallMap};
 use crate::{
     DependencyProvider, DerivationTree, Derived, External, Map, Package, Set, Term, VersionSet,
     term,
 };
+
+#[derive(Debug, Clone)]
+struct ContradictionCache {
+    /// The decision level where this incompatibility became contradicted.
+    decision_level: DecisionLevel,
+    /// The backtrack generation for that decision level.
+    backtrack_generation: u32,
+}
+
+impl ContradictionCache {
+    fn not_contradicted() -> Self {
+        Self {
+            decision_level: DecisionLevel::MAX,
+            backtrack_generation: 0,
+        }
+    }
+
+    fn is_contradicted(&self, last_valid_decision_levels: &[DecisionLevel]) -> bool {
+        // The active generation has no backtrack target yet, so every contradiction recorded in
+        // it remains valid. Completed generations store the highest decision level that survived
+        // their first invalidating backtrack.
+        last_valid_decision_levels
+            .get(self.backtrack_generation as usize)
+            .map(|&level| self.decision_level <= level)
+            .unwrap_or(true)
+    }
+}
 
 /// An incompatibility is a set of terms for different packages
 /// that should never be satisfied all together.
@@ -31,6 +58,7 @@ use crate::{
 pub(crate) struct Incompatibility<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> {
     package_terms: SmallMap<Id<P>, Term<VS>>,
     kind: Kind<P, VS, M>,
+    contradiction_cache: ContradictionCache,
 }
 
 /// Type alias of unique identifiers for incompatibilities.
@@ -100,6 +128,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
                 Term::Negative(VS::singleton(version.clone())),
             )]),
             kind: Kind::NotRoot(package, version),
+            contradiction_cache: ContradictionCache::not_contradicted(),
         }
     }
 
@@ -112,6 +141,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         Self {
             package_terms: SmallMap::One([(package, term)]),
             kind: Kind::NoVersions(package, set),
+            contradiction_cache: ContradictionCache::not_contradicted(),
         }
     }
 
@@ -125,6 +155,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         Self {
             package_terms: SmallMap::One([(package, term)]),
             kind: Kind::Custom(package, set, metadata),
+            contradiction_cache: ContradictionCache::not_contradicted(),
         }
     }
 
@@ -135,6 +166,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         Self {
             package_terms: SmallMap::One([(package, term)]),
             kind: Kind::Custom(package, set, metadata),
+            contradiction_cache: ContradictionCache::not_contradicted(),
         }
     }
 
@@ -151,6 +183,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
                 ])
             },
             kind: Kind::FromDependencyOf(package, p2),
+            contradiction_cache: ContradictionCache::not_contradicted(),
         }
     }
 
@@ -250,7 +283,28 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         Self {
             package_terms,
             kind,
+            contradiction_cache: ContradictionCache::not_contradicted(),
         }
+    }
+
+    pub(crate) fn is_contradicted(&self, last_valid_decision_levels: &[DecisionLevel]) -> bool {
+        self.contradiction_cache
+            .is_contradicted(last_valid_decision_levels)
+    }
+
+    pub(crate) fn mark_contradicted(
+        &mut self,
+        decision_level: DecisionLevel,
+        backtrack_generation: u32,
+    ) {
+        self.contradiction_cache = ContradictionCache {
+            decision_level,
+            backtrack_generation,
+        };
+    }
+
+    pub(crate) fn reset_contradiction_cache(&mut self) {
+        self.contradiction_cache = ContradictionCache::not_contradicted();
     }
 
     /// Check if an incompatibility should mark the end of the algorithm
@@ -422,6 +476,32 @@ pub(crate) mod tests {
     use crate::term::tests::strategy as term_strat;
     use crate::{OfflineDependencyProvider, Ranges};
 
+    #[test]
+    fn contradiction_cache_tracks_backtrack_generations() {
+        let current_generation = ContradictionCache {
+            decision_level: DecisionLevel::new(3),
+            backtrack_generation: 1,
+        };
+
+        // A generation without a recorded backtrack target is still active.
+        assert!(current_generation.is_contradicted(&[DecisionLevel::ZERO]));
+        // Backtracking below the contradiction's decision level invalidates it.
+        assert!(!current_generation.is_contradicted(&[DecisionLevel::ZERO, DecisionLevel::new(2)]));
+        // Backtracking to or above that decision level preserves it.
+        assert!(current_generation.is_contradicted(&[DecisionLevel::ZERO, DecisionLevel::new(3)]));
+
+        let later_generation = ContradictionCache {
+            decision_level: DecisionLevel::new(5),
+            backtrack_generation: 2,
+        };
+        assert!(later_generation.is_contradicted(&[DecisionLevel::ZERO, DecisionLevel::new(3)]));
+        assert!(!later_generation.is_contradicted(&[
+            DecisionLevel::ZERO,
+            DecisionLevel::new(3),
+            DecisionLevel::new(4),
+        ]));
+    }
+
     #[derive(Debug, Eq, PartialEq)]
     struct PanicOnCloneRanges(Ranges<usize>);
 
@@ -479,12 +559,14 @@ pub(crate) mod tests {
             let p3 = package_store.alloc("p3");
             let i1 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([(p1, t1.clone()), (p2, t2.negate())]),
-                kind: Kind::<_, _, String>::FromDependencyOf(p1, p2)
+                kind: Kind::<_, _, String>::FromDependencyOf(p1, p2),
+                contradiction_cache: ContradictionCache::not_contradicted(),
             });
 
             let i2 = store.alloc(Incompatibility {
                 package_terms: SmallMap::Two([(p2, t2), (p3, t3.clone())]),
-                kind: Kind::<_, _, String>::FromDependencyOf(p2, p3)
+                kind: Kind::<_, _, String>::FromDependencyOf(p2, p3),
+                contradiction_cache: ContradictionCache::not_contradicted(),
             });
 
             let mut i3 = Map::default();
