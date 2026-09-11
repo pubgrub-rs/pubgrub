@@ -1,0 +1,168 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="PubGrub version solving algorithm."><title>pubgrub - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-1ed95124.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="pubgrub" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.1 (48a229cea 2026-09-01)" data-channel="1.98.1" data-search-js="search-9944d736.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../static.files/storage-41dd4d93.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate pubgrub</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../pubgrub/index.html">pubgrub</a><span class="version">0.4.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#basic-example" title="Basic example">Basic example</a></li><li><a href="#package-and-version-flexibility" title="Package and Version flexibility">Package and Version flexibility</a></li><li><a href="#dependencyprovider-trait" title="DependencyProvider trait">DependencyProvider trait</a></li><li><a href="#solution-and-error-reporting" title="Solution and error reporting">Solution and error reporting</a></li></ul><h3><a href="#structs">Crate Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#traits" title="Traits">Traits</a></li><li><a href="#functions" title="Functions">Functions</a></li><li><a href="#types" title="Type Aliases">Type Aliases</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1>Crate <span>pubgrub</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/pubgrub/lib.rs.html#3-244">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>PubGrub version solving algorithm.</p>
+<p>Version solving consists in efficiently finding a set of packages and versions
+that satisfy all the constraints of a given project dependencies.
+In addition, when that is not possible,
+we should try to provide a very human-readable and clear
+explanation as to why that failed.</p>
+<h2 id="basic-example"><a class="doc-anchor" href="#basic-example">§</a>Basic example</h2>
+<p>Let’s imagine that we are building a user interface
+with a menu containing dropdowns with some icons,
+icons that we are also directly using in other parts of the interface.
+For this scenario our direct dependencies are <code>menu</code> and <code>icons</code>,
+but the complete set of dependencies looks like follows:</p>
+<ul>
+<li><code>root</code> depends on <code>menu</code> and <code>icons</code></li>
+<li><code>menu</code> depends on <code>dropdown</code></li>
+<li><code>dropdown</code> depends on <code>icons</code></li>
+<li><code>icons</code> has no dependency</li>
+</ul>
+<p>We can model that scenario with this library as follows</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>
+<span class="kw">type </span>NumVS = Ranges&lt;u32&gt;;
+
+<span class="kw">let </span><span class="kw-2">mut </span>dependency_provider = OfflineDependencyProvider::&lt;<span class="kw-2">&amp;</span>str, NumVS&gt;::new();
+
+dependency_provider.add_dependencies(
+    <span class="string">"root"</span>,
+    <span class="number">1u32</span>,
+    [(<span class="string">"menu"</span>, Ranges::full()), (<span class="string">"icons"</span>, Ranges::full())],
+);
+dependency_provider.add_dependencies(<span class="string">"menu"</span>, <span class="number">1u32</span>, [(<span class="string">"dropdown"</span>, Ranges::full())]);
+dependency_provider.add_dependencies(<span class="string">"dropdown"</span>, <span class="number">1u32</span>, [(<span class="string">"icons"</span>, Ranges::full())]);
+dependency_provider.add_dependencies(<span class="string">"icons"</span>, <span class="number">1u32</span>, []);
+
+<span class="comment">// Run the algorithm.
+</span><span class="kw">let </span>solution = resolve(<span class="kw-2">&amp;</span>dependency_provider, <span class="string">"root"</span>, <span class="number">1u32</span>).unwrap();</code></pre></div><h2 id="package-and-version-flexibility"><a class="doc-anchor" href="#package-and-version-flexibility">§</a>Package and Version flexibility</h2>
+<p>The <a href="struct.OfflineDependencyProvider.html" title="struct pubgrub::OfflineDependencyProvider">OfflineDependencyProvider</a> used in that example is generic over the way package names,
+version requirements, and version numbers are represented.</p>
+<p>The first bound is the type of package names. It can be anything that implements our <a href="trait.Package.html" title="trait pubgrub::Package">Package</a> trait.
+The <a href="trait.Package.html" title="trait pubgrub::Package">Package</a> trait is automatic if the type already implements
+<a href="https://doc.rust-lang.org/1.98.1/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> + <a href="https://doc.rust-lang.org/1.98.1/core/cmp/trait.Eq.html" title="trait core::cmp::Eq">Eq</a> + <a href="https://doc.rust-lang.org/1.98.1/core/hash/macros/derive.Hash.html" title="derive core::hash::macros::Hash">Hash</a> + <a href="https://doc.rust-lang.org/1.98.1/core/fmt/macros/derive.Debug.html" title="derive core::fmt::macros::Debug">Debug</a> + <a href="https://doc.rust-lang.org/1.98.1/core/fmt/trait.Display.html" title="trait core::fmt::Display">Display</a>.
+So things like <a href="https://doc.rust-lang.org/1.98.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a> will work out of the box.</p>
+<p>The second bound is the type of package requirements. It can be anything that implements our <a href="trait.VersionSet.html" title="trait pubgrub::VersionSet">VersionSet</a> trait.
+This trait is used to figure out how version requirements are combined.
+If the normal <a href="https://doc.rust-lang.org/1.98.1/core/cmp/trait.Ord.html" title="trait core::cmp::Ord">Ord</a>/<a href="https://doc.rust-lang.org/1.98.1/core/cmp/trait.PartialEq.html" title="trait core::cmp::PartialEq">PartialEq</a> operations are all that is needed for requirements, our <a href="struct.Range.html" title="struct pubgrub::Range">Ranges</a> type will work.</p>
+<p>The chosen <code>VersionSet</code> in turn specifies what can be used for version numbers.
+This type needs to at least implement <a href="https://doc.rust-lang.org/1.98.1/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> + <a href="https://doc.rust-lang.org/1.98.1/core/cmp/trait.Ord.html" title="trait core::cmp::Ord">Ord</a> + <a href="https://doc.rust-lang.org/1.98.1/core/fmt/macros/derive.Debug.html" title="derive core::fmt::macros::Debug">Debug</a> + <a href="https://doc.rust-lang.org/1.98.1/core/fmt/trait.Display.html" title="trait core::fmt::Display">Display</a>.
+For convenience, this library provides <a href="struct.SemanticVersion.html" title="struct pubgrub::SemanticVersion">SemanticVersion</a> that implements the basics of semantic versioning rules.</p>
+<h2 id="dependencyprovider-trait"><a class="doc-anchor" href="#dependencyprovider-trait">§</a>DependencyProvider trait</h2>
+<p>In our previous example we used the
+<a href="struct.OfflineDependencyProvider.html" title="struct pubgrub::OfflineDependencyProvider">OfflineDependencyProvider</a>,
+which is a basic implementation of the <a href="trait.DependencyProvider.html" title="trait pubgrub::DependencyProvider">DependencyProvider</a> trait.</p>
+<p>But we might want to implement the <a href="trait.DependencyProvider.html" title="trait pubgrub::DependencyProvider">DependencyProvider</a>
+trait for our own type.
+Let’s say that we will use <a href="https://doc.rust-lang.org/1.98.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a> for packages,
+and <a href="struct.SemanticVersion.html" title="struct pubgrub::SemanticVersion">SemanticVersion</a> for versions.
+This may be done quite easily by implementing the three following functions.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">type </span>SemVS = Ranges&lt;SemanticVersion&gt;;
+
+<span class="kw">impl </span>DependencyProvider <span class="kw">for </span>MyDependencyProvider {
+    <span class="kw">fn </span>choose_version(<span class="kw-2">&amp;</span><span class="self">self</span>, package: <span class="kw-2">&amp;</span>String, range: <span class="kw-2">&amp;</span>SemVS) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;SemanticVersion&gt;, Infallible&gt; {
+        <span class="macro">unimplemented!</span>()
+    }
+
+    <span class="kw">type </span>Priority = usize;
+    <span class="kw">fn </span>prioritize(<span class="kw-2">&amp;</span><span class="self">self</span>, package: <span class="kw-2">&amp;</span>String, range: <span class="kw-2">&amp;</span>SemVS, conflicts_counts: <span class="kw-2">&amp;</span>PackageResolutionStatistics) -&gt; <span class="self">Self</span>::Priority {
+        <span class="macro">unimplemented!</span>()
+    }
+
+    <span class="kw">fn </span>get_dependencies(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        package: <span class="kw-2">&amp;</span>String,
+        version: <span class="kw-2">&amp;</span>SemanticVersion,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Dependencies&lt;String, SemVS, <span class="self">Self</span>::M&gt;, Infallible&gt; {
+        <span class="prelude-val">Ok</span>(Dependencies::Available(DependencyConstraints::default()))
+    }
+
+    <span class="kw">type </span><span class="prelude-val">Err </span>= Infallible;
+    <span class="kw">type </span>P = String;
+    <span class="kw">type </span>V = SemanticVersion;
+    <span class="kw">type </span>VS = SemVS;
+    <span class="kw">type </span>M = String;
+}</code></pre></div>
+<p>The first method
+<a href="trait.DependencyProvider.html#tymethod.choose_version" title="method pubgrub::DependencyProvider::choose_version">choose_version</a>
+chooses a version compatible with the provided range for a package.
+The second method
+<a href="trait.DependencyProvider.html#tymethod.prioritize" title="method pubgrub::DependencyProvider::prioritize">prioritize</a>
+in which order different packages should be chosen.
+Usually prioritizing packages
+with the fewest number of compatible versions speeds up resolution.
+But in general you are free to employ whatever strategy suits you best
+to pick a package and a version.</p>
+<p>The third method <a href="trait.DependencyProvider.html#tymethod.get_dependencies" title="method pubgrub::DependencyProvider::get_dependencies">get_dependencies</a>
+aims at retrieving the dependencies of a given package at a given version.</p>
+<p>In a real scenario, these two methods may involve reading the file system
+or doing network request, so you may want to hold a cache in your
+<a href="trait.DependencyProvider.html" title="trait pubgrub::DependencyProvider">DependencyProvider</a> implementation.
+How exactly this could be achieved is shown in <code>CachingDependencyProvider</code>
+(see <code>examples/caching_dependency_provider.rs</code>).
+You could also use the <a href="struct.OfflineDependencyProvider.html" title="struct pubgrub::OfflineDependencyProvider">OfflineDependencyProvider</a>
+type defined by the crate as guidance,
+but you are free to use whatever approach makes sense in your situation.</p>
+<h2 id="solution-and-error-reporting"><a class="doc-anchor" href="#solution-and-error-reporting">§</a>Solution and error reporting</h2>
+<p>When everything goes well, the algorithm finds and returns the complete
+set of direct and indirect dependencies satisfying all the constraints.
+The packages and versions selected are returned as
+<a href="struct.SelectedDependencies.html" title="struct pubgrub::SelectedDependencies">SelectedDependencies&lt;P, V&gt;</a>.
+But sometimes there is no solution because dependencies are incompatible.
+In such cases, <a href="fn.resolve.html" title="fn pubgrub::resolve">resolve(…)</a> returns a
+<a href="enum.PubGrubError.html#variant.NoSolution" title="variant pubgrub::PubGrubError::NoSolution">PubGrubError::NoSolution(derivation_tree)</a>,
+where the provided derivation tree is a custom binary tree
+containing the full chain of reasons why there is no solution.</p>
+<p>All the items in the tree are called incompatibilities
+and may be of two types, either “external” or “derived”.
+Leaves of the tree are external incompatibilities,
+and nodes are derived.
+External incompatibilities have reasons that are independent
+of the way this algorithm is implemented such as</p>
+<ul>
+<li>dependencies: “package_a” at version 1 depends on “package_b” at version 4</li>
+<li>missing dependencies: dependencies of “package_a” are unavailable</li>
+<li>absence of version: there is no version of “package_a” in the range [3.1.0  4.0.0[</li>
+</ul>
+<p>Derived incompatibilities are obtained during the algorithm execution by deduction,
+such as if “a” depends on “b” and “b” depends on “c”, “a” depends on “c”.</p>
+<p>This crate defines a <a href="trait.Reporter.html" title="trait pubgrub::Reporter">Reporter</a> trait, with an associated
+<a href="trait.Reporter.html#associatedtype.Output" title="associated type pubgrub::Reporter::Output">Output</a> type and a single method.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">pub trait </span>Reporter&lt;P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display&gt; {
+    <span class="kw">type </span>Output;
+
+    <span class="kw">fn </span>report(derivation_tree: <span class="kw-2">&amp;</span>DerivationTree&lt;P, VS, M&gt;) -&gt; <span class="self">Self</span>::Output;
+}</code></pre></div>
+<p>Implementing a <a href="trait.Reporter.html" title="trait pubgrub::Reporter">Reporter</a> may involve a lot of heuristics
+to make the output human-readable and natural.
+For convenience, we provide a default implementation
+<a href="struct.DefaultStringReporter.html" title="struct pubgrub::DefaultStringReporter">DefaultStringReporter</a> that outputs the report as a <a href="https://doc.rust-lang.org/1.98.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>.
+You may use it as follows:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">match </span>resolve(<span class="kw-2">&amp;</span>dependency_provider, root_package, root_version) {
+    <span class="prelude-val">Ok</span>(solution) =&gt; <span class="macro">println!</span>(<span class="string">"{:?}"</span>, solution),
+    <span class="prelude-val">Err</span>(PubGrubError::NoSolution(<span class="kw-2">mut </span>derivation_tree)) =&gt; {
+        derivation_tree.collapse_no_versions();
+        <span class="macro">eprintln!</span>(<span class="string">"{}"</span>, DefaultStringReporter::report(<span class="kw-2">&amp;</span>derivation_tree));
+    }
+    <span class="prelude-val">Err</span>(err) =&gt; <span class="macro">panic!</span>(<span class="string">"{:?}"</span>, err),
+};</code></pre></div>
+<p>Notice that we also used
+<a href="enum.DerivationTree.html#method.collapse_no_versions" title="method pubgrub::DerivationTree::collapse_no_versions">collapse_no_versions()</a> above.
+This method simplifies the derivation tree to get rid of the
+<a href="enum.External.html#variant.NoVersions" title="variant pubgrub::External::NoVersions">NoVersions</a>
+external incompatibilities in the derivation tree.
+So instead of seeing things like this in the report:</p>
+<div class="example-wrap"><pre class="language-txt"><code>Because there is no version of foo in 1.0.1 &lt;= v &lt; 2.0.0
+and foo 1.0.0 depends on bar 2.0.0 &lt;= v &lt; 3.0.0,
+foo 1.0.0 &lt;= v &lt; 2.0.0 depends on bar 2.0.0 &lt;= v &lt; 3.0.0.</code></pre></div>
+<p>you may have directly:</p>
+<div class="example-wrap"><pre class="language-txt"><code>foo 1.0.0 &lt;= v &lt; 2.0.0 depends on bar 2.0.0 &lt;= v &lt; 3.0.0.</code></pre></div>
+<p>Beware though that if you are using some kind of offline mode
+with a cache, you may want to know that some versions
+do not exist in your cache.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.DefaultStringReportFormatter.html" title="struct pubgrub::DefaultStringReportFormatter">Default<wbr>String<wbr>Report<wbr>Formatter</a></dt><dd>Default formatter for the default reporter.</dd><dt><a class="struct" href="struct.DefaultStringReporter.html" title="struct pubgrub::DefaultStringReporter">Default<wbr>String<wbr>Reporter</a></dt><dd>Default reporter able to generate an explanation as a <a href="https://doc.rust-lang.org/1.98.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>.</dd><dt><a class="struct" href="struct.DependencyConstraints.html" title="struct pubgrub::DependencyConstraints">Dependency<wbr>Constraints</a></dt><dd>The dependencies of a package with their version ranges.</dd><dt><a class="struct" href="struct.Derived.html" title="struct pubgrub::Derived">Derived</a></dt><dd>Incompatibility derived from two others.</dd><dt><a class="struct" href="struct.OfflineDependencyProvider.html" title="struct pubgrub::OfflineDependencyProvider">Offline<wbr>Dependency<wbr>Provider</a></dt><dd>A basic implementation of <a href="trait.DependencyProvider.html" title="trait pubgrub::DependencyProvider">DependencyProvider</a>.</dd><dt><a class="struct" href="struct.PackageResolutionStatistics.html" title="struct pubgrub::PackageResolutionStatistics">Package<wbr>Resolution<wbr>Statistics</a></dt><dd>Statistics on how often a package conflicted with other packages.</dd><dt><a class="struct" href="struct.Range.html" title="struct pubgrub::Range">Range</a></dt><dd>Ranges represents multiple intervals of a continuous range of monotone increasing values.</dd><dt><a class="struct" href="struct.Ranges.html" title="struct pubgrub::Ranges">Ranges</a></dt><dd>Ranges represents multiple intervals of a continuous range of monotone increasing values.</dd><dt><a class="struct" href="struct.SelectedDependencies.html" title="struct pubgrub::SelectedDependencies">Selected<wbr>Dependencies</a></dt><dd>The resolved dependencies and their versions.</dd><dt><a class="struct" href="struct.SemanticVersion.html" title="struct pubgrub::SemanticVersion">Semantic<wbr>Version</a></dt><dd>Type for semantic versions: major.minor.patch.</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.Dependencies.html" title="enum pubgrub::Dependencies">Dependencies</a></dt><dd>An enum used by <a href="trait.DependencyProvider.html" title="trait pubgrub::DependencyProvider">DependencyProvider</a> that holds information about package dependencies.
+For each <a href="trait.Package.html" title="trait pubgrub::Package">Package</a> there is a set of versions allowed as a dependency.</dd><dt><a class="enum" href="enum.DerivationTree.html" title="enum pubgrub::DerivationTree">Derivation<wbr>Tree</a></dt><dd>Derivation tree resulting in the impossibility to solve the dependencies of our root package.</dd><dt><a class="enum" href="enum.External.html" title="enum pubgrub::External">External</a></dt><dd>Incompatibility that is not derived from other incompatibilities.</dd><dt><a class="enum" href="enum.PubGrubError.html" title="enum pubgrub::PubGrubError">PubGrub<wbr>Error</a></dt><dd>Errors that may occur while solving dependencies.</dd><dt><a class="enum" href="enum.SetRelation.html" title="enum pubgrub::SetRelation">SetRelation</a></dt><dd>Describes how one set relates to another.</dd><dt><a class="enum" href="enum.Term.html" title="enum pubgrub::Term">Term</a></dt><dd>A positive or negative expression regarding a set of versions.</dd><dt><a class="enum" href="enum.VersionParseError.html" title="enum pubgrub::VersionParseError">Version<wbr>Parse<wbr>Error</a></dt><dd>Error creating <a href="struct.SemanticVersion.html" title="struct pubgrub::SemanticVersion">SemanticVersion</a> from <a href="https://doc.rust-lang.org/1.98.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>.</dd></dl><h2 id="traits" class="section-header">Traits<a href="#traits" class="anchor">§</a></h2><dl class="item-table"><dt><a class="trait" href="trait.DependencyProvider.html" title="trait pubgrub::DependencyProvider">Dependency<wbr>Provider</a></dt><dd>Trait that allows the algorithm to retrieve available packages and their dependencies.
+An implementor needs to be supplied to the <a href="fn.resolve.html" title="fn pubgrub::resolve">resolve</a> function.</dd><dt><a class="trait" href="trait.Package.html" title="trait pubgrub::Package">Package</a></dt><dd>Trait for identifying packages.
+Automatically implemented for types already implementing
+<a href="https://doc.rust-lang.org/1.98.1/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> + <a href="https://doc.rust-lang.org/1.98.1/core/cmp/trait.Eq.html" title="trait core::cmp::Eq">Eq</a> + <a href="https://doc.rust-lang.org/1.98.1/core/hash/trait.Hash.html" title="trait core::hash::Hash">Hash</a> + <a href="https://doc.rust-lang.org/1.98.1/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a> + <a href="https://doc.rust-lang.org/1.98.1/core/fmt/trait.Display.html" title="trait core::fmt::Display">Display</a>.</dd><dt><a class="trait" href="trait.ReportFormatter.html" title="trait pubgrub::ReportFormatter">Report<wbr>Formatter</a></dt><dd>Trait for formatting outputs in the reporter.</dd><dt><a class="trait" href="trait.Reporter.html" title="trait pubgrub::Reporter">Reporter</a></dt><dd>Reporter trait.</dd><dt><a class="trait" href="trait.VersionSet.html" title="trait pubgrub::VersionSet">Version<wbr>Set</a></dt><dd>A set of versions.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.resolve.html" title="fn pubgrub::resolve">resolve</a></dt><dd>Finds a set of packages satisfying dependency bounds for a given package + version pair.</dd></dl><h2 id="types" class="section-header">Type Aliases<a href="#types" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.Map.html" title="type pubgrub::Map">Map</a></dt><dd>Map implementation used by the library.</dd><dt><a class="type" href="type.NoSolutionError.html" title="type pubgrub::NoSolutionError">NoSolution<wbr>Error</a></dt><dd>There is no solution for this set of dependencies.</dd><dt><a class="type" href="type.Set.html" title="type pubgrub::Set">Set</a></dt><dd>Set implementation used by the library.</dd></dl></section></div></main></body></html>
