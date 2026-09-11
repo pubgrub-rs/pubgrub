@@ -813,6 +813,14 @@ impl<V: Ord + Clone> Ranges<V> {
     /// Note that we don't know that set of all existing `V`s here, so we only check if all
     /// segments `self` are contained in a segment of `other`.
     pub fn subset_of(&self, other: &Self) -> bool {
+        // Equality is common for long accumulated ranges during PubGrub conflict resolution.
+        if self.segments.len() > 1
+            && self.segments.len() == other.segments.len()
+            && self.segments == other.segments
+        {
+            return true;
+        }
+
         let mut containing_iter = other.segments.iter();
         let mut subset_iter = self.segments.iter();
         let Some(mut containing_elem) = containing_iter.next() else {
