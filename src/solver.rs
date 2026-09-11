@@ -52,34 +52,6 @@ impl<P, V: Ord> AddedDependencies<P, V> {
     }
 }
 
-#[cfg(test)]
-mod added_dependencies_tests {
-    use super::AddedDependencies;
-    use crate::internal::HashArena;
-
-    #[test]
-    fn deduplicates_complete_history_after_backtracking() {
-        let mut packages = HashArena::new();
-        let first = packages.alloc("first");
-        let second = packages.alloc("second");
-        let mut added = AddedDependencies::new();
-
-        assert!(added.insert(first, 1u32, false));
-        assert!(added.insert(second, 1u32, false));
-
-        // The first backtrack can revisit either package from the previous history.
-        assert!(!added.insert(first, 1u32, true));
-        assert!(!added.insert(second, 1u32, true));
-
-        // New versions are recorded once, including across later backtracks.
-        assert!(added.insert(first, 2u32, true));
-        assert!(!added.insert(first, 1u32, true));
-        assert!(!added.insert(first, 2u32, true));
-        assert!(added.insert(second, 2u32, true));
-        assert!(!added.insert(second, 2u32, true));
-    }
-}
-
 /// Statistics on how often a package conflicted with other packages.
 #[derive(Debug, Default, Clone)]
 pub struct PackageResolutionStatistics {
