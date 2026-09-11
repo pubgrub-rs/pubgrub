@@ -3,7 +3,7 @@
 use std::borrow::Borrow;
 use std::fmt::{Debug, Display};
 
-use crate::Ranges;
+use crate::{Ranges, SetRelation};
 
 /// A set of versions.
 ///
@@ -97,6 +97,21 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
     fn subset_of(&self, other: &Self) -> bool {
         self == &self.intersection(other)
     }
+
+    /// Classifies `self` as a subset of, disjoint from, or partially overlapping with `other`.
+    ///
+    /// Implementations can override this to avoid traversing both sets once for [`Self::subset_of`]
+    /// and again for [`Self::is_disjoint`].
+    /// An empty `self` must be classified as [`SetRelation::Subset`].
+    fn relation(&self, other: &Self) -> SetRelation {
+        if self.subset_of(other) {
+            SetRelation::Subset
+        } else if self.is_disjoint(other) {
+            SetRelation::Disjoint
+        } else {
+            SetRelation::Overlapping
+        }
+    }
 }
 
 /// [`Ranges`] contains optimized implementations of all operations.
@@ -149,5 +164,9 @@ impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Ranges<T> {
 
     fn subset_of(&self, other: &Self) -> bool {
         Ranges::subset_of(self, other)
+    }
+
+    fn relation(&self, other: &Self) -> SetRelation {
+        Ranges::relation(self, other)
     }
 }

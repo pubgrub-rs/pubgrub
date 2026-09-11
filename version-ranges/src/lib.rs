@@ -78,6 +78,20 @@ pub struct Ranges<V> {
     segments: SmallVec<[Interval<V>; 1]>,
 }
 
+/// Describes how one set relates to another.
+///
+/// [`SetRelation::Subset`] takes precedence when the left-hand set is empty and therefore also
+/// disjoint.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SetRelation {
+    /// Every value in the left-hand set is also in the right-hand set.
+    Subset,
+    /// The two sets have no values in common.
+    Disjoint,
+    /// The sets overlap, but the left-hand set is not a subset of the right-hand set.
+    Overlapping,
+}
+
 // TODO: Replace the tuple type with a custom enum inlining the bounds to reduce the type's size.
 type Interval<V> = (Bound<V>, Bound<V>);
 
@@ -808,6 +822,57 @@ impl<V: Ord + Clone> Ranges<V> {
         true
     }
 
+    /// Classifies `self` as a subset of, disjoint from, or partially overlapping with `other`.
+    ///
+    /// This combines [`Self::subset_of`] and [`Self::is_disjoint`] into a single traversal.
+    /// An empty `self` is classified as [`SetRelation::Subset`].
+    pub fn relation(&self, other: &Self) -> SetRelation {
+        // Equality is common for long accumulated ranges during PubGrub conflict resolution.
+        if self.segments.len() > 1
+            && self.segments.len() == other.segments.len()
+            && self.segments == other.segments
+        {
+            return SetRelation::Subset;
+        }
+
+        let mut other_iter = other.segments.iter().peekable();
+        let mut is_subset = true;
+        let mut overlaps = false;
+
+        for subset_elem in &self.segments {
+            while other_iter.peek().is_some_and(|containing_elem| {
+                !valid_segment(&subset_elem.start_bound(), &containing_elem.end_bound())
+            }) {
+                other_iter.next();
+            }
+
+            let Some(containing_elem) = other_iter.peek() else {
+                is_subset = false;
+                break;
+            };
+
+            if !valid_segment(&containing_elem.start_bound(), &subset_elem.end_bound()) {
+                is_subset = false;
+                continue;
+            }
+
+            overlaps = true;
+            if !left_start_is_smaller(containing_elem.start_bound(), subset_elem.start_bound())
+                || !left_end_is_smaller(subset_elem.end_bound(), containing_elem.end_bound())
+            {
+                is_subset = false;
+            }
+        }
+
+        if is_subset {
+            SetRelation::Subset
+        } else if overlaps {
+            SetRelation::Overlapping
+        } else {
+            SetRelation::Disjoint
+        }
+    }
+
     /// Return true if any `V` that is contained in `self` is also contained in `other`.
     ///
     /// Note that we don't know that set of all existing `V`s here, so we only check if all
@@ -1396,6 +1461,18 @@ pub mod tests {
         fn subset_of_through_intersection(r1 in proptest_strategy(), r2 in proptest_strategy()) {
             let disjoint_def = r1.intersection(&r2) == r1;
             assert_eq!(r1.subset_of(&r2), disjoint_def);
+        }
+
+        #[test]
+        fn relation_through_subset_and_disjoint(r1 in proptest_strategy(), r2 in proptest_strategy()) {
+            let relation_def = if r1.subset_of(&r2) {
+                SetRelation::Subset
+            } else if r1.is_disjoint(&r2) {
+                SetRelation::Disjoint
+            } else {
+                SetRelation::Overlapping
+            };
+            assert_eq!(r1.relation(&r2), relation_def);
         }
 
         #[test]

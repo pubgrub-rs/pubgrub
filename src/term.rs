@@ -5,7 +5,7 @@
 
 use std::fmt::{self, Display};
 
-use crate::VersionSet;
+use crate::{SetRelation, VersionSet};
 
 /// A positive or negative expression regarding a set of versions.
 ///
@@ -140,6 +140,7 @@ impl<VS: VersionSet> Term<VS> {
     /// Indicate if this term is a subset of another term.
     /// Just like for sets, we say that t1 is a subset of t2
     /// if and only if t1 ∩ t2 = t1.
+    #[cfg(test)]
     pub(crate) fn subset_of(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Positive(r1), Self::Positive(r2)) => r1.subset_of(r2),
@@ -196,13 +197,40 @@ impl<VS: VersionSet> Term<VS> {
 
     /// Check if a set of terms satisfies or contradicts a given term.
     /// Otherwise the relation is inconclusive.
+    /// Satisfaction takes precedence when an empty positive intersection both satisfies and
+    /// contradicts the term.
     pub(crate) fn relation_with(&self, other_terms_intersection: &Self) -> Relation {
-        if other_terms_intersection.subset_of(self) {
-            Relation::Satisfied
-        } else if self.is_disjoint(other_terms_intersection) {
-            Relation::Contradicted
-        } else {
-            Relation::Inconclusive
+        match (self, other_terms_intersection) {
+            (Self::Positive(range), Self::Positive(other)) => match other.relation(range) {
+                SetRelation::Subset => Relation::Satisfied,
+                SetRelation::Disjoint => Relation::Contradicted,
+                SetRelation::Overlapping => Relation::Inconclusive,
+            },
+            (Self::Positive(range), Self::Negative(other)) => {
+                if range.subset_of(other) {
+                    Relation::Contradicted
+                } else {
+                    Relation::Inconclusive
+                }
+            }
+            (Self::Negative(range), Self::Positive(other)) => {
+                if other == &VS::empty() {
+                    Relation::Satisfied
+                } else {
+                    match other.relation(range) {
+                        SetRelation::Subset => Relation::Contradicted,
+                        SetRelation::Disjoint => Relation::Satisfied,
+                        SetRelation::Overlapping => Relation::Inconclusive,
+                    }
+                }
+            }
+            (Self::Negative(range), Self::Negative(other)) => {
+                if range.subset_of(other) {
+                    Relation::Satisfied
+                } else {
+                    Relation::Inconclusive
+                }
+            }
         }
     }
 }
@@ -232,12 +260,75 @@ pub mod tests {
     use proptest::prelude::*;
     use version_ranges::Ranges;
 
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    struct NoDisjointRanges(Ranges<u32>);
+
+    impl Display for NoDisjointRanges {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+
+    impl VersionSet for NoDisjointRanges {
+        type V = u32;
+
+        fn empty() -> Self {
+            Self(Ranges::empty())
+        }
+
+        fn singleton(version: Self::V) -> Self {
+            Self(Ranges::singleton(version))
+        }
+
+        fn complement(&self) -> Self {
+            Self(self.0.complement())
+        }
+
+        fn intersection(&self, other: &Self) -> Self {
+            Self(self.0.intersection(&other.0))
+        }
+
+        fn contains(&self, version: &Self::V) -> bool {
+            self.0.contains(version)
+        }
+
+        fn is_disjoint(&self, _other: &Self) -> bool {
+            panic!("subset-only term relations must not check disjointness")
+        }
+    }
+
     pub fn strategy() -> impl Strategy<Value = Term<Ranges<u32>>> {
         prop_oneof![
             version_ranges::proptest_strategy().prop_map(Term::Negative),
             version_ranges::proptest_strategy().prop_map(Term::Positive),
         ]
     }
+
+    #[test]
+    fn empty_positive_intersection_satisfies_negative_term() {
+        let term = Term::Negative(Ranges::<u32>::singleton(1u32));
+
+        assert!(matches!(
+            term.relation_with(&Term::empty()),
+            Relation::Satisfied
+        ));
+    }
+
+    #[test]
+    fn subset_only_relations_do_not_check_disjointness() {
+        let one = NoDisjointRanges::singleton(1);
+        let two = NoDisjointRanges::singleton(2);
+
+        assert!(matches!(
+            Term::Positive(one.clone()).relation_with(&Term::Negative(two.clone())),
+            Relation::Inconclusive
+        ));
+        assert!(matches!(
+            Term::Negative(one).relation_with(&Term::Negative(two)),
+            Relation::Inconclusive
+        ));
+    }
+
     proptest! {
 
         // Testing relation --------------------------------
