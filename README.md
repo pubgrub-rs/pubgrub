@@ -22,7 +22,7 @@ The best way to get started with PubGrub are the [guide][guide] and the
 algorithm's [introductory blog post][medium-pubgrub]. There are also some
 runnable examples in the [examples](./examples) folder. More details are
 available in the [stable API documentation][docs] and the [development API
-documentation][docs-dev] from dev branch.
+documentation][docs-dev] from the main branch.
 
 ## The PubGrub Algorithm
 

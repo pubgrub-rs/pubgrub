@@ -246,7 +246,7 @@ The gist of it is:
 [0.2.1]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.2.1
 [0.2.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.2.0
 [0.1.0]: https://github.com/pubgrub-rs/pubgrub/releases/tag/v0.1.0
-[unreleased-diff]: https://github.com/pubgrub-rs/pubgrub/compare/release...dev
+[unreleased-diff]: https://github.com/pubgrub-rs/pubgrub/compare/release...main
 [0.2.1-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.2.1...v0.3.0
 [0.2.0-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.2.0...v0.2.1
 [0.1.0-diff]: https://github.com/pubgrub-rs/pubgrub/compare/v0.1.0...v0.2.0
