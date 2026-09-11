@@ -350,24 +350,28 @@ impl<DP: DependencyProvider> State<DP> {
     /// without having to check the existence of other versions though.
     fn merge_incompatibility(&mut self, mut id: IncompDpId<DP>) {
         if let Some((p1, p2)) = self.incompatibility_store[id].as_dependency() {
-            // If we are a dependency, there's a good chance we can be merged with a previous dependency
-            let deps_lookup = self.merged_dependencies.entry((p1, p2)).or_default();
-            if let Some((past, merged)) = deps_lookup.as_mut_slice().iter_mut().find_map(|past| {
-                self.incompatibility_store[id]
-                    .merge_dependents(&self.incompatibility_store[*past])
-                    .map(|m| (past, m))
-            }) {
-                let new = self.incompatibility_store.alloc(merged);
-                for (pkg, _) in self.incompatibility_store[new].iter() {
-                    self.incompatibilities
-                        .entry(pkg)
-                        .or_default()
-                        .retain(|id| id != past);
+            // Self-dependencies cannot be merged.
+            if p1 != p2 {
+                let deps_lookup = self.merged_dependencies.entry((p1, p2)).or_default();
+                if let Some((past, merged)) =
+                    deps_lookup.as_mut_slice().iter_mut().find_map(|past| {
+                        self.incompatibility_store[id]
+                            .merge_dependents(&self.incompatibility_store[*past])
+                            .map(|merged| (past, merged))
+                    })
+                {
+                    let new = self.incompatibility_store.alloc(merged);
+                    for (pkg, _) in self.incompatibility_store[new].iter() {
+                        self.incompatibilities
+                            .entry(pkg)
+                            .or_default()
+                            .retain(|id| id != past);
+                    }
+                    *past = new;
+                    id = new;
+                } else {
+                    deps_lookup.push(id);
                 }
-                *past = new;
-                id = new;
-            } else {
-                deps_lookup.push(id);
             }
         }
         for (pkg, term) in self.incompatibility_store[id].iter() {
