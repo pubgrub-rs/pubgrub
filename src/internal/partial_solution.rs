@@ -297,6 +297,22 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         self.next_global_index += 1;
     }
 
+    /// The list of package that have not been selected after the last prioritization.
+    ///
+    /// This list gets updated by [`Self::pick_highest_priority_pkg`] and by backtracking.
+    #[allow(clippy::type_complexity)]
+    #[allow(dead_code)]
+    pub fn undecided_packages(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            &Id<DP::P>,
+            &(<DP as DependencyProvider>::Priority, Reverse<u32>),
+        ),
+    > {
+        self.prioritized_potential_packages.iter()
+    }
+
     /// Add a derivation.
     pub(crate) fn add_derivation(
         &mut self,
@@ -344,6 +360,21 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
                 });
             }
         }
+    }
+
+    #[cold]
+    #[allow(dead_code)]
+    pub fn prioritized_packages(&self) -> impl Iterator<Item = (Id<DP::P>, &DP::VS)> {
+        // TODO(konsti): Should we use `self.outdated_priorities` instead?
+        let current_decision_level = self.current_decision_level;
+        self.package_assignments
+            .get_range(self.current_decision_level.get() as usize..)
+            .unwrap()
+            .iter()
+            .filter(move |(_, pa)| pa.highest_decision_level == current_decision_level)
+            .filter_map(|(&p, pa)| {
+                Some((p, pa.assignments_intersection.potential_package_filter()?))
+            })
     }
 
     #[cold]
@@ -638,6 +669,19 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
 
     pub(crate) fn current_decision_level(&self) -> DecisionLevel {
         self.current_decision_level
+    }
+
+    /// Retrieve the constraints on a package that will not change.
+    #[allow(dead_code)]
+    pub fn unchanging_term_for_package(&self, package: Id<DP::P>) -> Option<&Term<DP::VS>> {
+        let pa = self.package_assignments.get(&package)?;
+
+        let idx_newer = pa
+            .dated_derivations
+            .as_slice()
+            .partition_point(|dd| dd.decision_level <= DecisionLevel::new(1));
+        let idx = idx_newer.checked_sub(1)?;
+        Some(&pa.dated_derivations[idx].accumulated_intersection)
     }
 }
 
