@@ -730,6 +730,7 @@ pub(crate) mod tests {
             state.add_package_version_dependencies(
                 state.root_package,
                 0,
+                Ranges::singleton(0usize),
                 [("foo".to_string(), Ranges::singleton(1usize))],
             );
             state.unit_propagation(state.root_package).unwrap();
@@ -739,7 +740,12 @@ pub(crate) mod tests {
                 .partial_solution
                 .pick_highest_priority_pkg(|_p, _r| (0, Reverse(0)))
                 .unwrap();
-            state.add_package_version_dependencies(next, 1, case.clone());
+            state.add_package_version_dependencies(
+                next,
+                1,
+                Ranges::singleton(1usize),
+                case.clone(),
+            );
             state.unit_propagation(next).unwrap();
 
             assert!(
