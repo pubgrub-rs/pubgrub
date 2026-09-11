@@ -6,6 +6,7 @@
 use std::cmp::Reverse;
 use std::fmt::{Debug, Display};
 use std::hash::BuildHasherDefault;
+use std::num::NonZeroU32;
 
 use priority_queue::PriorityQueue;
 use rustc_hash::FxHasher;
@@ -18,17 +19,46 @@ use crate::{DependencyProvider, Package, Term, VersionSet};
 type FnvIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 type FnvIndexSet<T> = indexmap::IndexSet<T, BuildHasherDefault<FxHasher>>;
 
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub(crate) struct DecisionLevel(pub(crate) u32);
+/// The number of decisions that have been made at some point in solving.
+///
+/// The logical level is zero-based, but it is stored as `level + 1` in a
+/// `NonZeroU32` so that `Option<DecisionLevel>` fits in the same 4 bytes as a
+/// bare `u32`, with `None` occupying the all-zero niche.
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub(crate) struct DecisionLevel(NonZeroU32);
 
 impl DecisionLevel {
-    /// Sentinel for a decision level not associated with a cached contradiction.
-    pub(crate) const MAX: Self = Self(u32::MAX);
+    /// Decision level zero: no decisions have been made yet.
+    pub(crate) const ZERO: DecisionLevel = DecisionLevel(NonZeroU32::MIN);
+    /// Sentinel greater than any decision level the solver can reach.
+    pub(crate) const MAX: DecisionLevel = DecisionLevel(NonZeroU32::MAX);
 
+    /// Build a `DecisionLevel` from its zero-based logical value.
+    pub(crate) fn new(level: u32) -> Self {
+        // `level + 1` is always >= 1; the only overflow would be `u32::MAX`
+        // decisions, which the solver cannot reach.
+        Self(NonZeroU32::new(level + 1).expect("decision level overflow"))
+    }
+
+    /// The zero-based logical decision level.
+    pub(crate) fn get(self) -> u32 {
+        self.0.get() - 1
+    }
+
+    /// Advances to the next decision level, panicking if the representation is exhausted.
     pub(crate) fn increment(self) -> Self {
-        Self(self.0 + 1)
+        Self(self.0.checked_add(1).expect("decision level overflow"))
     }
 }
+
+impl Debug for DecisionLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DecisionLevel({})", self.get())
+    }
+}
+
+// Preserve the niche so `Option<DecisionLevel>` stays as small as a bare `u32`.
+const _: () = assert!(std::mem::size_of::<Option<DecisionLevel>>() == std::mem::size_of::<u32>());
 
 /// The partial solution contains all package assignments,
 /// organized by package and historically ordered.
@@ -172,11 +202,11 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     pub(crate) fn empty() -> Self {
         Self {
             next_global_index: 0,
-            current_decision_level: DecisionLevel(0),
+            current_decision_level: DecisionLevel::ZERO,
             package_assignments: FnvIndexMap::default(),
             prioritized_potential_packages: PriorityQueue::default(),
             outdated_priorities: FnvIndexSet::default(),
-            last_valid_decision_levels: vec![DecisionLevel(0)],
+            last_valid_decision_levels: vec![DecisionLevel::ZERO],
         }
     }
 
@@ -248,7 +278,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
                 },
             }
         }
-        let new_idx = self.current_decision_level.0 as usize;
+        let new_idx = self.current_decision_level.get() as usize;
         self.current_decision_level = self.current_decision_level.increment();
         let (old_idx, _, pa) = self
             .package_assignments
@@ -349,7 +379,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     pub(crate) fn extract_solution(&self) -> impl Iterator<Item = (Id<DP::P>, DP::V)> + '_ {
         self.package_assignments
             .iter()
-            .take(self.current_decision_level.0 as usize)
+            .take(self.current_decision_level.get() as usize)
             .map(|(&p, pa)| match &pa.assignments_intersection {
                 AssignmentsIntersection::Decision {
                     decision_level: _,
@@ -362,7 +392,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
                     for (id, assignment) in self
                         .package_assignments
                         .iter()
-                        .take(self.current_decision_level.0 as usize)
+                        .take(self.current_decision_level.get() as usize)
                     {
                         context.push_str(&format!(
                             " * {:?} {:?}\n",
@@ -371,7 +401,8 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
                     }
                     panic!(
                         "Derivations in the Decision part. Decision level {}\n{}",
-                        self.current_decision_level.0, context
+                        self.current_decision_level.get(),
+                        context
                     )
                 }
             })
@@ -426,6 +457,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
                 true
             }
         });
+
         // Close the active generation, then lower every generation invalidated by this backtrack
         // to the new highest valid decision level.
         self.last_valid_decision_levels.push(DecisionLevel::MAX);
@@ -601,7 +633,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
             .iter()
             .max_by_key(|(_p, (_, global_index, _))| global_index)
             .unwrap();
-        decision_level.max(DecisionLevel(1))
+        decision_level.max(DecisionLevel::new(1))
     }
 
     pub(crate) fn current_decision_level(&self) -> DecisionLevel {
