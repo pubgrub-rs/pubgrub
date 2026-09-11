@@ -8,6 +8,50 @@ use crate::internal::{Id, Incompatibility, State};
 use crate::{Map, Package, PubGrubError, Term, VersionSet};
 use log::{debug, info};
 
+/// Tracks package versions whose dependency incompatibilities have already been added.
+///
+/// Before the first backtrack, entries are stored in a compact history because decisions cannot
+/// be revisited. The history is promoted to a deduplicating map only once revisits become possible.
+struct AddedDependencies<P, V> {
+    before_first_backtrack: Vec<(Id<P>, V)>,
+    after_first_backtrack: Option<Map<Id<P>, Set<V>>>,
+}
+
+impl<P, V: Ord> AddedDependencies<P, V> {
+    fn new() -> Self {
+        Self {
+            before_first_backtrack: Vec::new(),
+            after_first_backtrack: None,
+        }
+    }
+
+    /// Records a package version and returns whether its dependency incompatibilities still need
+    /// to be added.
+    ///
+    /// `has_backtracked` must remain true after the first backtrack so that later decisions are
+    /// deduplicated against the complete pre-backtrack history.
+    fn insert(&mut self, package: Id<P>, version: V, has_backtracked: bool) -> bool {
+        if !has_backtracked {
+            // Without a backtrack, an earlier decision cannot be revisited. Keep a compact history
+            // so the common case does not allocate a map entry and tree node per package.
+            self.before_first_backtrack.push((package, version));
+            return true;
+        }
+
+        self.after_first_backtrack
+            .get_or_insert_with(|| {
+                let mut added = Map::<Id<P>, Set<V>>::default();
+                for (package, version) in std::mem::take(&mut self.before_first_backtrack) {
+                    added.entry(package).or_default().insert(version);
+                }
+                added
+            })
+            .entry(package)
+            .or_default()
+            .insert(version)
+    }
+}
+
 /// Statistics on how often a package conflicted with other packages.
 #[derive(Debug, Default, Clone)]
 pub struct PackageResolutionStatistics {
@@ -139,7 +183,7 @@ pub fn resolve<DP: DependencyProvider>(
 ) -> Result<SelectedDependencies<DP::P, DP::V>, PubGrubError<DP>> {
     let mut state: State<DP> = State::init(package.clone(), version.into());
     let mut conflict_tracker: Map<Id<DP::P>, PackageResolutionStatistics> = Map::default();
-    let mut added_dependencies: Map<Id<DP::P>, Set<DP::V>> = Map::default();
+    let mut added_dependencies = AddedDependencies::new();
     let mut next = state.root_package;
     loop {
         dependency_provider
@@ -221,10 +265,8 @@ pub fn resolve<DP: DependencyProvider>(
             );
         }
 
-        let is_new_dependency = added_dependencies
-            .entry(next)
-            .or_default()
-            .insert(v.clone());
+        let is_new_dependency =
+            added_dependencies.insert(next, v.clone(), state.partial_solution.has_backtracked());
 
         if is_new_dependency {
             // Retrieve that package dependencies.
