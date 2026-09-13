@@ -59,3 +59,7 @@ required-features = ["serde"]
 [[bench]]
 name = "sudoku"
 harness = false
+
+[[bench]]
+name = "report"
+harness = false
