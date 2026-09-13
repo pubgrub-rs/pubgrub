@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::{
-    DefaultStringReporter, Map, OfflineDependencyProvider, PubGrubError, Ranges, Reporter as _,
-    SelectedDependencies, SemanticVersion, Set, resolve,
+    DefaultStringReporter, DerivationTree, Derived, External, Map, OfflineDependencyProvider,
+    PubGrubError, Ranges, Reporter as _, SelectedDependencies, SemanticVersion, Set, Term, resolve,
 };
 
 type NumVS = Ranges<u32>;
 type SemVS = Ranges<SemanticVersion>;
 
 use std::io::Write;
+use std::sync::Arc;
 
 use log::LevelFilter;
 
@@ -265,4 +266,42 @@ And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5
         // baz isn't shown.
         Set::from_iter(&["root", "foo", "bar"])
     );
+}
+
+#[test]
+fn collapse_no_versions_into_custom_reason() {
+    let versions = NumVS::singleton(1u32);
+    let unavailable = Arc::new(DerivationTree::External(External::Custom(
+        "foo",
+        versions.clone(),
+        "because builds are disabled".to_owned(),
+    )));
+    let missing = Arc::new(DerivationTree::External(External::NoVersions(
+        "foo",
+        versions.complement(),
+    )));
+
+    for (cause1, cause2) in [
+        (unavailable.clone(), missing.clone()),
+        (missing, unavailable),
+    ] {
+        let mut tree = DerivationTree::Derived(Derived {
+            terms: Map::from_iter([("foo", Term::Positive(NumVS::full()))]),
+            shared_id: None,
+            cause1,
+            cause2,
+        });
+        tree.collapse_no_versions();
+
+        assert_eq!(
+            DefaultStringReporter::report(&tree),
+            "dependencies of foo are unavailable because builds are disabled"
+        );
+        let DerivationTree::External(External::Custom(package, range, reason)) = tree else {
+            panic!("expected a custom reason without nonexistent-version gaps");
+        };
+        assert_eq!(package, "foo");
+        assert_eq!(range, NumVS::full());
+        assert_eq!(reason, "because builds are disabled");
+    }
 }
