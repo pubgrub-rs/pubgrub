@@ -440,80 +440,6 @@ impl<DP: DependencyProvider> State<DP> {
 }
 
 #[cfg(test)]
-mod dependency_merge_tests {
-    use std::fmt::{self, Display};
-    use std::hash::{Hash, Hasher};
-
-    use crate::{OfflineDependencyProvider, Ranges, VersionSet};
-
-    use super::State;
-
-    #[test]
-    fn merge_dependencies_with_hash_collisions() {
-        let mut state: State<OfflineDependencyProvider<&str, CollidingRanges>> =
-            State::init("root", 0);
-        let package = state.package_store.alloc("package");
-
-        // Alternate two pairs of constraints so equal ranges recur non-adjacently, while every
-        // range shares the same hash.
-        for version in 0..10 {
-            let first = (version % 2) * 2;
-            state.add_incompatibility_from_dependencies(
-                package,
-                CollidingRanges::singleton(version),
-                [
-                    ("dependency", CollidingRanges::singleton(first)),
-                    ("dependency", CollidingRanges::singleton(first + 1)),
-                ],
-            );
-        }
-
-        let dependency = state.package_store.alloc("dependency");
-        assert_eq!(state.incompatibilities[&package].len(), 4);
-        assert_eq!(state.incompatibilities[&dependency].len(), 4);
-    }
-
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    struct CollidingRanges(Ranges<u32>);
-
-    impl Display for CollidingRanges {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            Display::fmt(&self.0, f)
-        }
-    }
-
-    impl Hash for CollidingRanges {
-        fn hash<H: Hasher>(&self, state: &mut H) {
-            0u8.hash(state);
-        }
-    }
-
-    impl VersionSet for CollidingRanges {
-        type V = u32;
-
-        fn empty() -> Self {
-            Self(Ranges::empty())
-        }
-
-        fn singleton(v: Self::V) -> Self {
-            Self(Ranges::singleton(v))
-        }
-
-        fn complement(&self) -> Self {
-            Self(self.0.complement())
-        }
-
-        fn intersection(&self, other: &Self) -> Self {
-            Self(self.0.intersection(&other.0))
-        }
-
-        fn contains(&self, v: &Self::V) -> bool {
-            self.0.contains(v)
-        }
-    }
-}
-
-#[cfg(test)]
 mod tests {
     //! Resolution with dependent versions widened over the known versions must behave like
     //! resolution with singleton dependent versions.
@@ -668,6 +594,29 @@ mod tests {
 
         assert_eq!(resolve_with_widening(&provider, "root", 1, false), None);
         assert_eq!(resolve_with_widening(&provider, "root", 1, true), None);
+    }
+
+    #[test]
+    fn merge_recurring_non_adjacent_dependencies() {
+        let mut state: State<OfflineDependencyProvider<&str, NumVS>> = State::init("root", 0);
+        let package = state.package_store.alloc("package");
+
+        // Alternate two pairs of constraints so equal ranges recur non-adjacently.
+        for version in 0u32..10 {
+            let first = (version % 2) * 2;
+            state.add_incompatibility_from_dependencies(
+                package,
+                NumVS::singleton(version),
+                [
+                    ("dependency", NumVS::singleton(first)),
+                    ("dependency", NumVS::singleton(first + 1)),
+                ],
+            );
+        }
+
+        let dependency = state.package_store.alloc("dependency");
+        assert_eq!(state.incompatibilities[&package].len(), 4);
+        assert_eq!(state.incompatibilities[&dependency].len(), 4);
     }
 
     #[test]
