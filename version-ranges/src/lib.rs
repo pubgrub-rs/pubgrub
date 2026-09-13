@@ -1100,8 +1100,10 @@ impl<V: Ord + Clone> Ranges<V> {
     }
 
     /// Iterate over the parts of the range.
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (&Bound<V>, &Bound<V>)> {
-        self.segments.iter().map(|(start, end)| (start, end))
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Bound<&V>, Bound<&V>)> {
+        self.segments
+            .iter()
+            .map(|(start, end)| (start.as_ref(), end.as_ref()))
     }
 }
 

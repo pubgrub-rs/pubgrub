@@ -4,6 +4,10 @@ Changelog for the version-ranges crate.
 
 ## Unreleased
 
+### Breaking
+
+- `Ranges::iter` now returns `(Bound<&V>, Bound<&V>)`, consistent with `Ranges::bounding_range`, instead of references to stored `Bound<V>` values ([Astral #30](https://github.com/astral-sh/pubgrub/pull/30)).
+
 ### Added
 
 - Add classification of subset, disjoint, and overlapping ranges.
