@@ -1453,8 +1453,6 @@ pub fn proptest_strategy() -> impl Strategy<Value = Ranges<u32>> {
 
 #[cfg(test)]
 pub mod tests {
-    use proptest::prelude::*;
-
     use super::*;
 
     fn version_strat() -> impl Strategy<Value = u32> {
