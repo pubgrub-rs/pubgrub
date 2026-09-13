@@ -508,7 +508,8 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
             return Err(());
         };
         let decision_level = DecisionLevel::new(decision_level as u32);
-        if decision_level > self.current_decision_level {
+        // Decisions occupy indices strictly below the current decision level.
+        if decision_level >= self.current_decision_level {
             return Err(());
         }
         debug!(
