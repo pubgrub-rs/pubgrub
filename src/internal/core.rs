@@ -10,7 +10,37 @@ use crate::internal::{
     Arena, DecisionLevel, HashArena, Id, IncompDpId, IncompId, Incompatibility, PartialSolution,
     Relation, SatisfierSearch, SmallVec,
 };
-use crate::{DependencyProvider, DerivationTree, Map, NoSolutionError, VersionSet};
+use crate::{DependencyProvider, DerivationTree, Map, NoSolutionError, Package, VersionSet};
+
+#[derive(Clone)]
+struct MergedDependencies<P: Package, I> {
+    buckets: Map<DependencyKey<P>, SmallVec<I>>,
+}
+
+impl<P: Package, I> Default for MergedDependencies<P, I> {
+    fn default() -> Self {
+        Self {
+            buckets: Map::default(),
+        }
+    }
+}
+
+impl<P: Package, I> MergedDependencies<P, I> {
+    fn bucket(&mut self, dependent: Id<P>, dependency: Id<P>) -> &mut SmallVec<I> {
+        self.buckets
+            .entry(DependencyKey {
+                dependent,
+                dependency,
+            })
+            .or_default()
+    }
+}
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+struct DependencyKey<P: Package> {
+    dependent: Id<P>,
+    dependency: Id<P>,
+}
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
@@ -21,10 +51,8 @@ pub(crate) struct State<DP: DependencyProvider> {
     #[allow(clippy::type_complexity)]
     incompatibilities: Map<Id<DP::P>, Vec<IncompDpId<DP>>>,
 
-    /// All incompatibilities expressing dependencies,
-    /// with common dependents merged.
-    #[allow(clippy::type_complexity)]
-    merged_dependencies: Map<(Id<DP::P>, Id<DP::P>), SmallVec<IncompDpId<DP>>>,
+    /// All incompatibilities expressing dependencies, with common dependents merged.
+    merged_dependencies: MergedDependencies<DP::P, IncompDpId<DP>>,
 
     /// Partial solution.
     /// TODO: remove pub.
@@ -62,7 +90,7 @@ impl<DP: DependencyProvider> State<DP> {
             incompatibility_store,
             package_store,
             unit_propagation_buffer: SmallVec::Empty,
-            merged_dependencies: Map::default(),
+            merged_dependencies: MergedDependencies::default(),
         }
     }
 
@@ -368,7 +396,7 @@ impl<DP: DependencyProvider> State<DP> {
         if let Some((p1, p2)) = self.incompatibility_store[id].as_dependency() {
             // Self-dependencies cannot be merged.
             if p1 != p2 {
-                let deps_lookup = self.merged_dependencies.entry((p1, p2)).or_default();
+                let deps_lookup = self.merged_dependencies.bucket(p1, p2);
                 if let Some((past, merged)) =
                     deps_lookup.as_mut_slice().iter_mut().find_map(|past| {
                         self.incompatibility_store[id]
