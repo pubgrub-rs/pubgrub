@@ -2,6 +2,7 @@
 
 use std::borrow::Borrow;
 use std::fmt::{Debug, Display};
+use std::hash::Hash;
 
 use crate::{Ranges, SetRelation};
 
@@ -12,13 +13,13 @@ use crate::{Ranges, SetRelation};
 /// The methods with default implementations can be overwritten for better performance, but their
 /// output must be equal to the default implementation.
 ///
-/// # Equality
+/// # Equality and hashing
 ///
-/// It is important that the `Eq` trait is implemented so that if two sets contain the same
-/// versions, they are equal under `Eq`. In particular, you can only use `#[derive(Eq, PartialEq)]`
-/// if `Eq` is strictly equivalent to the structural equality, i.e. if version sets are always
-/// stored in a canonical representations. Such problems may arise if your implementations of
-/// `complement()` and `intersection()` do not return canonical representations.
+/// It is important that the `Eq` and `Hash` traits are implemented so that if two sets contain the
+/// same versions, they are equal under `Eq` and produce the same hash. In particular, you can only
+/// derive these traits if equality is strictly equivalent to structural equality, i.e. if version
+/// sets are always stored in canonical representations. Such problems may arise if your
+/// implementations of `complement()` and `intersection()` do not return canonical representations.
 ///
 /// For example, `>=1,<4 || >=2,<5` and `>=1,<4 || >=3,<5` are equal, because they can both be
 /// normalized to `>=1,<5`.
@@ -27,7 +28,7 @@ use crate::{Ranges, SetRelation};
 /// is about upholding the mathematical properties of set operations, assuming all versions are
 /// possible. This is required for the solver to determine the relationship of version sets to each
 /// other.
-pub trait VersionSet: Debug + Display + Clone + Eq {
+pub trait VersionSet: Debug + Display + Clone + Eq + Hash {
     /// Version type associated with the sets manipulated.
     type V: Debug + Display + Clone + Ord;
 
@@ -115,7 +116,7 @@ pub trait VersionSet: Debug + Display + Clone + Eq {
 }
 
 /// [`Ranges`] contains optimized implementations of all operations.
-impl<T: Debug + Display + Clone + Eq + Ord> VersionSet for Ranges<T> {
+impl<T: Debug + Display + Clone + Eq + Ord + Hash> VersionSet for Ranges<T> {
     type V = T;
 
     fn empty() -> Self {

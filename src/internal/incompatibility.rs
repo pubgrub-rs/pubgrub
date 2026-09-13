@@ -502,7 +502,7 @@ pub(crate) mod tests {
         ]));
     }
 
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(Debug, Eq, Hash, PartialEq)]
     struct PanicOnCloneRanges(Ranges<usize>);
 
     impl Clone for PanicOnCloneRanges {
