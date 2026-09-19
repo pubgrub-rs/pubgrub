@@ -8,10 +8,14 @@ use std::hash::{BuildHasher, Hash};
 use std::sync::Arc;
 
 use crate::internal::{
-    Arena, DecisionLevel, HashArena, Id, IncompDpId, IncompId, Incompatibility, PartialSolution,
-    Relation, SatisfierSearch, SmallVec,
+    Arena, DecisionLevel, HashArena, Id, IncompDpId, Incompatibility, PartialSolution, Relation,
+    SatisfierSearch, SmallVec,
 };
 use crate::{DependencyProvider, DerivationTree, Map, NoSolutionError, Package, VersionSet};
+
+/// An opaque handle to a conflict recorded by solver state.
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct ConflictId<DP: DependencyProvider>(IncompDpId<DP>);
 
 #[derive(Clone)]
 struct MergedDependencies<P: Package, I> {
@@ -125,19 +129,21 @@ impl<DP: DependencyProvider> State<DP> {
         version: DP::V,
         versions: DP::VS,
         dependencies: impl IntoIterator<Item = (DP::P, DP::VS)>,
-    ) -> Option<IncompId<DP::P, DP::VS, DP::M>> {
+    ) -> Option<ConflictId<DP>> {
         debug_assert!(
             versions.contains(&version),
             "the version being decided must be in the version set sharing its dependencies",
         );
         let dep_incompats =
             self.add_incompatibility_from_dependencies(package, versions, dependencies);
-        self.partial_solution.add_package_version_incompatibilities(
-            package,
-            version,
-            dep_incompats,
-            &self.incompatibility_store,
-        )
+        self.partial_solution
+            .add_package_version_incompatibilities(
+                package,
+                version,
+                dep_incompats,
+                &self.incompatibility_store,
+            )
+            .map(ConflictId)
     }
 
     /// Record that no available version satisfies a version range.
@@ -153,9 +159,9 @@ impl<DP: DependencyProvider> State<DP> {
     /// Iterate over the packages participating in a conflict.
     pub(crate) fn conflict_packages(
         &self,
-        conflict: &IncompDpId<DP>,
+        conflict: &ConflictId<DP>,
     ) -> impl Iterator<Item = Id<DP::P>> {
-        self.incompatibility_store[*conflict]
+        self.incompatibility_store[conflict.0]
             .iter()
             .map(|(package, _)| package)
     }
@@ -192,13 +198,14 @@ impl<DP: DependencyProvider> State<DP> {
     /// CF <https://github.com/dart-lang/pub/blob/master/doc/solver.md#unit-propagation>
     ///
     /// For each package with a satisfied incompatibility, returns the package and the root cause
-    /// incompatibility.
+    /// conflict.
     #[cold]
     #[allow(clippy::type_complexity)] // Type definitions don't support impl trait.
     pub(crate) fn unit_propagation(
         &mut self,
         package: Id<DP::P>,
-    ) -> Result<SmallVec<(Id<DP::P>, IncompDpId<DP>)>, NoSolutionError<DP>> {
+    ) -> Result<impl IntoIterator<Item = (Id<DP::P>, ConflictId<DP>)> + use<DP>, NoSolutionError<DP>>
+    {
         let mut satisfier_causes = SmallVec::default();
         self.unit_propagation_buffer.clear();
         self.unit_propagation_buffer.push(package);
@@ -272,7 +279,9 @@ impl<DP: DependencyProvider> State<DP> {
             }
         }
         // If there are no more changed packages, unit propagation is done.
-        Ok(satisfier_causes)
+        Ok(satisfier_causes
+            .into_iter()
+            .map(|(package, id)| (package, ConflictId(id))))
     }
 
     /// Return the root cause or the terminal incompatibility. CF
