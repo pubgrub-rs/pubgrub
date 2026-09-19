@@ -17,6 +17,22 @@ use crate::{DependencyProvider, DerivationTree, Map, NoSolutionError, Package, V
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ConflictId<DP: DependencyProvider>(IncompDpId<DP>);
 
+/// A dependency constraint from one package (dependent) onto another (dependency).
+///
+/// This may merge overlapping constraints from multiple dependent versions, hence the version
+/// range for dependent.
+#[derive(Debug)]
+pub(crate) struct Dependency<'a, P, VS> {
+    /// The package declaring the dependency.
+    pub dependent: Id<P>,
+    /// The versions of the dependent package sharing this dependency.
+    pub dependent_versions: &'a VS,
+    /// The required package.
+    pub dependency: Id<P>,
+    /// The required versions, or `None` if the dependency range is empty.
+    pub dependency_versions: Option<&'a VS>,
+}
+
 #[derive(Clone)]
 struct MergedDependencies<P: Package, I> {
     buckets: Map<DependencyKey<P>, SmallVec<I>>,
