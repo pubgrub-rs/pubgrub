@@ -176,7 +176,7 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         Self {
             package_terms: if set2 == VS::empty() {
                 SmallMap::One([(package, Term::Positive(versions))])
-a             } else if package == p2 {
+            } else if package == p2 {
                 // Track incompatible self-dependencies.
                 // Possible and impossible self-dependencies may have overlapping version ranges,
                 // incompatible is only the impossible one.
