@@ -133,39 +133,19 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
     }
 
     /// Create an incompatibility to remember that a given set does not contain any version.
-    pub(crate) fn no_versions(package: Id<P>, term: Term<VS>) -> Self {
-        let set = match &term {
-            Term::Positive(r) => r.clone(),
-            Term::Negative(_) => panic!("No version should have a positive term"),
-        };
+    pub(crate) fn no_versions(package: Id<P>, versions: VS) -> Self {
         Self {
-            package_terms: SmallMap::One([(package, term)]),
-            kind: Kind::NoVersions(package, set),
+            package_terms: SmallMap::One([(package, Term::Positive(versions.clone()))]),
+            kind: Kind::NoVersions(package, versions),
             contradiction_cache: ContradictionCache::not_contradicted(),
         }
     }
 
     /// Create an incompatibility for a reason outside pubgrub.
-    #[allow(dead_code)] // Used by uv
-    pub(crate) fn custom_term(package: Id<P>, term: Term<VS>, metadata: M) -> Self {
-        let set = match &term {
-            Term::Positive(r) => r.clone(),
-            Term::Negative(_) => panic!("No version should have a positive term"),
-        };
+    pub(crate) fn custom(package: Id<P>, versions: VS, metadata: M) -> Self {
         Self {
-            package_terms: SmallMap::One([(package, term)]),
-            kind: Kind::Custom(package, set, metadata),
-            contradiction_cache: ContradictionCache::not_contradicted(),
-        }
-    }
-
-    /// Create an incompatibility for a reason outside pubgrub.
-    pub(crate) fn custom_version(package: Id<P>, version: VS::V, metadata: M) -> Self {
-        let set = VS::singleton(version);
-        let term = Term::Positive(set.clone());
-        Self {
-            package_terms: SmallMap::One([(package, term)]),
-            kind: Kind::Custom(package, set, metadata),
+            package_terms: SmallMap::One([(package, Term::Positive(versions.clone()))]),
+            kind: Kind::Custom(package, versions, metadata),
             contradiction_cache: ContradictionCache::not_contradicted(),
         }
     }
@@ -307,10 +287,6 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
             decision_level,
             backtrack_generation,
         };
-    }
-
-    pub(crate) fn reset_contradiction_cache(&mut self) {
-        self.contradiction_cache = ContradictionCache::not_contradicted();
     }
 
     /// Check if an incompatibility should mark the end of the algorithm

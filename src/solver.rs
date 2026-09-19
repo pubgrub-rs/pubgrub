@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fmt::{Debug, Display};
 
 use crate::internal::{Id, Incompatibility, State};
-use crate::{Map, Package, PubGrubError, Term, VersionSet};
+use crate::{Map, Package, PubGrubError, VersionSet};
 use log::{debug, info};
 
 /// Tracks package versions whose dependency incompatibilities have already been added.
@@ -250,8 +250,7 @@ pub fn resolve<DP: DependencyProvider>(
         // Pick the next compatible version.
         let v = match decision {
             None => {
-                let inc =
-                    Incompatibility::no_versions(next, Term::Positive(term_intersection.clone()));
+                let inc = Incompatibility::no_versions(next, term_intersection.clone());
                 state.add_incompatibility(inc);
                 continue;
             }
@@ -281,9 +280,9 @@ pub fn resolve<DP: DependencyProvider>(
 
             let dependencies = match dependencies {
                 Dependencies::Unavailable(reason) => {
-                    state.add_incompatibility(Incompatibility::custom_version(
+                    state.add_incompatibility(Incompatibility::custom(
                         p,
-                        v.clone(),
+                        DP::VS::singleton(v),
                         reason,
                     ));
                     continue;
