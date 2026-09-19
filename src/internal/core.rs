@@ -68,7 +68,7 @@ pub(crate) struct State<DP: DependencyProvider> {
     pub(crate) partial_solution: PartialSolution<DP>,
 
     /// The store is the reference storage for all incompatibilities.
-    pub(crate) incompatibility_store: Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
+    incompatibility_store: Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
 
     /// The store is the reference storage for all packages.
     pub(crate) package_store: HashArena<DP::P>,
@@ -140,15 +140,35 @@ impl<DP: DependencyProvider> State<DP> {
         )
     }
 
+    /// Record that no available version satisfies a version range.
+    pub(crate) fn add_no_versions(&mut self, package: Id<DP::P>, versions: DP::VS) {
+        self.add_incompatibility(Incompatibility::no_versions(package, versions));
+    }
+
+    /// Record that a version range is unavailable for a reason outside the solver.
+    pub(crate) fn add_unavailable(&mut self, package: Id<DP::P>, versions: DP::VS, reason: DP::M) {
+        self.add_incompatibility(Incompatibility::custom(package, versions, reason));
+    }
+
+    /// Iterate over the packages participating in a conflict.
+    pub(crate) fn conflict_packages(
+        &self,
+        conflict: &IncompDpId<DP>,
+    ) -> impl Iterator<Item = Id<DP::P>> {
+        self.incompatibility_store[*conflict]
+            .iter()
+            .map(|(package, _)| package)
+    }
+
     /// Add a newly constructed incompatibility to the state.
-    pub(crate) fn add_incompatibility(&mut self, incompat: Incompatibility<DP::P, DP::VS, DP::M>) {
+    fn add_incompatibility(&mut self, incompat: Incompatibility<DP::P, DP::VS, DP::M>) {
         let id = self.incompatibility_store.alloc(incompat);
         self.merge_incompatibility(id);
     }
 
     /// Add an incompatibility to the state.
     #[cold]
-    pub(crate) fn add_incompatibility_from_dependencies(
+    fn add_incompatibility_from_dependencies(
         &mut self,
         package: Id<DP::P>,
         versions: DP::VS,
@@ -525,7 +545,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::collections::BTreeSet;
 
-    use crate::internal::{Id, Incompatibility, State};
+    use crate::internal::{Id, State};
     use crate::{
         Dependencies, DependencyProvider, Map, OfflineDependencyProvider,
         PackageResolutionStatistics, Ranges,
@@ -578,8 +598,8 @@ mod tests {
                 .choose_version(&state.package_store[package], term_intersection)
                 .unwrap()
             else {
-                let inc = Incompatibility::no_versions(package, term_intersection.clone());
-                state.add_incompatibility(inc);
+                let versions = term_intersection.clone();
+                state.add_no_versions(package, versions);
                 continue;
             };
 
@@ -593,11 +613,7 @@ mod tests {
                     .unwrap()
                 {
                     Dependencies::Unavailable(reason) => {
-                        state.add_incompatibility(Incompatibility::custom(
-                            package,
-                            NumVS::singleton(decision),
-                            reason,
-                        ));
+                        state.add_unavailable(package, NumVS::singleton(decision), reason);
                         continue;
                     }
                     Dependencies::Available(dependencies) => dependencies,
