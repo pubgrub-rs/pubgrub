@@ -55,6 +55,21 @@ fn depend_on_self() {
     assert!(resolve(&dependency_provider, "a", 66u32).is_err());
 }
 
+/// Even if backtracking past an unavailable dependency with an incompatible self-dependency,
+/// all required packages must be part of the solution.
+#[test]
+fn self_dependency_after_backtracking() {
+    let mut dependency_provider = OfflineDependencyProvider::<_, NumVS>::new();
+    dependency_provider.add_dependencies("root", 1u32, [("a", Ranges::full())]);
+    dependency_provider.add_dependencies("a", 2u32, [("b", Ranges::singleton(1u32))]);
+    dependency_provider.add_dependencies("a", 1u32, [("a", Ranges::higher_than(2u32))]);
+
+    assert!(matches!(
+        resolve(&dependency_provider, "root", 1u32),
+        Err(PubGrubError::NoSolution(_))
+    ));
+}
+
 /// Test the prioritization is stable across platforms.
 ///
 /// https://github.com/pubgrub-rs/pubgrub/issues/373#issuecomment-3384608891

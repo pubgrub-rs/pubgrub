@@ -176,6 +176,12 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         Self {
             package_terms: if set2 == VS::empty() {
                 SmallMap::One([(package, Term::Positive(versions))])
+            } else if package == p2 {
+                // Track incompatible self-dependencies.
+                // Possible and impossible self-dependencies may have overlapping version ranges,
+                // incompatible is only the impossible one.
+                let incompatible = versions.difference(&set2);
+                SmallMap::One([(package, Term::Positive(incompatible))])
             } else {
                 SmallMap::Two([
                     (package, Term::Positive(versions)),
@@ -663,16 +669,17 @@ pub(crate) mod tests {
             &empty,
         );
 
+        // Self-dependencies retain only the forbidden versions and an empty dependency range.
         assert_dependency_tree(
             &package_store,
             Incompatibility::from_dependency(
                 package,
                 versions.clone(),
-                (package, dependency_versions.clone()),
+                (package, Ranges::between(2usize, 4usize)),
             ),
-            &versions,
+            &Ranges::between(1usize, 2usize),
             "package",
-            &dependency_versions,
+            &empty,
         );
 
         let first: Incompatibility<String, Ranges<usize>, String> =
