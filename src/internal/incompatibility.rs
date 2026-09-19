@@ -6,7 +6,7 @@
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 
-use crate::internal::{Arena, DecisionLevel, HashArena, Id, SmallMap};
+use crate::internal::{Arena, DecisionLevel, Dependency, HashArena, Id, SmallMap};
 use crate::{
     DependencyProvider, DerivationTree, Derived, External, Map, Package, Set, Term, VersionSet,
     term,
@@ -198,6 +198,18 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
         }
     }
 
+    pub(crate) fn dependency(&self) -> Option<Dependency<'_, P, VS>> {
+        let (dependent, dependency) = self.as_dependency()?;
+        let (dependent_versions, dependency_versions) =
+            self.dependency_terms(dependent, dependency);
+        Some(Dependency {
+            dependent,
+            dependent_versions,
+            dependency,
+            dependency_versions,
+        })
+    }
+
     /// Merge dependant versions with the same dependency.
     ///
     /// When multiple versions of a package depend on the same range of another package,
@@ -359,14 +371,18 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> Incompatibilit
                 package_store[package].clone(),
                 set.clone(),
             )),
-            Kind::FromDependencyOf(package, dep_package) => {
-                let (package_versions, dependency_versions) =
-                    store[self_id].dependency_terms(package, dep_package);
+            Kind::FromDependencyOf(_, _) => {
+                let dependency = store[self_id]
+                    .dependency()
+                    .expect("expected a dependency incompatibility");
                 DerivationTree::External(External::FromDependencyOf(
-                    package_store[package].clone(),
-                    package_versions.clone(),
-                    package_store[dep_package].clone(),
-                    dependency_versions.cloned().unwrap_or_else(VS::empty),
+                    package_store[dependency.dependent].clone(),
+                    dependency.dependent_versions.clone(),
+                    package_store[dependency.dependency].clone(),
+                    dependency
+                        .dependency_versions
+                        .cloned()
+                        .unwrap_or_else(VS::empty),
                 ))
             }
             Kind::Custom(package, set, metadata) => DerivationTree::External(External::Custom(
