@@ -46,6 +46,8 @@ version-ranges = { version = "0.1.4", path = "version-ranges", features = ["prop
 
 [features]
 serde = ["dep:serde", "version-ranges/serde"]
+# Expose the unstable API for driving solver state directly.
+unstable-state-api = []
 
 [[bench]]
 name = "backtracking"
