@@ -96,20 +96,34 @@ impl From<SemanticVersion> for (u32, u32, u32) {
 
 // Bump versions.
 impl SemanticVersion {
-    /// Bump the patch number of a version.
+    /// Bump the patch number of a version, returning `self` if the patch is already `u32::MAX`.
     pub fn bump_patch(self) -> Self {
-        Self::new(self.major, self.minor, self.patch + 1)
+        Self::new(self.major, self.minor, self.patch.saturating_add(1))
     }
 
-    /// Bump the minor number of a version.
+    /// Bump the minor number of a version, returning `self` if the minor is already `u32::MAX`.
     pub fn bump_minor(self) -> Self {
-        Self::new(self.major, self.minor + 1, 0)
+        self.minor
+            .checked_add(1)
+            .map_or(self, |minor| Self::new(self.major, minor, 0))
     }
 
-    /// Bump the major number of a version.
+    /// Bump the major number of a version, returning `self` if the major is already `u32::MAX`.
     pub fn bump_major(self) -> Self {
-        Self::new(self.major + 1, 0, 0)
+        self.major
+            .checked_add(1)
+            .map_or(self, |major| Self::new(major, 0, 0))
     }
+}
+
+#[test]
+fn bump_at_component_limit() {
+    let patch = SemanticVersion::new(1, 2, u32::MAX);
+    let minor = SemanticVersion::new(1, u32::MAX, 3);
+    let major = SemanticVersion::new(u32::MAX, 2, 3);
+    assert_eq!(patch.bump_patch(), patch);
+    assert_eq!(minor.bump_minor(), minor);
+    assert_eq!(major.bump_major(), major);
 }
 
 /// Error creating [SemanticVersion] from [String].
