@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use pubgrub::{
-    DefaultStringReporter, Map, OfflineDependencyProvider, PubGrubError, Ranges, Reporter as _,
-    SelectedDependencies, SemanticVersion, Set, resolve,
+    DefaultStringReporter, DerivationTree, Derived, External, Map, OfflineDependencyProvider,
+    PubGrubError, Ranges, Reporter as _, SelectedDependencies, SemanticVersion, Set, resolve,
 };
 
 type NumVS = Ranges<u32>;
 type SemVS = Ranges<SemanticVersion>;
 
 use std::io::Write;
+use std::sync::Arc;
 
 use log::LevelFilter;
 
@@ -264,5 +265,25 @@ And because there is no version of foo in <1 | >1, <2 | >2, <3 | >3, <4 | >4, <5
         derivation_tree.packages(),
         // baz isn't shown.
         Set::from_iter(&["root", "foo", "bar"])
+    );
+}
+
+#[test]
+fn collapse_no_versions_keeps_root_cause() {
+    let mut tree = DerivationTree::<_, NumVS, String>::Derived(Derived {
+        terms: Map::default(),
+        shared_id: None,
+        cause1: Arc::new(DerivationTree::External(External::NotRoot("root", 1))),
+        cause2: Arc::new(DerivationTree::External(External::NoVersions(
+            "root",
+            NumVS::singleton(1u32),
+        ))),
+    });
+
+    tree.collapse_no_versions();
+    assert_eq!(
+        DefaultStringReporter::report(&tree),
+        "Because we are solving dependencies of root 1 and there is no version of root in 1, \
+         version solving failed."
     );
 }
