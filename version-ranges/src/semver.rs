@@ -99,8 +99,18 @@ fn ranges_wildcard(major: u64, minor: Option<u64>, _patch: Option<u64>) -> Range
     }
 }
 
+#[test]
+fn patch_without_a_minor_matches_no_versions() {
+    let mut req = VersionReq::parse("=1.2.3").unwrap();
+    req.comparators[0].minor = None;
+    assert!(Ranges::from_req(req).is_empty());
+}
+
 impl Ranges<Version> {
     /// Convert from a semver version requirement.
+    ///
+    /// If any comparator has a patch version but no minor version, the requirement
+    /// is malformed and converts to an empty range.
     ///
     /// Note that this is not a lossless conversion.
     /// Semver additionally require the `VersionReq` to contain prereleases for versions with prereleases to be matched.
@@ -110,6 +120,9 @@ impl Ranges<Version> {
     pub fn from_req(req: VersionReq) -> Self {
         let mut ranges = Ranges::full();
         for cmp in req.comparators {
+            if cmp.minor.is_none() && cmp.patch.is_some() {
+                return Ranges::empty();
+            }
             let new = match cmp.op {
                 semver::Op::Exact => ranges_exact(cmp.major, cmp.minor, cmp.patch),
                 semver::Op::Greater => ranges_greater(cmp.major, cmp.minor, cmp.patch),
