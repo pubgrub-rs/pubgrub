@@ -99,13 +99,6 @@ fn ranges_wildcard(major: u64, minor: Option<u64>, _patch: Option<u64>) -> Range
     }
 }
 
-#[test]
-fn patch_without_a_minor_matches_no_versions() {
-    let mut req = VersionReq::parse("=1.2.3").unwrap();
-    req.comparators[0].minor = None;
-    assert!(Ranges::from_req(req).is_empty());
-}
-
 impl Ranges<Version> {
     /// Convert from a semver version requirement.
     ///
@@ -138,4 +131,11 @@ impl Ranges<Version> {
         }
         ranges
     }
+}
+
+#[test]
+fn patch_without_a_minor_matches_no_versions() {
+    let mut req = VersionReq::parse("=1.2.3").unwrap();
+    req.comparators[0].minor = None;
+    assert!(Ranges::from_req(req).is_empty());
 }
