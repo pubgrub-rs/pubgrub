@@ -1357,7 +1357,7 @@ impl<V: Display + Eq> Display for Ranges<V> {
 // SERIALIZATION ###############################################################
 
 #[cfg(feature = "serde")]
-impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Ranges<V> {
+impl<'de, V: serde::Deserialize<'de> + PartialOrd> serde::Deserialize<'de> for Ranges<V> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         // This enables conversion from the "old" discrete implementation of `Ranges` to the new
         // bounded one.
@@ -1375,11 +1375,23 @@ impl<'de, V: serde::Deserialize<'de>> serde::Deserialize<'de> for Ranges<V> {
 
         let mut segments = SmallVec::new();
         for i in bounds {
-            match i {
-                EitherInterval::B(l, r) => segments.push((l, r)),
-                EitherInterval::D(l, Some(r)) => segments.push((Included(l), Excluded(r))),
-                EitherInterval::D(l, None) => segments.push((Included(l), Unbounded)),
+            let (start, end) = match i {
+                EitherInterval::B(l, r) => (l, r),
+                EitherInterval::D(l, Some(r)) => (Included(l), Excluded(r)),
+                EitherInterval::D(l, None) => (Included(l), Unbounded),
+            };
+            if !valid_segment(&start, &end) {
+                return Err(serde::de::Error::custom("empty range segment"));
             }
+            if segments
+                .last()
+                .is_some_and(|(_, prev_end)| !end_before_start_with_gap(prev_end, &start))
+            {
+                return Err(serde::de::Error::custom(
+                    "range segments must be ordered and separated by a gap",
+                ));
+            }
+            segments.push((start, end));
         }
 
         Ok(Ranges { segments })
@@ -1692,6 +1704,21 @@ pub mod tests {
             let actual =  Ranges::from_iter(segments.clone());
             assert_eq!(expected, actual, "{segments:?}");
         }
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deserialize_invalid_segments() {
+        let overlapping: &[Interval<u32>] = &[(Unbounded, Included(0)), (Unbounded, Included(1))];
+        let input = ron::ser::to_string(overlapping).unwrap();
+        assert!(ron::de::from_str::<Ranges<u32>>(&input).is_err());
+
+        // The legacy format encodes each segment as a start and an optional exclusive end.
+        assert!(ron::de::from_str::<Ranges<u32>>("[(3, Some(1))]").is_err());
+        assert_eq!(
+            ron::de::from_str::<Ranges<u32>>("[(1, Some(3))]").unwrap(),
+            Ranges::from_range_bounds(1u32..3),
+        );
     }
 
     #[test]
