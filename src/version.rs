@@ -96,21 +96,29 @@ impl From<SemanticVersion> for (u32, u32, u32) {
 
 // Bump versions.
 impl SemanticVersion {
-    /// Bump the patch number of a version.
-    pub fn bump_patch(self) -> Self {
-        Self::new(self.major, self.minor, self.patch + 1)
+    /// Bump the patch number, returning an error if it is already `u32::MAX`.
+    pub fn bump_patch(self) -> Result<Self, VersionBumpError> {
+        let patch = self.patch.checked_add(1).ok_or(VersionBumpError)?;
+        Ok(Self::new(self.major, self.minor, patch))
     }
 
-    /// Bump the minor number of a version.
-    pub fn bump_minor(self) -> Self {
-        Self::new(self.major, self.minor + 1, 0)
+    /// Bump the minor number, returning an error if it is already `u32::MAX`.
+    pub fn bump_minor(self) -> Result<Self, VersionBumpError> {
+        let minor = self.minor.checked_add(1).ok_or(VersionBumpError)?;
+        Ok(Self::new(self.major, minor, 0))
     }
 
-    /// Bump the major number of a version.
-    pub fn bump_major(self) -> Self {
-        Self::new(self.major + 1, 0, 0)
+    /// Bump the major number, returning an error if it is already `u32::MAX`.
+    pub fn bump_major(self) -> Result<Self, VersionBumpError> {
+        let major = self.major.checked_add(1).ok_or(VersionBumpError)?;
+        Ok(Self::new(major, 0, 0))
     }
 }
+
+/// The version component being bumped is already `u32::MAX`.
+#[derive(Debug, Error, PartialEq, Eq)]
+#[error("cannot increment a version component beyond u32::MAX")]
+pub struct VersionBumpError;
 
 /// Error creating [SemanticVersion] from [String].
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -221,4 +229,21 @@ impl Display for SemanticVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
     }
+}
+
+#[test]
+fn bump_at_component_limit() {
+    let max = u32::MAX;
+    let v = SemanticVersion::new(max, max, max);
+    assert_eq!(v.bump_patch(), Err(VersionBumpError));
+    assert_eq!(v.bump_minor(), Err(VersionBumpError));
+    assert_eq!(v.bump_major(), Err(VersionBumpError));
+
+    let v = SemanticVersion::new(max - 1, max - 1, max - 1);
+    assert_eq!(
+        v.bump_patch(),
+        Ok(SemanticVersion::new(max - 1, max - 1, max))
+    );
+    assert_eq!(v.bump_minor(), Ok(SemanticVersion::new(max - 1, max, 0)));
+    assert_eq!(v.bump_major(), Ok(SemanticVersion::new(max, 0, 0)));
 }
