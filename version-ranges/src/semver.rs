@@ -2,6 +2,18 @@ use semver::{Version, VersionReq};
 
 use crate::Ranges;
 
+/// A version requirement comparator specifies a patch version without a minor version.
+#[derive(Debug, PartialEq, Eq)]
+pub struct PatchWithoutMinor;
+
+impl std::fmt::Display for PatchWithoutMinor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("a patch version requires a minor version")
+    }
+}
+
+impl std::error::Error for PatchWithoutMinor {}
+
 /// Follows the specifications in [`semver::Op`].
 fn ranges_exact(major: u64, minor: Option<u64>, patch: Option<u64>) -> Ranges<Version> {
     match (minor, patch) {
@@ -102,19 +114,22 @@ fn ranges_wildcard(major: u64, minor: Option<u64>, _patch: Option<u64>) -> Range
 impl Ranges<Version> {
     /// Convert from a semver version requirement.
     ///
-    /// If any comparator has a patch version but no minor version, the requirement
-    /// is malformed and converts to an empty range.
-    ///
     /// Note that this is not a lossless conversion.
-    /// Semver additionally require the `VersionReq` to contain prereleases for versions with prereleases to be matched.
-    /// Therefore the `Ranges` constraint after conversion will be **looser** than original as it does only interval arithmetics based on ordering of versions.
+    /// Semver additionally requires the `VersionReq` to contain prereleases for versions with
+    /// prereleases to be matched. Therefore the `Ranges` constraint after conversion will be
+    /// **looser** than the original as it only compares versions by their ordering.
     ///
-    /// The behavior is undefined unless all major, minor and patch numbers in `VersionReq` are less than `u64::MAX` due to integer overflow.
-    pub fn from_req(req: VersionReq) -> Self {
+    /// The behavior is undefined unless all major, minor and patch numbers in `VersionReq`
+    /// are less than `u64::MAX` due to integer overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PatchWithoutMinor`] if any comparator specifies a patch version without a minor.
+    pub fn from_req(req: VersionReq) -> Result<Self, PatchWithoutMinor> {
         let mut ranges = Ranges::full();
         for cmp in req.comparators {
             if cmp.minor.is_none() && cmp.patch.is_some() {
-                return Ranges::empty();
+                return Err(PatchWithoutMinor);
             }
             let new = match cmp.op {
                 semver::Op::Exact => ranges_exact(cmp.major, cmp.minor, cmp.patch),
@@ -129,13 +144,19 @@ impl Ranges<Version> {
             };
             ranges = ranges.intersection(&new);
         }
-        ranges
+        Ok(ranges)
     }
 }
 
 #[test]
-fn patch_without_a_minor_matches_no_versions() {
+fn patch_without_a_minor_returns_an_error() {
     let mut req = VersionReq::parse("=1.2.3").unwrap();
     req.comparators[0].minor = None;
-    assert!(Ranges::from_req(req).is_empty());
+    assert_eq!(Ranges::from_req(req), Err(PatchWithoutMinor));
+}
+
+#[test]
+fn contradictory_requirement_returns_an_empty_range() {
+    let req = VersionReq::parse(">2, <1").unwrap();
+    assert_eq!(Ranges::from_req(req), Ok(Ranges::empty()));
 }
