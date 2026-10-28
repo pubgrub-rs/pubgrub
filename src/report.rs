@@ -135,12 +135,6 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
             // TODO: take care of the Derived case.
             // Once done, we can remove the Option.
             DerivationTree::Derived(_) => Some(self),
-            DerivationTree::External(External::NotRoot(_, _)) => {
-                panic!("How did we end up with a NoVersions merged with a NotRoot?")
-            }
-            //
-            // Cannot be merged because the reason may not match
-            DerivationTree::External(External::NoVersions(_, _)) => None,
             DerivationTree::External(External::FromDependencyOf(p1, r1, p2, r2)) => {
                 if p1 == package {
                     Some(DerivationTree::External(External::FromDependencyOf(
@@ -158,8 +152,10 @@ impl<P: Package, VS: VersionSet, M: Eq + Clone + Debug + Display> DerivationTree
                     )))
                 }
             }
-            // Cannot be merged because the reason may not match
-            DerivationTree::External(External::Custom(_, _, _)) => None,
+            // Only dependency causes have a version range we can widen.
+            DerivationTree::External(
+                External::NotRoot(_, _) | External::NoVersions(_, _) | External::Custom(_, _, _),
+            ) => None,
         }
     }
 }
