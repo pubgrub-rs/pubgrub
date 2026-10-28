@@ -1,18 +1,12 @@
 use semver::{Version, VersionReq};
+use thiserror::Error;
 
 use crate::Ranges;
 
 /// A version requirement comparator specifies a patch version without a minor version.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
+#[error("a patch version requires a minor version")]
 pub struct PatchWithoutMinor;
-
-impl std::fmt::Display for PatchWithoutMinor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("a patch version requires a minor version")
-    }
-}
-
-impl std::error::Error for PatchWithoutMinor {}
 
 /// Follows the specifications in [`semver::Op`].
 fn ranges_exact(major: u64, minor: Option<u64>, patch: Option<u64>) -> Ranges<Version> {
