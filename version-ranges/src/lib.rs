@@ -139,9 +139,24 @@ impl<V> Ranges<V> {
     }
 
     /// Set of versions greater or equal to `v1` but less than `v2`.
-    pub fn between(v1: impl Into<V>, v2: impl Into<V>) -> Self {
-        Self {
-            segments: smallvec![(Included(v1.into()), Excluded(v2.into()))],
+    /// Returns the empty set if `v1` is not less than `v2`.
+    pub fn between(v1: impl Into<V>, v2: impl Into<V>) -> Self
+    where
+        V: PartialOrd,
+    {
+        Self::from_bounds(Included(v1.into()), Excluded(v2.into()))
+    }
+
+    fn from_bounds(start: Bound<V>, end: Bound<V>) -> Self
+    where
+        V: PartialOrd,
+    {
+        if valid_segment(&start, &end) {
+            Self {
+                segments: smallvec![(start, end)],
+            }
+        } else {
+            Self::empty()
         }
     }
 
@@ -314,13 +329,7 @@ impl<V: Ord> Ranges<V> {
             Excluded(v) => Excluded(v.clone().into()),
             Unbounded => Unbounded,
         };
-        if valid_segment(&start, &end) {
-            Self {
-                segments: smallvec![(start, end)],
-            }
-        } else {
-            Self::empty()
-        }
+        Self::from_bounds(start, end)
     }
 
     /// See [`Ranges`] for the invariants checked.
@@ -1466,6 +1475,12 @@ pub fn proptest_strategy() -> impl Strategy<Value = Ranges<u32>> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+
+    #[test]
+    fn between_without_any_versions_is_empty() {
+        assert_eq!(Ranges::<i32>::between(2, 2), Ranges::empty());
+        assert_eq!(Ranges::<i32>::between(3, 2), Ranges::empty());
+    }
 
     fn version_strat() -> impl Strategy<Value = u32> {
         any::<u32>()
