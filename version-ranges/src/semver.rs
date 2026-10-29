@@ -1,6 +1,12 @@
 use semver::{Version, VersionReq};
+use thiserror::Error;
 
 use crate::Ranges;
+
+/// A version requirement comparator specifies a patch version without a minor version.
+#[derive(Error, Debug, PartialEq, Eq)]
+#[error("a patch version requires a minor version")]
+pub struct PatchWithoutMinor;
 
 /// Follows the specifications in [`semver::Op`].
 fn ranges_exact(major: u64, minor: Option<u64>, patch: Option<u64>) -> Ranges<Version> {
@@ -103,13 +109,22 @@ impl Ranges<Version> {
     /// Convert from a semver version requirement.
     ///
     /// Note that this is not a lossless conversion.
-    /// Semver additionally require the `VersionReq` to contain prereleases for versions with prereleases to be matched.
-    /// Therefore the `Ranges` constraint after conversion will be **looser** than original as it does only interval arithmetics based on ordering of versions.
+    /// Semver additionally requires the `VersionReq` to contain prereleases for versions with
+    /// prereleases to be matched. Therefore the `Ranges` constraint after conversion will be
+    /// **looser** than the original as it only compares versions by their ordering.
     ///
-    /// The behavior is undefined unless all major, minor and patch numbers in `VersionReq` are less than `u64::MAX` due to integer overflow.
-    pub fn from_req(req: VersionReq) -> Self {
+    /// The behavior is undefined unless all major, minor and patch numbers in `VersionReq`
+    /// are less than `u64::MAX` due to integer overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PatchWithoutMinor`] if any comparator specifies a patch version without a minor.
+    pub fn from_req(req: VersionReq) -> Result<Self, PatchWithoutMinor> {
         let mut ranges = Ranges::full();
         for cmp in req.comparators {
+            if cmp.minor.is_none() && cmp.patch.is_some() {
+                return Err(PatchWithoutMinor);
+            }
             let new = match cmp.op {
                 semver::Op::Exact => ranges_exact(cmp.major, cmp.minor, cmp.patch),
                 semver::Op::Greater => ranges_greater(cmp.major, cmp.minor, cmp.patch),
@@ -123,6 +138,19 @@ impl Ranges<Version> {
             };
             ranges = ranges.intersection(&new);
         }
-        ranges
+        Ok(ranges)
     }
+}
+
+#[test]
+fn patch_without_a_minor_returns_an_error() {
+    let mut req = VersionReq::parse("=1.2.3").unwrap();
+    req.comparators[0].minor = None;
+    assert_eq!(Ranges::from_req(req), Err(PatchWithoutMinor));
+}
+
+#[test]
+fn contradictory_requirement_returns_an_empty_range() {
+    let req = VersionReq::parse(">2, <1").unwrap();
+    assert_eq!(Ranges::from_req(req), Ok(Ranges::empty()));
 }
