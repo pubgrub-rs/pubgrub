@@ -15,14 +15,14 @@ use crate::{DependencyProvider, DerivationTree, Map, NoSolutionError, Package, V
 
 /// An opaque handle to a conflict recorded by solver state.
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct ConflictId<DP: DependencyProvider>(IncompDpId<DP>);
+pub struct ConflictId<DP: DependencyProvider>(IncompDpId<DP>);
 
 /// A dependency constraint from one package (dependent) onto another (dependency).
 ///
 /// This may merge overlapping constraints from multiple dependent versions, hence the version
 /// range for dependent.
 #[derive(Debug)]
-pub(crate) struct Dependency<'a, P, VS> {
+pub struct Dependency<'a, P, VS> {
     /// The package declaring the dependency.
     pub dependent: Id<P>,
     /// The versions of the dependent package sharing this dependency.
@@ -73,10 +73,12 @@ struct DependencyKey<P: Package> {
 
 /// Current state of the PubGrub algorithm.
 #[derive(Clone)]
-pub(crate) struct State<DP: DependencyProvider> {
+pub struct State<DP: DependencyProvider> {
+    /// The root package and version.
     pub root_package: Id<DP::P>,
     root_version: DP::V,
 
+    /// All incompatibilities indexed by package.
     #[allow(clippy::type_complexity)]
     incompatibilities: Map<Id<DP::P>, Vec<IncompDpId<DP>>>,
 
@@ -84,14 +86,13 @@ pub(crate) struct State<DP: DependencyProvider> {
     merged_dependencies: MergedDependencies<DP::P, IncompDpId<DP>>,
 
     /// Partial solution.
-    /// TODO: remove pub.
-    pub(crate) partial_solution: PartialSolution<DP>,
+    pub partial_solution: PartialSolution<DP>,
 
     /// The store is the reference storage for all incompatibilities.
     incompatibility_store: Arena<Incompatibility<DP::P, DP::VS, DP::M>>,
 
     /// The store is the reference storage for all packages.
-    pub(crate) package_store: HashArena<DP::P>,
+    pub package_store: HashArena<DP::P>,
 
     /// This is a stack of work to be done in `unit_propagation`.
     /// It can definitely be a local variable to that method, but
@@ -101,7 +102,7 @@ pub(crate) struct State<DP: DependencyProvider> {
 
 impl<DP: DependencyProvider> State<DP> {
     /// Initialization of PubGrub state.
-    pub(crate) fn init(root_package: DP::P, root_version: DP::V) -> Self {
+    pub fn init(root_package: DP::P, root_version: DP::V) -> Self {
         let mut incompatibility_store = Arena::new();
         let mut package_store = HashArena::new();
         let root_package = package_store.alloc(root_package);
@@ -139,7 +140,7 @@ impl<DP: DependencyProvider> State<DP> {
     /// `versions` must contain `version`, every existing version in `versions` must have exactly
     /// the given dependencies, and the set of existing versions must not grow while resolution
     /// is running.
-    pub(crate) fn add_package_version_dependencies(
+    pub fn add_package_version_dependencies(
         &mut self,
         package: Id<DP::P>,
         version: DP::V,
@@ -163,20 +164,46 @@ impl<DP: DependencyProvider> State<DP> {
     }
 
     /// Record that no available version satisfies a version range.
-    pub(crate) fn add_no_versions(&mut self, package: Id<DP::P>, versions: DP::VS) {
+    pub fn add_no_versions(&mut self, package: Id<DP::P>, versions: DP::VS) {
         self.add_incompatibility(Incompatibility::no_versions(package, versions));
     }
 
     /// Record that a version range is unavailable for a reason outside the solver.
-    pub(crate) fn add_unavailable(&mut self, package: Id<DP::P>, versions: DP::VS, reason: DP::M) {
+    pub fn add_unavailable(&mut self, package: Id<DP::P>, versions: DP::VS, reason: DP::M) {
         self.add_incompatibility(Incompatibility::custom(package, versions, reason));
     }
 
-    /// Iterate over the packages participating in a conflict.
-    pub(crate) fn conflict_packages(
+    /// Record a dependency constraint without deciding a package version.
+    #[cfg(feature = "unstable-state-api")]
+    pub fn add_dependency(
+        &mut self,
+        package: Id<DP::P>,
+        versions: DP::VS,
+        dependency: (Id<DP::P>, DP::VS),
+    ) {
+        self.add_incompatibility(Incompatibility::from_dependency(
+            package, versions, dependency,
+        ));
+    }
+
+    /// Iterate over the known incoming and outgoing dependencies of a package.
+    ///
+    /// Dependent versions with the same dependency range may be merged. Learned
+    /// incompatibilities and unavailable-version reasons are excluded.
+    #[cfg(feature = "unstable-state-api")]
+    pub fn dependencies(
         &self,
-        conflict: &ConflictId<DP>,
-    ) -> impl Iterator<Item = Id<DP::P>> {
+        package: Id<DP::P>,
+    ) -> impl Iterator<Item = Dependency<'_, DP::P, DP::VS>> {
+        self.incompatibilities
+            .get(&package)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .filter_map(|&id| self.incompatibility_store[id].dependency())
+    }
+
+    /// Iterate over the packages participating in a conflict.
+    pub fn conflict_packages(&self, conflict: &ConflictId<DP>) -> impl Iterator<Item = Id<DP::P>> {
         self.incompatibility_store[conflict.0]
             .iter()
             .map(|(package, _)| package)
@@ -217,7 +244,7 @@ impl<DP: DependencyProvider> State<DP> {
     /// conflict.
     #[cold]
     #[allow(clippy::type_complexity)] // Type definitions don't support impl trait.
-    pub(crate) fn unit_propagation(
+    pub fn unit_propagation(
         &mut self,
         package: Id<DP::P>,
     ) -> Result<impl IntoIterator<Item = (Id<DP::P>, ConflictId<DP>)> + use<DP>, NoSolutionError<DP>>
@@ -390,6 +417,19 @@ impl<DP: DependencyProvider> State<DP> {
         if incompat_changed {
             self.merge_incompatibility(incompat);
         }
+    }
+
+    /// Manually backtrack before the given package was selected.
+    ///
+    /// This can be used to switch the order of packages if the previous prioritization was bad.
+    ///
+    /// Returns the number of the decisions that were backtracked, or `None` if the package was not
+    /// decided on yet.
+    #[cfg(feature = "unstable-state-api")]
+    pub fn backtrack_package(&mut self, package: Id<DP::P>) -> Option<u32> {
+        let base_decision_level = self.partial_solution.current_decision_level();
+        let new_decision_level = self.partial_solution.backtrack_package(package).ok()?;
+        Some(base_decision_level.get() - new_decision_level.get())
     }
 
     /// Add this incompatibility into the set of all incompatibilities.

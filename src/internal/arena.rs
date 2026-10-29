@@ -17,7 +17,7 @@ type FnvIndexSet<V> = indexmap::IndexSet<V, rustc_hash::FxBuildHasher>;
 /// The zero-based index is stored as `index + 1` in a [`NonZeroU32`], allowing
 /// `Option<Id<T>>` to use the zero niche and remain four bytes. The largest
 /// representable index is therefore `u32::MAX - 1`.
-pub(crate) struct Id<T> {
+pub struct Id<T> {
     raw: NonZeroU32,
     _ty: PhantomData<fn() -> T>,
 }

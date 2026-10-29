@@ -63,7 +63,7 @@ const _: () = assert!(std::mem::size_of::<Option<DecisionLevel>>() == std::mem::
 /// The partial solution contains all package assignments,
 /// organized by package and historically ordered.
 #[derive(Clone, Debug)]
-pub(crate) struct PartialSolution<DP: DependencyProvider> {
+pub struct PartialSolution<DP: DependencyProvider> {
     next_global_index: u32,
     /// The number of decisions that have been made, equal to the number of packages with decisions.
     current_decision_level: DecisionLevel,
@@ -258,7 +258,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Add a decision.
-    pub(crate) fn add_decision(&mut self, package: Id<DP::P>, version: DP::V) {
+    pub fn add_decision(&mut self, package: Id<DP::P>, version: DP::V) {
         // Check that add_decision is never used in the wrong context.
         if cfg!(debug_assertions) {
             match self.package_assignments.get_mut(&package) {
@@ -295,6 +295,22 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
             self.package_assignments.swap_indices(new_idx, old_idx);
         }
         self.next_global_index += 1;
+    }
+
+    /// The list of package that have not been selected after the last prioritization.
+    ///
+    /// This list gets updated by [`Self::pick_highest_priority_pkg`] and cleared by backtracking.
+    #[cfg(feature = "unstable-state-api")]
+    #[allow(clippy::type_complexity)]
+    pub fn undecided_packages(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            &Id<DP::P>,
+            &(<DP as DependencyProvider>::Priority, Reverse<u32>),
+        ),
+    > {
+        self.prioritized_potential_packages.iter()
     }
 
     /// Add a derivation.
@@ -346,8 +362,23 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         }
     }
 
+    #[cfg(feature = "unstable-state-api")]
     #[cold]
-    pub(crate) fn pick_highest_priority_pkg(
+    pub fn prioritized_packages(&self) -> impl Iterator<Item = (Id<DP::P>, &DP::VS)> {
+        // TODO(konsti): Should we use `self.outdated_priorities` instead?
+        let current_decision_level = self.current_decision_level;
+        self.package_assignments
+            .get_range(self.current_decision_level.get() as usize..)
+            .unwrap()
+            .iter()
+            .filter(move |(_, pa)| pa.highest_decision_level == current_decision_level)
+            .filter_map(|(&p, pa)| {
+                Some((p, pa.assignments_intersection.potential_package_filter()?))
+            })
+    }
+
+    #[cold]
+    pub fn pick_highest_priority_pkg(
         &mut self,
         mut prioritizer: impl FnMut(Id<DP::P>, &DP::VS) -> DP::Priority,
     ) -> Option<(Id<DP::P>, &DP::VS)> {
@@ -376,7 +407,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     /// If a partial solution has, for every positive derivation,
     /// a corresponding decision that satisfies that assignment,
     /// it's a total solution and version solving has succeeded.
-    pub(crate) fn extract_solution(&self) -> impl Iterator<Item = (Id<DP::P>, DP::V)> + '_ {
+    pub fn extract_solution(&self) -> impl Iterator<Item = (Id<DP::P>, DP::V)> + '_ {
         self.package_assignments
             .iter()
             .take(self.current_decision_level.get() as usize)
@@ -467,6 +498,30 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
         self.last_valid_decision_levels[index..].fill(decision_level);
     }
 
+    /// Backtrack the partial solution before a particular package was selected.
+    ///
+    /// This can be used to switch the order of packages if the previous prioritization was bad.
+    ///
+    /// Returns the new decision level on success and an error if the package was not decided on
+    /// yet.
+    #[cfg(feature = "unstable-state-api")]
+    pub(crate) fn backtrack_package(&mut self, package: Id<DP::P>) -> Result<DecisionLevel, ()> {
+        let Some(decision_level) = self.package_assignments.get_index_of(&package) else {
+            return Err(());
+        };
+        let decision_level = DecisionLevel::new(decision_level as u32);
+        // Decisions occupy indices strictly below the current decision level.
+        if decision_level >= self.current_decision_level {
+            return Err(());
+        }
+        log::debug!(
+            "Package backtracking ot decision level {}",
+            decision_level.get()
+        );
+        self.backtrack(decision_level);
+        Ok(decision_level)
+    }
+
     /// Add a package version as decision if none of its dependencies conflicts with the partial
     /// solution.
     ///
@@ -526,10 +581,7 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
     }
 
     /// Retrieve intersection of terms related to package.
-    pub(crate) fn term_intersection_for_package(
-        &self,
-        package: Id<DP::P>,
-    ) -> Option<&Term<DP::VS>> {
+    pub fn term_intersection_for_package(&self, package: Id<DP::P>) -> Option<&Term<DP::VS>> {
         self.package_assignments
             .get(&package)
             .map(|pa| pa.assignments_intersection.term())
@@ -638,6 +690,19 @@ impl<DP: DependencyProvider> PartialSolution<DP> {
 
     pub(crate) fn current_decision_level(&self) -> DecisionLevel {
         self.current_decision_level
+    }
+
+    /// Retrieve the constraints on a package that will not change.
+    #[cfg(feature = "unstable-state-api")]
+    pub fn unchanging_term_for_package(&self, package: Id<DP::P>) -> Option<&Term<DP::VS>> {
+        let pa = self.package_assignments.get(&package)?;
+
+        let idx_newer = pa
+            .dated_derivations
+            .as_slice()
+            .partition_point(|dd| dd.decision_level <= DecisionLevel::new(1));
+        let idx = idx_newer.checked_sub(1)?;
+        Some(&pa.dated_derivations[idx].accumulated_intersection)
     }
 }
 

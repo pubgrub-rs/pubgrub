@@ -241,4 +241,8 @@ pub use version_ranges::Ranges as Range;
 pub use version_ranges::{Ranges, SetRelation};
 pub use version_set::VersionSet;
 
+// Unstable API for driving solver state directly.
+#[cfg(feature = "unstable-state-api")]
+pub use internal::{ConflictId, Dependency, Id, State};
+
 mod internal;
